@@ -1,51 +1,56 @@
-import { useNavigate } from 'react-router-dom';
+import Header from '../components/Header';
+import Footer from '../components/Footer';
+import ToolCard from '../components/ToolCard';
 
-function HomePage() {
-  const navigate = useNavigate();
-
-  const handleCardClick = (path: string) => {
-    navigate(path);
-  };
-
-  const handleLogin = () => {
-    // This will redirect to your backend's login route
-    // Make sure VITE_API_BASE_URL is set in Render
-    window.location.href = `${import.meta.env.VITE_API_BASE_URL}/api/auth/login`;
-  };
-
+const HomePage = () => {
   return (
-    <div className="homepage-container">
-      <header className="app-header">
-        <h1 className="app-title">Anemoia</h1>
-        <nav className="header-nav">
-          {/* <a href="/faq">FAQ</a> */}
-          <button onClick={handleLogin} className="login-button">Login with Google</button>
-        </nav>
-      </header>
-      
-      <main className="card-grid">
-        <div className="tool-card" onClick={() => handleCardClick('/depth-map')}>
-          <h2 className="card-title">Depth Map</h2>
-          <p className="card-description">Generate stunning 3D depth maps from any 2D image.</p>
-        </div>
-
-        <div className="tool-card" onClick={() => handleCardClick('/pose-estimation')}>
-          <h2 className="card-title">Pose Estimation</h2>
-          <p className="card-description">Detect and visualize human body poses in your photos.</p>
-        </div>
-
-        <div className="tool-card" onClick={() => handleCardClick('/upscale')}>
-          <h2 className="card-title">AI Upscaler</h2>
-          <p className="card-description">Upscale images up to 4x their size with incredible detail.</p>
-        </div>
-
-        <div className="tool-card" onClick={() => handleCardClick('/edit')}>
-          <h2 className="card-title">Image Editor</h2>
-          <p className="card-description">Perform quick crops and color adjustments to perfect images.</p>
-        </div>
-      </main>
+    <div className="relative flex size-full min-h-screen flex-col dark group/design-root overflow-x-hidden">
+      <div className="layout-container flex h-full grow flex-col">
+        <Header />
+        <main className="px-10 md:px-20 lg:px-40 flex flex-1 justify-center py-12">
+          <div className="layout-content-container flex flex-col items-center max-w-5xl flex-1 w-full">
+            <div className="text-center mb-12">
+              <h2 className="text-4xl md:text-5xl font-bold mb-4 tracking-tighter">AI Photo Editing Suite</h2>
+              <p className="text-lg md:text-xl text-[var(--text-secondary)] max-w-2xl mx-auto">
+                Unlock the power of AI to transform your images. Explore our tools and create something amazing.
+              </p>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 w-full">
+              <ToolCard
+                title="Depth Map"
+                description="Generate stunning 3D depth maps from any 2D image."
+                icon="layers"
+                accent="1"
+                path="/depth-map"
+              />
+              <ToolCard
+                title="Pose Estimation"
+                description="Detect and visualize human body poses in your photos."
+                icon="accessibility_new"
+                accent="2"
+                path="/pose-estimation"
+              />
+              <ToolCard
+                title="AI Upscaler"
+                description="Upscale your images up to 4x their size with incredible detail."
+                icon="photo_filter"
+                accent="3"
+                path="/upscaler"
+              />
+              <ToolCard
+                title="Image Editor"
+                description="Perform quick crops, and color adjustments to perfect your images."
+                icon="tune"
+                accent="4"
+                path="/editor"
+              />
+            </div>
+          </div>
+        </main>
+        <Footer />
+      </div>
     </div>
   );
-}
+};
 
 export default HomePage;

@@ -1,12 +1,21 @@
 /* Basic Reset and Font Setup */
 :root {
-  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  --primary-color: #0c7ff2;
+  --secondary-color: #1f2937;
+  --text-primary: #ffffff;
+  --text-secondary: #90adcb;
+  --accent-color-1: #34d399;
+  --accent-color-2: #f59e0b;
+  --accent-color-3: #ec4899;
+  --accent-color-4: #8b5cf6;
+
+  font-family: "Space Grotesk", "Noto Sans", sans-serif;
   line-height: 1.5;
   font-weight: 400;
 
   color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #1a1d21; /* Dark background */
+  color: var(--text-primary);
+  background-color: #101a23;
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -14,95 +23,237 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
-body {
-  margin: 0;
-  display: flex;
-  place-items: center;
-  min-width: 320px;
-  min-height: 100vh;
+/* Material Symbols Configuration */
+.material-symbols-outlined {
+  font-variation-settings:
+    'FILL' 0,
+    'wght' 400,
+    'GRAD' 0,
+    'opsz' 48;
 }
 
-#root {
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  font-family: "Space Grotesk", "Noto Sans", sans-serif;
+  background-color: #101a23;
+  color: var(--text-primary);
+}
+
+/* Layout Container */
+.layout-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  flex-grow: 1;
+}
+
+/* Layout Content Container */
+.layout-content-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  max-width: 64rem; /* 5xl */
+  flex: 1;
   width: 100%;
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
-  text-align: center;
 }
 
 /* Header Styles */
-.app-header {
+header {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  margin-bottom: 4rem;
+  justify-content: space-between;
+  white-space: nowrap;
+  border-bottom: 1px solid #223649;
+  padding: 1rem 2.5rem;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
 }
 
-.app-title {
-  font-size: 2em;
-  font-weight: 700;
-  color: #fff;
-  margin: 0;
+/* Main Content */
+main {
+  padding: 3rem 2.5rem;
+  display: flex;
+  flex: 1;
+  justify-content: center;
 }
 
-.header-nav a, .login-button {
-  margin-left: 1.5rem;
-  color: #a9a9a9;
-  text-decoration: none;
-  font-weight: 500;
-  transition: color 0.2s ease;
+@media (min-width: 768px) {
+  main {
+    padding-left: 5rem;
+    padding-right: 5rem;
+  }
 }
 
-.header-nav a:hover, .login-button:hover {
-  color: #fff;
+@media (min-width: 1024px) {
+  main {
+    padding-left: 10rem;
+    padding-right: 10rem;
+  }
 }
 
-.login-button {
-  background-color: #3369ff;
-  color: white;
-  border: none;
-  padding: 0.6rem 1.2rem;
-  border-radius: 8px;
-  cursor: pointer;
-  font-weight: 600;
-  transition: background-color 0.2s ease;
+/* Footer */
+footer {
+  text-align: center;
+  padding: 2rem 0;
+  border-top: 1px solid #223649;
+  margin-top: auto;
 }
 
-.login-button:hover {
-  background-color: #1e4de6;
-  color: white;
-}
-
-/* Card Grid Layout */
-.card-grid {
+/* Card Grid */
+.grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 2rem;
+  grid-template-columns: repeat(1, 1fr);
+  gap: 1.5rem;
+  width: 100%;
 }
 
-.tool-card {
-  background-color: #24282f;
-  border: 1px solid #363b44;
-  border-radius: 12px;
-  padding: 2rem;
+@media (min-width: 640px) {
+  .grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 1024px) {
+  .grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+/* Card Styles */
+.card {
+  display: flex;
+  flex-direction: column;
+  background-color: var(--secondary-color);
+  border-radius: 0.75rem;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  transition: all 0.3s;
+  border: 1px solid transparent;
   cursor: pointer;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-  text-align: left;
 }
 
-.tool-card:hover {
-  transform: translateY(-5px);
-  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+.card:hover {
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+  transform: scale(1.05);
 }
 
-.card-title {
-  font-size: 1.5em;
-  margin-top: 0;
-  margin-bottom: 0.5rem;
-  color: #fff;
+.card[data-accent="1"]:hover {
+  border-color: var(--accent-color-1);
 }
 
-.card-description {
-  color: #a9a9a9;
-  font-size: 1em;
+.card[data-accent="2"]:hover {
+  border-color: var(--accent-color-2);
+}
+
+.card[data-accent="3"]:hover {
+  border-color: var(--accent-color-3);
+}
+
+.card[data-accent="4"]:hover {
+  border-color: var(--accent-color-4);
+}
+
+/* Button Styles */
+.button {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 84px;
+  max-width: 480px;
+  cursor: pointer;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 0.5rem;
+  height: 2.5rem;
+  padding: 0 1rem;
+  background-color: var(--primary-color);
+  color: white;
+  font-size: 0.875rem;
+  font-weight: 700;
+  letter-spacing: 0.015em;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  transition: all 0.2s ease-in-out;
+  transform: translateY(0);
+}
+
+.button:hover {
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+  background-color: #3b82f6;
+  transform: translateY(-2px);
+}
+
+.button:active {
+  background-color: #2563eb;
+  transform: translateY(0);
+}
+
+/* Navigation Links */
+.nav-link {
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: color 0.2s;
+}
+
+.nav-link:hover {
+  color: var(--text-primary);
+}
+
+/* Icon Container */
+.icon-container {
+  margin-bottom: 1rem;
+  padding: 0.75rem;
+  border-radius: 9999px;
+  color: white;
+}
+
+.icon-container[data-accent="1"] {
+  background-color: var(--accent-color-1);
+}
+
+.icon-container[data-accent="2"] {
+  background-color: var(--accent-color-2);
+}
+
+.icon-container[data-accent="3"] {
+  background-color: var(--accent-color-3);
+}
+
+.icon-container[data-accent="4"] {
+  background-color: var(--accent-color-4);
+}
+
+/* Typography */
+h1 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+}
+
+h2 {
+  font-size: 2.25rem;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  margin-bottom: 1rem;
+}
+
+@media (min-width: 768px) {
+  h2 {
+    font-size: 3rem;
+  }
+}
+
+p {
+  font-size: 1.125rem;
+  color: var(--text-secondary);
+  max-width: 42rem;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+@media (min-width: 768px) {
+  p {
+    font-size: 1.25rem;
+  }
 }
