@@ -139,7 +139,7 @@ const InputView = ({ onFileChange, onGenerate, imagePreview, isDisabled }: {
 
             <button
                 onClick={onGenerate}
-                disabled={isDisabled}
+                disabled={isDisabled || !imagePreview}
                 className="w-full flex items-center justify-center gap-2 px-6 py-3 border border-transparent rounded-md shadow-sm text-base font-medium text-white bg-[var(--primary-color)] hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 focus:ring-[var(--primary-color)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
                 <span className="material-symbols-outlined">layers</span>
@@ -398,7 +398,7 @@ const DepthMapPage = () => {
                         onFileChange={handleFileChange}
                         onGenerate={handleGenerate}
                         imagePreview={imagePreview}
-                        isDisabled={uiState === 'loading_model' || uiState === 'processing' || !processedImageData}
+                        isDisabled={uiState === 'loading_model' || uiState === 'processing'}
                     />
                 )}
                 <StatusSection uiState={uiState} errorMessage={errorMessage} />
