@@ -257,3 +257,11 @@ p {
     font-size: 1.25rem;
   }
 }
+
+/* FAQ Accordion Icons */
+.faq-item[open] .faq-icon-plus {
+  display: none;
+}
+.faq-item:not([open]) .faq-icon-minus {
+  display: none;
+}
