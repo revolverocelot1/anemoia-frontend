@@ -7,7 +7,7 @@ import * as posedetection from '@tensorflow-models/pose-detection';
 (tf as any).env().set('WASM_HAS_SIMD_SUPPORT', true);
 (tf as any).env().set('WASM_HAS_MULTITHREAD_SUPPORT', true);
 
-let detector: posedetection.PoseDetector | null = null;
+let detector: any = null;
 let ready = false;
 
 async function initModel() {

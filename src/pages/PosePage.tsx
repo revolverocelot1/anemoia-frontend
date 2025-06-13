@@ -110,22 +110,63 @@ const PosePage = () => {
     <div className="relative flex min-h-screen flex-col overflow-x-hidden">
       <div className="layout-container flex h-full grow flex-col">
         <Header />
-        <main className="px-10 md:px-20 lg:px-40 flex flex-1 justify-center py-12">
+        <main className="px-4 sm:px-6 md:px-10 flex flex-1 justify-center py-12">
           <div className="layout-content-container flex flex-col items-center max-w-3xl flex-1 w-full">
-            {uiState === 'idle' || uiState === 'processing' ? (
-              <div className="w-full bg-[var(--secondary-color)] rounded-xl shadow-lg p-8 space-y-6">
-                <input type="file" accept="image/*" onChange={(e)=>{if(e.target.files) handleFile(e.target.files[0])}} className="block w-full text-sm text-gray-300" />
-                {imagePreview && <img src={imagePreview} alt="preview" className="w-full rounded" />}
-                {uiState==='processing' && <p className="text-center text-[var(--text-secondary)]">Processing...</p>}
-              </div>
-            ): uiState==='output' ? (
-              <div className="w-full bg-[var(--secondary-color)] rounded-xl shadow-lg p-8 space-y-6">
+            <div className="text-center mb-10">
+              <h2 className="text-3xl md:text-4xl font-bold mb-3 tracking-tight text-[var(--text-primary)]">Pose Estimation</h2>
+              <p className="text-md md:text-lg text-[var(--text-secondary)] max-w-xl mx-auto">
+                Upload an image to detect and visualize human poses using our MoveNet Lightning model.
+              </p>
+            </div>
+
+            <div className="w-full bg-[var(--secondary-color)] rounded-xl shadow-xl p-6 md:p-8 space-y-6">
+              {/* Upload area / result */}
+              {uiState !== 'output' && (
+                <div>
+                  <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2" htmlFor="image-upload">Upload Image</label>
+                  <div className="mt-1 flex justify-center px-6 pt-10 pb-12 border-2 border-[var(--input-background)] border-dashed rounded-md hover:border-[var(--primary-color)] transition-colors duration-150">
+                    <div className="space-y-1 text-center">
+                      <span className="material-symbols-outlined text-5xl text-[var(--text-secondary)]">cloud_upload</span>
+                      <div className="flex text-sm text-[var(--text-secondary)]">
+                        <label htmlFor="file-upload" className="relative cursor-pointer bg-[var(--secondary-color)] rounded-md font-medium text-[var(--primary-color)] hover:text-blue-400 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-offset-[var(--secondary-color)] focus-within:ring-[var(--primary-color)]">
+                          <span>Upload a file</span>
+                          <input id="file-upload" name="file-upload" type="file" className="sr-only" accept="image/*" onChange={(e)=>{if(e.target.files) handleFile(e.target.files[0])}} />
+                        </label>
+                        <p className="pl-1">or drag and drop</p>
+                      </div>
+                      <p className="text-xs text-[var(--text-secondary)]">PNG, JPG, GIF up to 10MB</p>
+                    </div>
+                  </div>
+                  {imagePreview && (
+                    <img src={imagePreview} alt="preview" className="w-full rounded mt-6" />
+                  )}
+                </div>
+              )}
+
+              {uiState === 'output' && (
                 <img src={imagePreview || ''} alt="Pose" className="w-full rounded" />
-                <button className="button" onClick={()=>setUiState('idle')}>New Image</button>
-              </div>
-            ): (
-              <p className="text-red-500">{errorMessage}</p>
-            )}
+              )}
+
+              {/* Footer area inside card */}
+              {uiState === 'processing' && (
+                <p className="text-center text-[var(--text-secondary)]">Processing...</p>
+              )}
+              {uiState === 'error' && (
+                <p className="text-center text-red-500 text-sm">{errorMessage}</p>
+              )}
+
+              {uiState === 'output' ? (
+                <button className="w-full flex items-center justify-center gap-2 rounded-lg h-12 px-6 bg-[var(--primary-color)] text-white text-base font-semibold tracking-wide hover:bg-blue-600 transition-colors duration-150" type="button" onClick={()=>setUiState('idle')}>
+                  <span className="material-symbols-outlined">restart_alt</span>
+                  New Image
+                </button>
+              ) : (
+                <button className="w-full flex items-center justify-center gap-2 rounded-lg h-12 px-6 bg-[var(--primary-color)] text-white text-base font-semibold tracking-wide hover:bg-blue-600 transition-colors duration-150" type="button" disabled={uiState==='processing' || !imagePreview} onClick={handleGenerate}>
+                  <span className="material-symbols-outlined">auto_awesome</span>
+                  {uiState==='loading_model' ? 'Loading model…' : uiState==='processing' ? 'Estimating…' : 'Estimate Pose'}
+                </button>
+              )}
+            </div>
           </div>
         </main>
         <Footer />

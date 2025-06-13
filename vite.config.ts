@@ -14,5 +14,13 @@ export default defineConfig({
   publicDir: 'public',
   build: {
     assetsInlineLimit: 0,
+    rollupOptions: {
+      external: [
+        '@tensorflow/tfjs-core',
+        '@tensorflow/tfjs-backend-wasm',
+        '@tensorflow-models/pose-detection',
+        '@mediapipe/pose'
+      ],
+    },
   },
 })
