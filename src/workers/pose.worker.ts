@@ -1,24 +1,22 @@
-// src/workers/pose.worker.ts - MoveNet Lightning (WASM backend)
+// src/workers/pose.worker.ts - MoveNet Lightning (CPU backend)
 import * as tf from '@tensorflow/tfjs-core';
-import '@tensorflow/tfjs-backend-wasm';
+import '@tensorflow/tfjs-backend-cpu';
 import * as posedetection from '@tensorflow-models/pose-detection';
-
-// Configure WASM path dynamically via CDN fallback
-(tf as any).env().set('WASM_HAS_SIMD_SUPPORT', true);
-(tf as any).env().set('WASM_HAS_MULTITHREAD_SUPPORT', true);
 
 let detector: any = null;
 let ready = false;
 
 async function initModel() {
   if (ready) return;
-  await tf.setBackend('wasm');
+  
+  // Use CPU backend to avoid SharedArrayBuffer issues
+  await tf.setBackend('cpu');
   await tf.ready();
+  
   detector = await posedetection.createDetector(posedetection.SupportedModels.MoveNet, {
-    modelType: 'lightning',
+    modelType: posedetection.movenet.modelType.SINGLEPOSE_LIGHTNING,
     enableSmoothing: true,
-    wasmPaths: 'https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-wasm@4.9.0/dist/',
-  } as any);
+  });
   ready = true;
 }
 

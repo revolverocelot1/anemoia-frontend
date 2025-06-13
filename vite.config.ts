@@ -6,21 +6,22 @@ export default defineConfig({
   plugins: [react()],
   server: {
     headers: {
-      'Cross-Origin-Embedder-Policy': 'credentialless',
+      'Cross-Origin-Embedder-Policy': 'require-corp',
       'Cross-Origin-Opener-Policy': 'same-origin',
-      'Cross-Origin-Resource-Policy': 'cross-origin',
+    },
+  },
+  preview: {
+    headers: {
+      'Cross-Origin-Embedder-Policy': 'require-corp',
+      'Cross-Origin-Opener-Policy': 'same-origin',
     },
   },
   publicDir: 'public',
   build: {
     assetsInlineLimit: 0,
-    rollupOptions: {
-      external: [
-        '@tensorflow/tfjs-core',
-        '@tensorflow/tfjs-backend-wasm',
-        '@tensorflow-models/pose-detection',
-        '@mediapipe/pose'
-      ],
-    },
+    target: 'esnext',
+  },
+  optimizeDeps: {
+    exclude: ['@tensorflow/tfjs-backend-wasm'],
   },
 })
