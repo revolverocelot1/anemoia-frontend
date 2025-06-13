@@ -148,5 +148,7 @@ def google_auth_callback(code: str | None = None, state: str | None = None):
 # ----------------------
 
 @app.get("/", include_in_schema=False)
+@app.head("/", include_in_schema=False)
 def root():
+    """Basic welcome endpoint used by Render health-checks."""
     return {"message": "Welcome to the Anemoia API"} 

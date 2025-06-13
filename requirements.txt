@@ -2,4 +2,5 @@ fastapi
 uvicorn[standard]
 python-dotenv
 sentry-sdk
-requests 
+requests
+@mediapipe/pose
