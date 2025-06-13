@@ -5,6 +5,7 @@ import { BrowserRouter } from 'react-router-dom';
 import * as Sentry from "@sentry/react";
 // 1. Import the new integrations from their own packages
 import { browserTracingIntegration, replayIntegration } from "@sentry/browser";
+import { env } from '@huggingface/transformers';
 
 import App from './App';
 import './index.css';
@@ -23,6 +24,15 @@ Sentry.init({
   replaysSessionSampleRate: 0.1,
   replaysOnErrorSampleRate: 1.0,
 });
+
+// Configure transformers.js environment for WASM files
+env.allowLocalModels = false;
+env.allowRemoteModels = true;
+
+// Configure WASM paths if available
+if (env.backends?.onnx?.wasm) {
+    env.backends.onnx.wasm.wasmPaths = '/';
+}
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
