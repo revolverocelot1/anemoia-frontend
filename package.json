@@ -18,7 +18,10 @@
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-image-crop": "^11.0.10",
-    "react-router-dom": "^7.6.2"
+    "react-router-dom": "^7.6.2",
+    "@tensorflow-models/pose-detection": "^3.0.0",
+    "@tensorflow/tfjs-core": "^4.9.0",
+    "@tensorflow/tfjs-backend-wasm": "^4.9.0"
   },
   "devDependencies": {
   "@types/react": "^18.3.3",
