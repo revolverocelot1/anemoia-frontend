@@ -4,6 +4,7 @@ import DepthMapPage from './pages/DepthMapPage';
 import LoginPage from './pages/LoginPage';
 import AuthCallbackPage from './pages/AuthCallbackPage';
 import SettingsPage from './pages/SettingsPage';
+import FAQPage from './pages/FAQPage';
 // We will create these pages next
 // import PosePage from './pages/PosePage';
 
@@ -16,6 +17,7 @@ function App() {
       <Route path="/login" element={<LoginPage />} />
       <Route path="/auth/callback" element={<AuthCallbackPage />} />
       <Route path="/settings" element={<SettingsPage />} />
+      <Route path="/faq" element={<FAQPage />} />
       {/* <Route path="/pose-estimation" element={<PosePage />} /> */}
     </Routes>
   );

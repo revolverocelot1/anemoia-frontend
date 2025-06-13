@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { openAuthPopup } from '../utils/authPopup';
 
 const Header = () => {
-  const { setToken, isAuthenticated, logout } = useAuth();
+  const { setToken, isAuthenticated, logout, user } = useAuth();
 
   const handleLogin = async () => {
     const apiBaseUrl = import.meta.env.VITE_API_BASE_URL;
@@ -29,16 +29,24 @@ const Header = () => {
         <h1 className="text-2xl font-bold tracking-tight">Anemoia</h1>
       </Link>
       <nav className="flex flex-1 justify-end items-center gap-6">
-        <Link to="/faq" className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] text-sm font-medium transition-colors duration-200">
+        <Link to="/faq" className="text-[var(--text-primary)] hover:text-[var(--primary-color)] text-sm font-medium transition-colors">
           FAQ
         </Link>
         {isAuthenticated ? (
-          <button
-            onClick={handleLogout}
-            className="flex items-center gap-2 h-10 px-4 rounded-lg bg-red-500 text-white text-sm font-semibold hover:bg-red-600 transition-colors"
-          >
-            Logout
-          </button>
+          <div className="flex items-center gap-4">
+            {user?.picture && (
+              <img src={user.picture} alt="avatar" className="w-8 h-8 rounded-full" />
+            )}
+            <span className="text-sm font-medium text-[var(--text-primary)] truncate max-w-[120px]">
+              {user?.name || 'User'}
+            </span>
+            <button
+              onClick={handleLogout}
+              className="flex items-center gap-1 h-8 px-3 rounded bg-red-500 text-white text-xs font-semibold hover:bg-red-600 transition-colors"
+            >
+              <span className="material-symbols-outlined text-sm">logout</span> Logout
+            </button>
+          </div>
         ) : (
           <button 
             onClick={handleLogin}
