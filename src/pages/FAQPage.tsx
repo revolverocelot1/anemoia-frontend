@@ -1,4 +1,4 @@
-import React from 'react';
+// no explicit React import needed for JSX
 
 const FAQPage = () => (
   <main className="px-10 md:px-20 lg:px-40 flex flex-1 justify-center py-12">
