@@ -8,6 +8,7 @@ import { browserTracingIntegration, replayIntegration } from "@sentry/browser";
 import { env } from '@huggingface/transformers';
 
 import App from './App';
+import { AuthProvider } from './context/AuthContext';
 import './index.css';
 
 // Initialize Sentry for error tracking
@@ -37,7 +38,9 @@ if (env.backends?.onnx?.wasm) {
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <BrowserRouter>
-      <App />
+      <AuthProvider>
+        <App />
+      </AuthProvider>
     </BrowserRouter>
   </React.StrictMode>
 );

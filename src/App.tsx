@@ -1,6 +1,9 @@
 import { Routes, Route } from 'react-router-dom';
 import HomePage from './pages/HomePage';
 import DepthMapPage from './pages/DepthMapPage';
+import LoginPage from './pages/LoginPage';
+import AuthCallbackPage from './pages/AuthCallbackPage';
+import SettingsPage from './pages/SettingsPage';
 // We will create these pages next
 // import PosePage from './pages/PosePage';
 
@@ -10,6 +13,9 @@ function App() {
     <Routes>
       <Route path="/" element={<HomePage />} />
       <Route path="/depth-map" element={<DepthMapPage />} />
+      <Route path="/login" element={<LoginPage />} />
+      <Route path="/auth/callback" element={<AuthCallbackPage />} />
+      <Route path="/settings" element={<SettingsPage />} />
       {/* <Route path="/pose-estimation" element={<PosePage />} /> */}
     </Routes>
   );
