@@ -3,4 +3,3 @@ uvicorn[standard]
 python-dotenv
 sentry-sdk
 requests
-@mediapipe/pose
