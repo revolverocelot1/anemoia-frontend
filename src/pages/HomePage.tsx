@@ -1,9 +1,9 @@
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import ToolCard from '../components/ToolCard';
-import { motion } from 'framer-motion';
+import { motion, type Variants } from 'framer-motion';
 
-const containerVariants = {
+const containerVariants: Variants = { // Added : Variants
   hidden: { opacity: 1 }, // Container itself can be initially visible or fade in
   visible: {
     opacity: 1,
@@ -14,12 +14,12 @@ const containerVariants = {
   },
 };
 
-const itemVariants = {
+const itemVariants: Variants = { // Added : Variants
   hidden: { opacity: 0, y: 30 },
   visible: {
     opacity: 1,
     y: 0,
-    transition: { type: 'spring', stiffness: 120, damping: 12 }
+    transition: { type: 'spring' as const, stiffness: 120, damping: 12 } // Added 'as const'
   },
 };
 

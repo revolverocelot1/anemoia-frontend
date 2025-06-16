@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { motion, Variants } from 'framer-motion';
+import { motion, type Variants } from 'framer-motion';
 
 // Create a motion-compatible Link component
 const MotionLink = motion(Link);
