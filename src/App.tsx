@@ -10,6 +10,7 @@ import FAQPage from './pages/FAQPage';
 import PosePage from './pages/PosePage';
 import PoseResultsPage from './pages/PoseResultsPage';
 import { AccountPage } from './pages/AccountPage';
+import NewUpscalerPage from './pages/NewUpscalerPage';
 // We will create these pages next
 // import PosePage from './pages/PosePage';
 
@@ -88,6 +89,14 @@ function App() {
           element={
             <AnimatedPage>
               <PoseResultsPage />
+            </AnimatedPage>
+          }
+        />
+        <Route
+          path="/upscaler"
+          element={
+            <AnimatedPage>
+              <NewUpscalerPage />
             </AnimatedPage>
           }
         />
