@@ -60,6 +60,12 @@ const PosePage = () => {
             // Fallback: render inline (should rarely happen)
             setUiState('output');
             setPoses(workerPoses);
+            if (originalPreview) {
+              createPreviewURLs(originalPreview, workerPoses).then(({ overlay, skeleton }) => {
+                setOverlayPreview(overlay);
+                setSkeletonPreview(skeleton);
+              });
+            }
           }
           break;
         case 'error':
