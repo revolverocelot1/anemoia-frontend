@@ -49,6 +49,9 @@ const PosePage = () => {
           const previewSrc = originalPreviewRef.current;
           if (!previewSrc) return;
           createPreviewURLs(previewSrc, workerPoses).then(({overlay, skeleton}) => {
+            setOverlayPreview(overlay);
+            setSkeletonPreview(skeleton);
+            setPoses(workerPoses);
             navigate('/pose-estimation/results', {
               state: {
                 image: previewSrc,
