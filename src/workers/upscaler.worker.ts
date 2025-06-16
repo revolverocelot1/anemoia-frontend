@@ -1,5 +1,7 @@
 // src/workers/upscaler.worker.ts
 import * as tf from '@tensorflow/tfjs';
+import '@tensorflow/tfjs-backend-webgl';
+import '@tensorflow/tfjs-backend-webgpu';
 
 self.onmessage = async (event: MessageEvent<any>) => {
   const { command, imageData, scaleFactor, backend } = event.data; // modelBasePath removed, backend added
