@@ -14,7 +14,8 @@ async function initModel() {
   await tf.ready();
   
   detector = await posedetection.createDetector(posedetection.SupportedModels.MoveNet, {
-    modelType: posedetection.movenet.modelType.SINGLEPOSE_LIGHTNING,
+    // Use the multi-person lightning variant so we can detect several people in one image
+    modelType: posedetection.movenet.modelType.MULTIPOSE_LIGHTNING,
     enableSmoothing: true,
   });
   ready = true;

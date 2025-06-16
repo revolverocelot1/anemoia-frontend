@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 
@@ -17,15 +18,21 @@ const POSE_CONNECTIONS: [number, number][] = [
 const PosePage = () => {
   const [uiState, setUiState] = useState<'idle' | 'loading_model' | 'processing' | 'output' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState('');
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
+
+  // Three separate previews so we don't overwrite the original file after drawing overlays
+  const [originalPreview, setOriginalPreview] = useState<string | null>(null);
+  const [overlayPreview, setOverlayPreview] = useState<string | null>(null);
+  const [skeletonPreview, setSkeletonPreview] = useState<string | null>(null);
+
   const [poses, setPoses] = useState<any[]>([]);
   const workerRef = useRef<Worker | null>(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
     workerRef.current = new Worker(new URL('../workers/pose.worker.ts', import.meta.url), { type: 'module' });
 
     workerRef.current.onmessage = (e: MessageEvent) => {
-      const { status, error, poses } = e.data;
+      const { status, error, poses: workerPoses } = e.data;
       switch (status) {
         case 'loading_model':
           setUiState('loading_model');
@@ -37,8 +44,17 @@ const PosePage = () => {
           setUiState('processing');
           break;
         case 'complete':
-          setUiState('output');
-          setPoses(poses);
+          // If original preview available, redirect to dedicated results page
+          if (originalPreview) {
+            navigate('/pose-estimation/results', { state: { image: originalPreview, poses: workerPoses } });
+          } else {
+            // Fallback: render inline (should rarely happen)
+            setUiState('output');
+            setPoses(workerPoses);
+            if (originalPreview) {
+              generatePreviews(originalPreview, workerPoses);
+            }
+          }
           break;
         case 'error':
           setUiState('error');
@@ -50,7 +66,7 @@ const PosePage = () => {
     return () => {
       workerRef.current?.terminate();
     };
-  }, []);
+  }, [navigate]);
 
   const handleFile = (file: File) => {
     const reader = new FileReader();
@@ -66,7 +82,7 @@ const PosePage = () => {
         workerRef.current?.postMessage({ command: 'estimate', imageData });
       };
       img.src = ev.target?.result as string;
-      setImagePreview(ev.target?.result as string);
+      setOriginalPreview(ev.target?.result as string);
     };
     reader.readAsDataURL(file);
   };
@@ -86,21 +102,33 @@ const PosePage = () => {
     });
   };
 
-  useEffect(() => {
-    if (uiState === 'output' && poses.length && imagePreview) {
-      const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        canvas.width = img.width;
-        canvas.height = img.height;
-        const ctx = canvas.getContext('2d')!;
-        ctx.drawImage(img, 0, 0);
-        drawSkeleton(ctx, poses[0].keypoints);
-        setImagePreview(canvas.toDataURL('image/png'));
-      };
-      img.src = imagePreview;
-    }
-  }, [uiState]);
+  // Helper to generate the overlay & skeleton previews once we have poses
+  const generatePreviews = (imgSrc: string, detectedPoses: any[]) => {
+    const img = new Image();
+    img.onload = () => {
+      const { width, height } = img;
+
+      // Overlay – original image + skeletons
+      const overlayCanvas = document.createElement('canvas');
+      overlayCanvas.width = width;
+      overlayCanvas.height = height;
+      const overlayCtx = overlayCanvas.getContext('2d')!;
+      overlayCtx.drawImage(img, 0, 0);
+      detectedPoses.forEach((p) => drawSkeleton(overlayCtx, p.keypoints));
+      setOverlayPreview(overlayCanvas.toDataURL('image/png'));
+
+      // Skeleton only – black background
+      const skeletonCanvas = document.createElement('canvas');
+      skeletonCanvas.width = width;
+      skeletonCanvas.height = height;
+      const skeletonCtx = skeletonCanvas.getContext('2d')!;
+      skeletonCtx.fillStyle = 'black';
+      skeletonCtx.fillRect(0, 0, width, height);
+      detectedPoses.forEach((p) => drawSkeleton(skeletonCtx, p.keypoints));
+      setSkeletonPreview(skeletonCanvas.toDataURL('image/png'));
+    };
+    img.src = imgSrc;
+  };
 
   const handleGenerate = () => {
     // nothing extra; estimation happens on upload
@@ -115,7 +143,7 @@ const PosePage = () => {
             <div className="text-center mb-10">
               <h2 className="text-3xl md:text-4xl font-bold mb-3 tracking-tight text-[var(--text-primary)]">Pose Estimation</h2>
               <p className="text-md md:text-lg text-[var(--text-secondary)] max-w-xl mx-auto">
-                Upload an image to detect and visualize human poses using our MoveNet Lightning model.
+                Upload an image to detect and visualize human poses (supports multiple people) using our MoveNet Lightning model.
               </p>
             </div>
 
@@ -137,14 +165,58 @@ const PosePage = () => {
                       <p className="text-xs text-[var(--text-secondary)]">PNG, JPG, GIF up to 10MB</p>
                     </div>
                   </div>
-                  {imagePreview && (
-                    <img src={imagePreview} alt="preview" className="w-full rounded mt-6" />
+                  {originalPreview && (
+                    <img src={originalPreview} alt="preview" className="w-full rounded mt-6" />
                   )}
                 </div>
               )}
 
               {uiState === 'output' && (
-                <img src={imagePreview || ''} alt="Pose" className="w-full rounded" />
+                <div className="w-full grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8 mb-4">
+                  {/* Original */}
+                  <div className="flex flex-col items-center bg-[var(--secondary-color)] rounded-xl shadow-xl p-4">
+                    <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-2">Original Image</h3>
+                    {originalPreview && <img src={originalPreview} alt="Original" className="rounded-lg aspect-square object-cover w-full" />}
+                    {originalPreview && (
+                      <a href={originalPreview} download="original.png" className="mt-4 w-full flex items-center justify-center gap-2 rounded-lg h-10 px-4 bg-[var(--input-background)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] text-sm font-medium transition-colors duration-150">
+                        <span className="material-symbols-outlined text-base">download</span>
+                        Download
+                      </a>
+                    )}
+                  </div>
+
+                  {/* Overlay */}
+                  <div className="flex flex-col items-center bg-[var(--secondary-color)] rounded-xl shadow-xl p-4">
+                    <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-2">Pose Overlay</h3>
+                    {overlayPreview && <img src={overlayPreview} alt="Overlay" className="rounded-lg aspect-square object-cover w-full" />}
+                    {overlayPreview && (
+                      <a href={overlayPreview} download="pose_overlay.png" className="mt-4 w-full flex items-center justify-center gap-2 rounded-lg h-10 px-4 bg-[var(--input-background)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] text-sm font-medium transition-colors duration-150">
+                        <span className="material-symbols-outlined text-base">download</span>
+                        Download
+                      </a>
+                    )}
+                  </div>
+
+                  {/* Skeleton */}
+                  <div className="flex flex-col items-center bg-[var(--secondary-color)] rounded-xl shadow-xl p-4">
+                    <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-2">Pose Representation</h3>
+                    {skeletonPreview && <img src={skeletonPreview} alt="Skeleton" className="rounded-lg aspect-square object-cover w-full bg-black" />}
+                    {skeletonPreview && (
+                      <a href={skeletonPreview} download="pose_skeleton.png" className="mt-4 w-full flex items-center justify-center gap-2 rounded-lg h-10 px-4 bg-[var(--input-background)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] text-sm font-medium transition-colors duration-150">
+                        <span className="material-symbols-outlined text-base">download</span>
+                        Download
+                      </a>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Keypoints JSON */}
+              {uiState === 'output' && (
+                <details className="w-full bg-[var(--input-background)] rounded-md p-4 text-[var(--text-secondary)]">
+                  <summary className="cursor-pointer text-sm font-medium text-[var(--text-primary)] mb-2">Show keypoints JSON</summary>
+                  <pre className="overflow-x-auto text-xs whitespace-pre-wrap">{JSON.stringify(poses, null, 2)}</pre>
+                </details>
               )}
 
               {/* Footer area inside card */}
@@ -161,7 +233,7 @@ const PosePage = () => {
                   New Image
                 </button>
               ) : (
-                <button className="w-full flex items-center justify-center gap-2 rounded-lg h-12 px-6 bg-[var(--primary-color)] text-white text-base font-semibold tracking-wide hover:bg-blue-600 transition-colors duration-150" type="button" disabled={uiState==='processing' || !imagePreview} onClick={handleGenerate}>
+                <button className="w-full flex items-center justify-center gap-2 rounded-lg h-12 px-6 bg-[var(--primary-color)] text-white text-base font-semibold tracking-wide hover:bg-blue-600 transition-colors duration-150" type="button" disabled={uiState==='processing' || !originalPreview} onClick={handleGenerate}>
                   <span className="material-symbols-outlined">auto_awesome</span>
                   {uiState==='loading_model' ? 'Loading model…' : uiState==='processing' ? 'Estimating…' : 'Estimate Pose'}
                 </button>

@@ -6,6 +6,7 @@ import AuthCallbackPage from './pages/AuthCallbackPage';
 import SettingsPage from './pages/SettingsPage';
 import FAQPage from './pages/FAQPage';
 import PosePage from './pages/PosePage';
+import PoseResultsPage from './pages/PoseResultsPage';
 import { AccountPage } from './pages/AccountPage';
 // We will create these pages next
 // import PosePage from './pages/PosePage';
@@ -22,6 +23,7 @@ function App() {
       <Route path="/settings" element={<SettingsPage />} />
       <Route path="/faq" element={<FAQPage />} />
       <Route path="/pose-estimation" element={<PosePage />} />
+      <Route path="/pose-estimation/results" element={<PoseResultsPage />} />
       {/* <Route path="/pose-estimation" element={<PosePage />} /> */}
     </Routes>
   );
