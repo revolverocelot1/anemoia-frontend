@@ -3,12 +3,26 @@ import * as tf from '@tensorflow/tfjs';
 import '@tensorflow/tfjs-backend-webgl';
 import '@tensorflow/tfjs-backend-webgpu';
 
+console.log('Worker script started. TFJS Loaded:', tf);
+console.log('tf.engine (should be object):', tf.engine);
+console.log('tf.env (should be object):', tf.env);
+console.log('tf.ready (should be function):', tf.ready);
+console.log('tf.setBackend (should be function):', tf.setBackend);
+console.log('tf.getBackend (should be function):', tf.getBackend);
+
+if (tf.engine && typeof tf.engine === 'object' && tf.engine.registryFactory) { // Check if engine is an object as per new findings
+    console.log('Available TFJS backends (from worker start - direct engine):', Object.keys(tf.engine.registryFactory));
+} else if (tf.engine && typeof tf.engine === 'function' && tf.engine().registryFactory) { // Original check
+    console.log('Available TFJS backends (from worker start - engine as function):', Object.keys(tf.engine().registryFactory));
+} else {
+    console.log('tf.engine or tf.engine().registryFactory is not available at worker start as expected.');
+}
+
+
 self.onmessage = async (event: MessageEvent<any>) => {
-  const { command, imageData, scaleFactor, backend } = event.data; // modelBasePath removed, backend added
+  const { command, imageData, scaleFactor, backend } = event.data;
 
   if (command === 'initialize') {
-    // Optional: Pre-load backend or perform other setup
-    // For now, backend is set per 'upscale' command
     self.postMessage({ status: 'worker_initialized', message: 'Upscaler worker initialized.' });
   } else if (command === 'upscale') {
     if (!imageData || !scaleFactor) {
@@ -17,15 +31,15 @@ self.onmessage = async (event: MessageEvent<any>) => {
     }
 
     let model_url: string;
-    let model_name_for_db: string; // For IndexedDB key
+    let model_name_for_db: string;
 
     if (scaleFactor === 4) {
-      const modelInternalName = "general_plus_64"; // Simplified, tile size assumed by model name
+      const modelInternalName = "general_plus_64";
       model_name_for_db = `realesrgan_x4_${modelInternalName}`;
       model_url = `/models/upscaler/realesrgan_x4_${modelInternalName}/model.json`;
       self.postMessage({ status: 'model_loading', message: `Loading Real-ESRGAN 4x (${modelInternalName}) model...` });
     } else if (scaleFactor === 2) {
-      const modelInternalName = "conservative_64"; // Simplified
+      const modelInternalName = "conservative_64";
       model_name_for_db = `realcugan_x2_${modelInternalName}`;
       model_url = `/models/upscaler/realcugan_x2_${modelInternalName}/model.json`;
       self.postMessage({ status: 'model_loading', message: `Loading Real-CUGAN 2x (${modelInternalName}) model...` });
@@ -36,45 +50,61 @@ self.onmessage = async (event: MessageEvent<any>) => {
 
     const currentBackend = backend || 'webgl';
     self.postMessage({ status: 'info', message: `Attempting to set backend to: ${currentBackend}` });
-    console.log("Available TFJS backends before setBackend:", Object.keys(tf.engine().registryFactory));
-    self.postMessage({ status: 'info', message: `Available backends before set: ${Object.keys(tf.engine().registryFactory).join(', ')}` });
+
+    // Diagnostic log for available backends
+    let availableBackendsDiag = "N/A";
+    if (tf.engine && typeof tf.engine === 'object' && tf.engine.registryFactory) {
+        availableBackendsDiag = Object.keys(tf.engine.registryFactory).join(', ');
+    } else if (tf.engine && typeof tf.engine === 'function' && tf.engine().registryFactory) {
+        availableBackendsDiag = Object.keys(tf.engine().registryFactory).join(', ');
+    }
+    self.postMessage({ status: 'info', message: `Available backends before set: ${availableBackendsDiag}` });
+
 
     try {
-      await tf.env().setBackend(currentBackend); // Use tf.env()
+      const backendSetSuccessfully = await tf.setBackend(currentBackend); // Reverted to direct tf.setBackend
+      if (!backendSetSuccessfully) {
+          // This path might not be typically hit if setBackend throws on failure for unsupported backends.
+          throw new Error(`tf.setBackend reported failure for ${currentBackend} (returned false).`);
+      }
 
-      // Verify if backend was set
-      const actualBackend = tf.env().getBackend();
+      const actualBackend = tf.getBackend(); // Reverted to direct tf.getBackend
       console.log(`TF.js backend set to: ${actualBackend}`);
 
       if (actualBackend !== currentBackend) {
-        // Fallback or error if desired backend couldn't be set
-        console.warn(`Failed to set backend to ${currentBackend}. Actual backend: ${actualBackend}. Attempting to set again or falling back to webgl if different.`);
-        // Optionally, try to set to webgl if currentBackend !== 'webgl' and failed
-        if (currentBackend !== 'webgl') {
-            await tf.env().setBackend('webgl');
-            const fallbackBackend = tf.env().getBackend();
+        console.warn(`Failed to set backend to ${currentBackend}. Actual backend: ${actualBackend}. Attempting to fall back to webgl.`);
+        if (currentBackend !== 'webgl') { // Only attempt fallback if original request wasn't webgl
+            const webglSet = await tf.setBackend('webgl');
+             if(!webglSet) throw new Error(`Fallback to webgl also failed via tf.setBackend (returned false). Current is ${tf.getBackend()}`);
+            const fallbackBackend = tf.getBackend();
             console.log(`Fell back to webgl. Actual backend: ${fallbackBackend}`);
-            if (fallbackBackend !== 'webgl') {
-                 throw new Error(`Failed to set backend to ${currentBackend} or fallback webgl. Current is ${fallbackBackend}`);
+            if (fallbackBackend !== 'webgl') { // If even webgl couldn't be set
+                 throw new Error(`Failed to set backend to ${currentBackend} or fallback to webgl. Current is ${fallbackBackend}`);
             }
-        } else {
+        } else { // Original request was webgl and it wasn't set
             throw new Error(`Failed to set backend to ${currentBackend}. Current is ${actualBackend}`);
         }
       }
-      self.postMessage({ status: 'info', message: `TF.js backend successfully set to: ${tf.env().getBackend()}` });
+      self.postMessage({ status: 'info', message: `TF.js backend successfully set to: ${tf.getBackend()}` });
 
       await tf.ready();
       self.postMessage({ status: 'info', message: 'TF.js backend is ready.' });
 
     } catch (e) {
       console.error(`Error setting backend or backend not ready:`, e);
+      let availableBackendsMsg = "N/A";
+      if (tf.engine && typeof tf.engine === 'object' && tf.engine.registryFactory) {
+        availableBackendsMsg = Object.keys(tf.engine.registryFactory).join(', ');
+      } else if (tf.engine && typeof tf.engine === 'function' && tf.engine().registryFactory) {
+         availableBackendsMsg = Object.keys(tf.engine().registryFactory).join(', ');
+      }
       self.postMessage({
         status: 'error',
-        error: `Failed to set TF.js backend to ${currentBackend}: ${(e as Error).message}. Available: ${Object.keys(tf.engine().registryFactory).join(', ')}`,
+        error: `Failed to set TF.js backend to ${currentBackend}: ${(e as Error).message}. Available: ${availableBackendsMsg}`,
       });
-      return; // Stop if backend can't be set
+      return;
     }
-    // ... rest of model loading ...
+
     let model;
     try {
       console.log(`Attempting to load model from IndexedDB: indexeddb://${model_name_for_db}`);
@@ -101,18 +131,16 @@ self.onmessage = async (event: MessageEvent<any>) => {
       return;
     }
 
-    // Placeholder for actual upscaling logic using the loaded 'model'
     self.postMessage({ status: 'processing', message: 'Simulating image upscaling...' });
-    await new Promise(resolve => setTimeout(resolve, 2000)); // Simulate processing
+    await new Promise(resolve => setTimeout(resolve, 2000));
 
-    // Placeholder for result
     const upscaledDataUrl = `https://via.placeholder.com/800x600.png?text=Upscaled+${scaleFactor}x+(Simulated)`;
     const stats = {
       originalWidth: imageData.width || 0,
       originalHeight: imageData.height || 0,
       upscaledWidth: (imageData.width || 200) * scaleFactor,
       upscaledHeight: (imageData.height || 150) * scaleFactor,
-      processingTime: 2.0, // This would be measured in actual processing
+      processingTime: 2.0,
       scaleFactor: scaleFactor,
       modelName: model_name_for_db,
     };
@@ -125,7 +153,6 @@ self.onmessage = async (event: MessageEvent<any>) => {
   }
 };
 
-// Optional: Add a handler for unhandled rejections and errors within the worker
 self.addEventListener('unhandledrejection', event => {
   console.error('Unhandled rejection in worker:', event.reason);
   self.postMessage({ status: 'error', error: `Unhandled rejection: ${event.reason}` });
