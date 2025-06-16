@@ -46,14 +46,20 @@ const PosePage = () => {
         case 'complete':
           // If original preview available, redirect to dedicated results page
           if (originalPreview) {
-            navigate('/pose-estimation/results', { state: { image: originalPreview, poses: workerPoses } });
+            createPreviewURLs(originalPreview, workerPoses).then(({overlay, skeleton}) => {
+              navigate('/pose-estimation/results', {
+                state: {
+                  image: originalPreview,
+                  overlay,
+                  skeleton,
+                  poses: workerPoses,
+                }
+              });
+            });
           } else {
             // Fallback: render inline (should rarely happen)
             setUiState('output');
             setPoses(workerPoses);
-            if (originalPreview) {
-              generatePreviews(originalPreview, workerPoses);
-            }
           }
           break;
         case 'error':
@@ -102,32 +108,36 @@ const PosePage = () => {
     });
   };
 
-  // Helper to generate the overlay & skeleton previews once we have poses
-  const generatePreviews = (imgSrc: string, detectedPoses: any[]) => {
-    const img = new Image();
-    img.onload = () => {
-      const { width, height } = img;
+  // Helper that returns data URLs for overlay & skeleton canvases
+  const createPreviewURLs = (imgSrc: string, detectedPoses: any[]) : Promise<{overlay: string; skeleton: string;}> => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        const { width, height } = img;
 
-      // Overlay – original image + skeletons
-      const overlayCanvas = document.createElement('canvas');
-      overlayCanvas.width = width;
-      overlayCanvas.height = height;
-      const overlayCtx = overlayCanvas.getContext('2d')!;
-      overlayCtx.drawImage(img, 0, 0);
-      detectedPoses.forEach((p) => drawSkeleton(overlayCtx, p.keypoints));
-      setOverlayPreview(overlayCanvas.toDataURL('image/png'));
+        // Overlay canvas
+        const overlayCanvas = document.createElement('canvas');
+        overlayCanvas.width = width;
+        overlayCanvas.height = height;
+        const overlayCtx = overlayCanvas.getContext('2d')!;
+        overlayCtx.drawImage(img, 0, 0);
+        detectedPoses.forEach((p) => drawSkeleton(overlayCtx, p.keypoints));
+        const overlayURL = overlayCanvas.toDataURL('image/png');
 
-      // Skeleton only – black background
-      const skeletonCanvas = document.createElement('canvas');
-      skeletonCanvas.width = width;
-      skeletonCanvas.height = height;
-      const skeletonCtx = skeletonCanvas.getContext('2d')!;
-      skeletonCtx.fillStyle = 'black';
-      skeletonCtx.fillRect(0, 0, width, height);
-      detectedPoses.forEach((p) => drawSkeleton(skeletonCtx, p.keypoints));
-      setSkeletonPreview(skeletonCanvas.toDataURL('image/png'));
-    };
-    img.src = imgSrc;
+        // Skeleton-only canvas
+        const skeletonCanvas = document.createElement('canvas');
+        skeletonCanvas.width = width;
+        skeletonCanvas.height = height;
+        const skeletonCtx = skeletonCanvas.getContext('2d')!;
+        skeletonCtx.fillStyle = 'black';
+        skeletonCtx.fillRect(0, 0, width, height);
+        detectedPoses.forEach((p) => drawSkeleton(skeletonCtx, p.keypoints));
+        const skeletonURL = skeletonCanvas.toDataURL('image/png');
+
+        resolve({ overlay: overlayURL, skeleton: skeletonURL });
+      };
+      img.src = imgSrc;
+    });
   };
 
   const handleGenerate = () => {

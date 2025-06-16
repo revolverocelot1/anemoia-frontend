@@ -33,8 +33,8 @@ const drawSkeleton = (ctx: CanvasRenderingContext2D, keypoints: Keypoint[]) => {
 const PoseResultsPage = () => {
   const navigate = useNavigate();
   const { state } = useLocation() as { state?: any };
-  const [overlayURL, setOverlayURL] = useState<string | null>(null);
-  const [skeletonURL, setSkeletonURL] = useState<string | null>(null);
+  const [overlayURL, setOverlayURL] = useState<string | null>(state?.overlay ?? null);
+  const [skeletonURL, setSkeletonURL] = useState<string | null>(state?.skeleton ?? null);
 
   const imageURL: string | undefined = state?.image;
   const poses: any[] | undefined = state?.poses;
@@ -45,6 +45,9 @@ const PoseResultsPage = () => {
       navigate('/pose-estimation', { replace: true });
       return;
     }
+
+    // If overlay and skeleton already provided, skip generating
+    if (overlayURL && skeletonURL) return;
 
     const img = new Image();
     img.onload = () => {
