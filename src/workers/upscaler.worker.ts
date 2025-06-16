@@ -1,7 +1,19 @@
 // src/workers/upscaler.worker.ts - Real-ESRGAN placeholder (simulated upscaling)
 // In a real implementation, this would use ONNX.js or similar to run Real-ESRGAN
 
+import * as ort from 'onnxruntime-web';
+
 let ready = false;
+
+// Cache for loaded ONNX sessions keyed by scale factor
+const sessions: Record<number, ort.InferenceSession> = {};
+
+// Initialise ORT backend (prefer WebGPU, fallback WASM)
+async function initBackend() {
+  // Configure preferred EPs (will auto–fallback)
+  ort.env.wasm.numThreads = navigator.hardwareConcurrency || 4;
+  // nothing else to do; session creation will trigger backend init
+}
 
 async function initModel() {
   if (ready) return;
@@ -9,6 +21,34 @@ async function initModel() {
   // Simulate model loading time
   await new Promise(resolve => setTimeout(resolve, 2000));
   ready = true;
+}
+
+// Remote Hugging Face repo containing ONNX weights
+const HF_BASE = 'https://huggingface.co/USER_OR_ORG/REPO/resolve/main';
+
+async function fetchModel(scale: number): Promise<ArrayBuffer> {
+  const resp = await fetch(`${HF_BASE}/realesrgan_x${scale}.onnx`);
+  if (!resp.ok) throw new Error('Failed to download model');
+  return await resp.arrayBuffer();
+}
+
+async function getSession(scale: number) {
+  if (sessions[scale]) return sessions[scale];
+
+  self.postMessage({ status: 'loading_model' });
+  await initBackend();
+
+  // Download model from Hugging Face and create session from ArrayBuffer (no CORS issues)
+  const modelBuf = await fetchModel(scale);
+
+  const opts: ort.InferenceSession.SessionOptions = {
+    executionProviders: ['webgpu', 'wasm']
+  };
+  const session = await ort.InferenceSession.create(modelBuf, opts);
+  sessions[scale] = session;
+
+  self.postMessage({ status: 'model_ready' });
+  return session;
 }
 
 // Upscaling using OffscreenCanvas (works inside WebWorker)
