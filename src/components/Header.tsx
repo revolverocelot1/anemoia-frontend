@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom';
+import { NavLink } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 import { openAuthPopup } from '../utils/authPopup';
@@ -28,60 +28,66 @@ const Header = () => {
   };
 
   return (
-    <header className="flex items-center justify-between whitespace-nowrap border-b border-solid border-b-[#223649] px-10 py-4 shadow-md">
-      <Link to="/" className="flex items-center gap-3 text-[var(--text-primary)]">
-        <svg className="h-8 w-8 text-[var(--primary-color)]" fill="none" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
-          <path d="M39.5563 34.1455V13.8546C39.5563 15.708 36.8773 17.3437 32.7927 18.3189C30.2914 18.916 27.263 19.2655 24 19.2655C20.737 19.2655 17.7086 18.916 15.2073 18.3189C11.1227 17.3437 8.44365 15.708 8.44365 13.8546V34.1455C8.44365 35.9988 11.1227 37.6346 15.2073 38.6098C17.7086 39.2069 20.737 39.5564 24 39.5564C27.263 39.5564 30.2914 39.2069 32.7927 38.6098C36.8773 37.6346 39.5563 35.9988 39.5563 34.1455Z" fill="currentColor"></path>
-          <path clipRule="evenodd" d="M10.4485 13.8519C10.4749 13.9271 10.6203 14.246 11.379 14.7361C12.298 15.3298 13.7492 15.9145 15.6717 16.3735C18.0007 16.9296 20.8712 17.2655 24 17.2655C27.1288 17.2655 29.9993 16.9296 32.3283 16.3735C34.2508 15.9145 35.702 15.3298 36.621 14.7361C37.3796 14.246 37.5251 13.9271 37.5515 13.8519C37.5287 13.7876 37.4333 13.5973 37.0635 13.2931C36.5266 12.8516 35.6288 12.3647 34.343 11.9175C31.79 11.0295 28.1333 10.4437 24 10.4437C19.8667 10.4437 16.2099 11.0295 13.657 11.9175C12.3712 12.3647 11.4734 12.8516 10.9365 13.2931C10.5667 13.5973 10.4713 13.7876 10.4485 13.8519ZM37.5563 18.7877C36.3176 19.3925 34.8502 19.8839 33.2571 20.2642C30.5836 20.9025 27.3973 21.2655 24 21.2655C20.6027 21.2655 17.4164 20.9025 14.7429 20.2642C13.1498 19.8839 11.6824 19.3925 10.4436 18.7877V34.1275C10.4515 34.1545 10.5427 34.4867 11.379 35.027C12.298 35.6207 13.7492 36.2054 15.6717 36.6644C18.0007 37.2205 20.8712 37.5564 24 37.5564C27.1288 37.5564 29.9993 37.2205 32.3283 36.6644C34.2508 36.2054 35.702 35.6207 36.621 35.027C37.4573 34.4867 37.5485 34.1546 37.5563 34.1275V18.7877ZM41.5563 13.8546V34.1455C41.5563 36.1078 40.158 37.5042 38.7915 38.3869C37.3498 39.3182 35.4192 40.0389 33.2571 40.5551C30.5836 41.1934 27.3973 41.5564 24 41.5564C20.6027 41.5564 17.4164 41.1934 14.7429 40.5551C12.5808 40.0389 10.6502 39.3182 9.20848 38.3869C7.84205 37.5042 6.44365 36.1078 6.44365 34.1455L6.44365 13.8546C6.44365 12.2684 7.37223 11.0454 8.39581 10.2036C9.43325 9.3505 10.8137 8.67141 12.343 8.13948C15.4203 7.06909 19.5418 6.44366 24 6.44366C28.4582 6.44366 32.5797 7.06909 35.657 8.13948C37.1863 8.67141 38.5667 9.3505 39.6042 10.2036C40.6278 11.0454 41.5563 12.2684 41.5563 13.8546Z" fill="currentColor" fillRule="evenodd"></path>
-        </svg>
-        <h1 className="text-2xl font-bold tracking-tight">Anemoia</h1>
-      </Link>
-      <nav className="flex flex-1 justify-end items-center gap-6">
-        <Link to="/faq" className="text-[var(--text-primary)] hover:text-[var(--primary-color)] text-sm font-medium transition-colors">
-          FAQ
-        </Link>
-        {isAuthenticated ? (
-          <div className="flex items-center gap-4">
-            {/* Debug: Clear tokens button */}
-            <button
-              onClick={clearTokens}
-              className="text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] underline"
-              title="Clear all tokens and reload"
+    <motion.header 
+      className="sticky top-0 z-50"
+      initial={{ y: -100, opacity: 0 }}
+      animate={{ y: 0, opacity: 1 }}
+      transition={{ duration: 0.5, ease: 'easeOut' }}
+    >
+      <div className="flex items-center justify-between whitespace-nowrap border-b border-solid border-b-[#223649] px-10 py-4 shadow-md bg-[#101a23]/80 backdrop-blur-md">
+        <NavLink to="/" className="flex items-center gap-3 text-[var(--text-primary)]">
+          <svg className="h-8 w-8 text-[var(--primary-color)]" fill="none" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+            <path d="M39.5563 34.1455V13.8546C39.5563 15.708 36.8773 17.3437 32.7927 18.3189C30.2914 18.916 27.263 19.2655 24 19.2655C20.737 19.2655 17.7086 18.916 15.2073 18.3189C11.1227 17.3437 8.44365 15.708 8.44365 13.8546V34.1455C8.44365 35.9988 11.1227 37.6346 15.2073 38.6098C17.7086 39.2069 20.737 39.5564 24 39.5564C27.263 39.5564 30.2914 39.2069 32.7927 38.6098C36.8773 37.6346 39.5563 35.9988 39.5563 34.1455Z" fill="currentColor"></path>
+            <path clipRule="evenodd" d="M10.4485 13.8519C10.4749 13.9271 10.6203 14.246 11.379 14.7361C12.298 15.3298 13.7492 15.9145 15.6717 16.3735C18.0007 16.9296 20.8712 17.2655 24 17.2655C27.1288 17.2655 29.9993 16.9296 32.3283 16.3735C34.2508 15.9145 35.702 15.3298 36.621 14.7361C37.3796 14.246 37.5251 13.9271 37.5515 13.8519C37.5287 13.7876 37.4333 13.5973 37.0635 13.2931C36.5266 12.8516 35.6288 12.3647 34.343 11.9175C31.79 11.0295 28.1333 10.4437 24 10.4437C19.8667 10.4437 16.2099 11.0295 13.657 11.9175C12.3712 12.3647 11.4734 12.8516 10.9365 13.2931C10.5667 13.5973 10.4713 13.7876 10.4485 13.8519ZM37.5563 18.7877C36.3176 19.3925 34.8502 19.8839 33.2571 20.2642C30.5836 20.9025 27.3973 21.2655 24 21.2655C20.6027 21.2655 17.4164 20.9025 14.7429 20.2642C13.1498 19.8839 11.6824 19.3925 10.4436 18.7877V34.1275C10.4515 34.1545 10.5427 34.4867 11.379 35.027C12.298 35.6207 13.7492 36.2054 15.6717 36.6644C18.0007 37.2205 20.8712 37.5564 24 37.5564C27.1288 37.5564 29.9993 37.2205 32.3283 36.6644C34.2508 36.2054 35.702 35.6207 36.621 35.027C37.4573 34.4867 37.5485 34.1546 37.5563 34.1275V18.7877ZM41.5563 13.8546V34.1455C41.5563 36.1078 40.158 37.5042 38.7915 38.3869C37.3498 39.3182 35.4192 40.0389 33.2571 40.5551C30.5836 41.1934 27.3973 41.5564 24 41.5564C20.6027 41.5564 17.4164 41.1934 14.7429 40.5551C12.5808 40.0389 10.6502 39.3182 9.20848 38.3869C7.84205 37.5042 6.44365 36.1078 6.44365 34.1455L6.44365 13.8546C6.44365 12.2684 7.37223 11.0454 8.39581 10.2036C9.43325 9.3505 10.8137 8.67141 12.343 8.13948C15.4203 7.06909 19.5418 6.44366 24 6.44366C28.4582 6.44366 32.5797 7.06909 35.657 8.13948C37.1863 8.67141 38.5667 9.3505 39.6042 10.2036C40.6278 11.0454 41.5563 12.2684 41.5563 13.8546Z" fillRule="evenodd" fill="currentColor"></path>
+          </svg>
+          <h1 className="text-2xl font-bold tracking-tight">Anemoia</h1>
+        </NavLink>
+        <nav className="flex flex-1 justify-end items-center gap-6">
+          <NavLink className="nav-link" to="/faq">FAQ</NavLink>
+          <NavLink className="nav-link" to="/">Tools</NavLink>
+          {isAuthenticated ? (
+            <div className="flex items-center gap-4">
+              {/* Debug: Clear tokens button */}
+              <button
+                onClick={clearTokens}
+                className="text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] underline"
+                title="Clear all tokens and reload"
+              >
+                Clear Cache
+              </button>
+              {user?.picture && (
+                <img src={user.picture} alt="avatar" className="w-8 h-8 rounded-full" />
+              )}
+              <span className="text-sm font-medium text-[var(--text-primary)] truncate max-w-[120px]">
+                {user?.name || 'User'}
+              </span>
+              <button
+                onClick={handleLogout}
+                className="flex items-center gap-1 h-8 px-3 rounded bg-red-500 text-white text-xs font-semibold hover:bg-red-600 transition-colors"
+              >
+                <span className="material-symbols-outlined text-sm">logout</span> Logout
+              </button>
+            </div>
+          ) : (
+            <motion.button
+              onClick={handleLogin}
+              className="group flex items-center gap-2 min-w-[84px] max-w-[480px] cursor-pointer justify-center overflow-hidden rounded-lg h-10 px-4 bg-[var(--primary-color)] text-white text-sm font-bold tracking-[0.015em] shadow-md hover:shadow-lg hover:bg-blue-500 active:bg-blue-700"
+              whileHover={{ scale: 1.05, y: -2 }}
+              whileTap={{ scale: 0.95, y: 0 }}
+              transition={{ type: "spring", stiffness: 300, damping: 10 }}
             >
-              Clear Cache
-            </button>
-            {user?.picture && (
-              <img src={user.picture} alt="avatar" className="w-8 h-8 rounded-full" />
-            )}
-            <span className="text-sm font-medium text-[var(--text-primary)] truncate max-w-[120px]">
-              {user?.name || 'User'}
-            </span>
-            <button
-              onClick={handleLogout}
-              className="flex items-center gap-1 h-8 px-3 rounded bg-red-500 text-white text-xs font-semibold hover:bg-red-600 transition-colors"
-            >
-              <span className="material-symbols-outlined text-sm">logout</span> Logout
-            </button>
-          </div>
-        ) : (
-          <motion.button
-            onClick={handleLogin}
-            className="group flex items-center gap-2 min-w-[84px] max-w-[480px] cursor-pointer justify-center overflow-hidden rounded-lg h-10 px-4 bg-[var(--primary-color)] text-white text-sm font-bold tracking-[0.015em] shadow-md hover:shadow-lg hover:bg-blue-500 active:bg-blue-700"
-            whileHover={{ scale: 1.05, y: -2 }}
-            whileTap={{ scale: 0.95, y: 0 }}
-            transition={{ type: "spring", stiffness: 300, damping: 10 }}
-          >
-            <svg className="h-5 w-5 transition-transform duration-200 group-hover:rotate-6" height="24px" viewBox="0 0 48 48" width="24px" xmlns="http://www.w3.org/2000/svg">
-              <path d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12c0-6.627,5.373-12,12-12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C12.955,4,4,12.955,4,24s8.955,20,20,20s20-8.955,20-20C44,22.659,43.862,21.35,43.611,20.083z" fill="#FFC107"></path>
-              <path d="M6.306,14.691l6.571,4.819C14.655,15.108,18.961,12,24,12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C16.318,4,9.656,8.337,6.306,14.691z" fill="#FF3D00"></path>
-              <path d="M24,44c5.166,0,9.86-1.977,13.409-5.192l-6.19-5.238C29.211,35.091,26.715,36,24,36c-5.202,0-9.619-3.317-11.283-7.946l-6.522,5.025C9.505,39.556,16.227,44,24,44z" fill="#4CAF50"></path>
-              <path d="M43.611,20.083H42V20H24v8h11.303c-0.792,2.237-2.231,4.166-4.087,5.574l6.19,5.238C39.99,36.096,44,30.693,44,24C44,22.659,43.862,21.35,43.611,20.083z" fill="#1976D2"></path>
-            </svg>
-            <span className="truncate">Login with Google</span>
-          </motion.button>
-        )}
-      </nav>
-    </header>
+              <svg className="h-5 w-5 transition-transform duration-200 group-hover:rotate-6" height="24px" viewBox="0 0 48 48" width="24px" xmlns="http://www.w3.org/2000/svg">
+                <path d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12c0-6.627,5.373-12,12-12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C12.955,4,4,12.955,4,24s8.955,20,20,20s20-8.955,20-20C44,22.659,43.862,21.35,43.611,20.083z" fill="#FFC107"></path>
+                <path d="M6.306,14.691l6.571,4.819C14.655,15.108,18.961,12,24,12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C16.318,4,9.656,8.337,6.306,14.691z" fill="#FF3D00"></path>
+                <path d="M24,44c5.166,0,9.86-1.977,13.409-5.192l-6.19-5.238C29.211,35.091,26.715,36,24,36c-5.202,0-9.619-3.317-11.283-7.946l-6.522,5.025C9.505,39.556,16.227,44,24,44z" fill="#4CAF50"></path>
+                <path d="M43.611,20.083H42V20H24v8h11.303c-0.792,2.237-2.231,4.166-4.087,5.574l6.19,5.238C39.99,36.096,44,30.693,44,24C44,22.659,43.862,21.35,43.611,20.083z" fill="#1976D2"></path>
+              </svg>
+              <span className="truncate">Login with Google</span>
+            </motion.button>
+          )}
+        </nav>
+      </div>
+    </motion.header>
   );
 };
 
