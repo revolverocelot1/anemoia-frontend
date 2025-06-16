@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { motion, Variants } from 'framer-motion';
 
 // Create a motion-compatible Link component
 const MotionLink = motion(Link);
@@ -10,9 +10,10 @@ interface ToolCardProps {
   icon: string;
   accent?: string;
   path: string;
+  variants?: Variants; // Add this line
 }
 
-const ToolCard = ({ title, description, icon, accent, path }: ToolCardProps) => {
+const ToolCard = ({ title, description, icon, accent, path, variants }: ToolCardProps) => {
   // Default accent color if none provided
   const accentColor = accent || 'accent-color-1';
 
@@ -23,6 +24,7 @@ const ToolCard = ({ title, description, icon, accent, path }: ToolCardProps) => 
       whileHover={{ scale: 1.05, y: -5 }}
       whileTap={{ scale: 0.98 }}
       transition={{ type: 'spring', stiffness: 300, damping: 15 }}
+      variants={variants} // Add this line
     >
       {/* Accent bar */}
       <div className={`absolute left-0 top-0 h-full w-1 bg-[var(--${accentColor})]`} />

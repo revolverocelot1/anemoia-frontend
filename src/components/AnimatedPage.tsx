@@ -22,7 +22,7 @@ const pageVariants = {
 
 const pageTransition = {
   type: 'tween',
-  ease: 'anticipate', // Can try 'easeInOut' or others
+  ease: 'easeInOut',
   duration: 0.5,
 };
 

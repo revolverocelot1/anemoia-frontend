@@ -13,7 +13,7 @@ const LoadingOverlay = ({ message, progress }: LoadingOverlayProps) => {
           <motion.span
             className="material-symbols-outlined text-5xl text-[var(--primary-color)]"
             animate={{ rotate: 360 }}
-            transition={{ loop: Infinity, ease: "linear", duration: 1 }}
+            transition={{ repeat: Infinity, ease: "linear", duration: 1 }}
           >
             autorenew
           </motion.span>
