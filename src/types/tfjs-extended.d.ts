@@ -4,24 +4,28 @@ declare module '@tensorflow/tfjs' {
   // These signatures purposefully use `any`/`unknown` to stay robust across tfjs versions.
   // You can refine them later if you upgrade tfjs or switch to a maintained community typings package.
   // NOTE: We keep this in a project-local augmentation file so that upstream library updates do not break our build.
-  // tf.engine behaves like a callable function that also has properties such as `registryFactory`.
+  // The tf.engine() is a singleton that needs to be callable but also has properties.
   export const engine: {
-    (): any;                    // callable signature (returns the internal engine)
-    registryFactory?: Record<string, any>; // map of backend factories
-    [key: string]: any;         // allow access to any other dynamic properties exposed at runtime
+    (): any;
+    registryFactory: Record<string, any>;
+    [key: string]: any;
   };
 
-  // tf.env behaves like a callable function that also has properties such as `registryFactory`.
+  // The tf.env() is a singleton that holds flags.
   export const env: {
     (): any;
     [key: string]: any;
   };
 
-  /** Wait until the backend is initialised. */
+  /** Waits for the backend to be ready. */
   export function ready(): Promise<void>;
+
+  /** Sets the active backend. */
   export function setBackend(backendName: string): Promise<boolean>;
+
+  /** Returns the name of the current backend. */
   export function getBackend(): string;
 
-  /** Load a SavedModel / GraphModel from a URL or IndexedDB. */
-  export function loadGraphModel(path: string, options?: any): Promise<any>;
+  /** Loads a graph model from a URL or IndexedDB. */
+  export function loadGraphModel(url: string | any, options?: any): Promise<any>;
 } 
