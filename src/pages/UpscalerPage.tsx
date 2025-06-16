@@ -19,7 +19,7 @@ const UpscalerPage = () => {
     workerRef.current = new Worker(new URL('../workers/upscaler.worker.ts', import.meta.url), { type: 'module' });
 
     workerRef.current.onmessage = (e: MessageEvent) => {
-      const { status, error, upscaledImage } = e.data;
+      const { status, error, upscaledBlob } = e.data;
       switch (status) {
         case 'loading_model':
           setUiState('loading_model');
@@ -34,7 +34,6 @@ const UpscalerPage = () => {
           const previewSrc = originalPreviewRef.current;
           if (!previewSrc) return;
           
-          const { upscaledBlob } = e.data;
           const upscaledUrl = URL.createObjectURL(upscaledBlob);
 
           navigate('/upscaler/results', {
