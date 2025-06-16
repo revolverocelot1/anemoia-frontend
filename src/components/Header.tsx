@@ -7,6 +7,7 @@ const Header = () => {
 
   const handleLogin = async () => {
     const apiBaseUrl = import.meta.env.VITE_API_BASE_URL;
+    console.log('Auth URL:', `${apiBaseUrl}/auth/google?popup=1`);
     try {
       const token = await openAuthPopup(`${apiBaseUrl}/auth/google?popup=1`);
       setToken(token);
@@ -17,6 +18,12 @@ const Header = () => {
 
   const handleLogout = () => {
     logout();
+  };
+
+  const clearTokens = () => {
+    localStorage.removeItem('anemoia_token');
+    logout();
+    window.location.reload();
   };
 
   return (
@@ -34,6 +41,14 @@ const Header = () => {
         </Link>
         {isAuthenticated ? (
           <div className="flex items-center gap-4">
+            {/* Debug: Clear tokens button */}
+            <button
+              onClick={clearTokens}
+              className="text-xs text-gray-400 hover:text-gray-200 underline"
+              title="Clear all tokens and reload"
+            >
+              Clear Cache
+            </button>
             {user?.picture && (
               <img src={user.picture} alt="avatar" className="w-8 h-8 rounded-full" />
             )}

@@ -40,10 +40,13 @@ export function openAuthPopup(authUrl: string): Promise<string> {
 
     function onMessage(e: MessageEvent) {
       try {
+        console.log('Popup message received:', e.data, 'from origin:', e.origin);
         const originOk = new URL(authUrl).origin === e.origin;
+        console.log('Origin check:', originOk, 'expected:', new URL(authUrl).origin);
         if (!originOk) return; // ignore other origins
         const { token } = e.data || {};
         if (typeof token === 'string') {
+          console.log('Valid token received, closing popup');
           cleanup();
           resolve(token);
           if (popup && !popup.closed) {
@@ -51,7 +54,7 @@ export function openAuthPopup(authUrl: string): Promise<string> {
           }
         }
       } catch {
-        // ignore
+        console.warn('Error processing popup message:', e);
       }
     }
 

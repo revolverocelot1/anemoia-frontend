@@ -36,6 +36,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   }, []);
 
+  // Auto-validate token and clear if invalid
+  useEffect(() => {
+    if (!token) return;
+
+    // Ping a protected endpoint to verify token still works
+    fetch(`${import.meta.env.VITE_API_BASE_URL}/api/health`, {
+      headers: { Authorization: `Bearer ${token}` },
+    }).then(res => {
+      if (res.status === 401) {
+        // Token no longer valid -> wipe it
+        setToken(null);
+      }
+    }).catch(() => {/* ignore network errors */});
+  }, [token]);
+
   const setToken = (t: string | null) => {
     if (t) {
       localStorage.setItem(TOKEN_KEY, t);
