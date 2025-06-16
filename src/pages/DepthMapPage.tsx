@@ -5,7 +5,7 @@ import Footer from '../components/Footer';
 
 // Progress Bar component
 const ProgressBar = ({ message }: { message: string }) => (
-    <div className="w-full bg-[#2d3f53] rounded-full h-1.5">
+    <div className="w-full bg-white bg-opacity-20 rounded-full h-1.5">
         <div 
             className="bg-[var(--primary-color)] h-1.5 rounded-full transition-all duration-300 ease-out animate-pulse"
             style={{ width: '100%' }}
@@ -22,7 +22,7 @@ const StatusSection = ({ uiState, errorMessage }: {
     if (uiState === 'output') return null;
     
     return (
-        <div className="mt-4 p-4 bg-[#2d3f53] rounded-lg">
+        <div className="mt-4 p-4 bg-[var(--input-background)] rounded-lg">
             <div className="flex items-center justify-between mb-2">
                 {uiState === 'error' ? (
                     <span className="text-red-500">{errorMessage}</span>
@@ -90,7 +90,7 @@ const InputView = ({ onFileChange, onGenerate, imagePreview, isDisabled }: {
                     Upload Image
                 </label>
                 <div
-                    className={`mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-[#2d3f53] border-dashed rounded-md transition-colors cursor-pointer ${dragActive ? 'border-[var(--primary-color)] bg-[#223649]' : 'hover:border-[var(--primary-color)]'} ${isDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    className={`mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-[var(--input-border-color)] border-dashed rounded-md transition-colors cursor-pointer ${dragActive ? 'border-[var(--primary-color)] bg-[var(--primary-color)] bg-opacity-10' : 'hover:border-[var(--primary-color)]'} ${isDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
                     onDragEnter={handleDrag}
                     onDragOver={handleDrag}
                     onDragLeave={handleDrag}
@@ -105,7 +105,7 @@ const InputView = ({ onFileChange, onGenerate, imagePreview, isDisabled }: {
                         <span className="material-symbols-outlined text-5xl text-[var(--text-secondary)]">cloud_upload</span>
                         <div className="flex text-sm text-[var(--text-secondary)]">
                             <label
-                                className="relative cursor-pointer bg-[var(--secondary-color)] rounded-md font-medium text-[var(--primary-color)] hover:text-blue-400 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-offset-gray-800 focus-within:ring-[var(--primary-color)]"
+                                className="relative cursor-pointer bg-[var(--secondary-color)] rounded-md font-medium text-[var(--primary-color)] hover:text-[var(--primary-color-hover)] focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-offset-[var(--secondary-color)] focus-within:ring-[var(--primary-color)]"
                                 htmlFor="file-upload"
                                 tabIndex={-1}
                             >
@@ -123,11 +123,11 @@ const InputView = ({ onFileChange, onGenerate, imagePreview, isDisabled }: {
                             </label>
                             <p className="pl-1">or drag and drop</p>
                         </div>
-                        <p className="text-xs text-gray-500">PNG, JPG, GIF up to 10MB</p>
+                        <p className="text-xs text-[var(--text-secondary)] opacity-75">PNG, JPG, GIF up to 10MB</p>
                     </div>
                 </div>
                 {imagePreview && (
-                    <div className="mt-4 aspect-square bg-[#2d3f53] rounded-lg overflow-hidden">
+                    <div className="mt-4 aspect-square bg-[var(--input-background)] rounded-lg overflow-hidden">
                         <img
                             src={imagePreview}
                             alt="Preview"
@@ -140,7 +140,7 @@ const InputView = ({ onFileChange, onGenerate, imagePreview, isDisabled }: {
             <button
                 onClick={onGenerate}
                 disabled={isDisabled || !imagePreview}
-                className="w-full flex items-center justify-center gap-2 px-6 py-3 border border-transparent rounded-md shadow-sm text-base font-medium text-white bg-[var(--primary-color)] hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 focus:ring-[var(--primary-color)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full flex items-center justify-center gap-2 px-6 py-3 border border-transparent rounded-md shadow-sm text-base font-medium text-white bg-[var(--primary-color)] hover:bg-[var(--primary-color-hover)] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-[var(--secondary-color)] focus:ring-[var(--primary-color)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
                 <span className="material-symbols-outlined">layers</span>
                 Generate Depth Map
@@ -179,18 +179,18 @@ const OutputView = ({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
             <div>
               <h3 className="text-xl font-semibold text-[var(--text-primary)] mb-4">Original Image</h3>
-              <div className="aspect-square bg-[#2d3f53] rounded-lg overflow-hidden">
+              <div className="aspect-square bg-[var(--input-background)] rounded-lg overflow-hidden">
                 <img alt="Original uploaded image" className="w-full h-full object-cover" src={imagePreview || ''} />
               </div>
             </div>
             <div>
               <h3 className="text-xl font-semibold text-[var(--text-primary)] mb-4">Generated Depth Map</h3>
-              <div className="aspect-square bg-[#2d3f53] rounded-lg overflow-hidden">
+              <div className="aspect-square bg-[var(--input-background)] rounded-lg overflow-hidden">
                 {outputUrl && <img alt="Generated depth map" className="w-full h-full object-cover" src={outputUrl} />}
               </div>
             </div>
           </div>
-          <div className="border-t border-[#2d3f53] pt-8 space-y-6">
+          <div className="border-t border-[var(--input-border-color)] pt-8 space-y-6">
             <div>
               <h4 className="text-lg font-medium text-[var(--text-secondary)] mb-2">Processing Details:</h4>
               <ul className="list-disc list-inside text-[var(--text-secondary)] space-y-1 text-sm">
@@ -200,16 +200,16 @@ const OutputView = ({
               </ul>
             </div>
             <div className="flex flex-col sm:flex-row gap-4">
-              <button onClick={onSave} className="w-full flex items-center justify-center gap-2 px-6 py-3 border border-transparent rounded-md shadow-sm text-base font-medium text-white bg-[var(--primary-color)] hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 focus:ring-[var(--primary-color)] transition-colors" type="button">
+              <button onClick={onSave} className="w-full flex items-center justify-center gap-2 px-6 py-3 border border-transparent rounded-md shadow-sm text-base font-medium text-white bg-[var(--primary-color)] hover:bg-[var(--primary-color-hover)] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-[var(--secondary-color)] focus:ring-[var(--primary-color)] transition-colors" type="button">
                 <span className="material-symbols-outlined">save</span>
                 Save Depth Map
               </button>
-              <button onClick={onEdit} className="w-full flex items-center justify-center gap-2 px-6 py-3 border border-[#2d3f53] rounded-md shadow-sm text-base font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--primary-color)] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 focus:ring-[var(--primary-color)] transition-colors" type="button">
+              <button onClick={onEdit} className="w-full flex items-center justify-center gap-2 px-6 py-3 border border-[var(--input-border-color)] rounded-md shadow-sm text-base font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--primary-color)] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-[var(--secondary-color)] focus:ring-[var(--primary-color)] transition-colors" type="button">
                 <span className="material-symbols-outlined">edit</span>
                 Edit Further
               </button>
             </div>
-            <button onClick={onReset} className="w-full flex items-center justify-center gap-2 px-6 py-3 border border-transparent rounded-md text-base font-medium text-[var(--primary-color)] hover:text-blue-400 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 focus:ring-[var(--primary-color)] transition-colors" type="button">
+            <button onClick={onReset} className="w-full flex items-center justify-center gap-2 px-6 py-3 border border-transparent rounded-md text-base font-medium text-[var(--primary-color)] hover:text-[var(--primary-color-hover)] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-[var(--secondary-color)] focus:ring-[var(--primary-color)] transition-colors" type="button">
               <span className="material-symbols-outlined">restart_alt</span>
               Generate New Depth Map
             </button>

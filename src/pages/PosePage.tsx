@@ -97,7 +97,7 @@ const PosePage = () => {
 
   const drawSkeleton = (ctx: CanvasRenderingContext2D, keypoints: Keypoint[]) => {
     ctx.lineWidth = 2;
-    ctx.strokeStyle = '#0c7ff2';
+    ctx.strokeStyle = '#00AFFF'; /* Corresponds to the new --primary-color */
     // draw joints
     keypoints.forEach(kp => {
       if ((kp.score ?? 0) > 0.3) {
@@ -175,11 +175,11 @@ const PosePage = () => {
               {uiState !== 'output' && (
                 <div>
                   <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2" htmlFor="image-upload">Upload Image</label>
-                  <div className="mt-1 flex justify-center px-6 pt-10 pb-12 border-2 border-[var(--input-background)] border-dashed rounded-md hover:border-[var(--primary-color)] transition-colors duration-150" onDragOver={(e)=>e.preventDefault()} onDrop={(e)=>{e.preventDefault(); if(e.dataTransfer.files && e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);}}>
+                  <div className="mt-1 flex justify-center px-6 pt-10 pb-12 border-2 border-[var(--input-border-color)] border-dashed rounded-md hover:border-[var(--primary-color)] transition-colors duration-150" onDragOver={(e)=>e.preventDefault()} onDrop={(e)=>{e.preventDefault(); if(e.dataTransfer.files && e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);}}>
                     <div className="space-y-1 text-center">
                       <span className="material-symbols-outlined text-5xl text-[var(--text-secondary)]">cloud_upload</span>
                       <div className="flex text-sm text-[var(--text-secondary)]">
-                        <label htmlFor="file-upload" className="relative cursor-pointer bg-[var(--secondary-color)] rounded-md font-medium text-[var(--primary-color)] hover:text-blue-400 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-offset-[var(--secondary-color)] focus-within:ring-[var(--primary-color)]">
+                        <label htmlFor="file-upload" className="relative cursor-pointer bg-[var(--secondary-color)] rounded-md font-medium text-[var(--primary-color)] hover:text-[var(--primary-color-hover)] focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-offset-[var(--secondary-color)] focus-within:ring-[var(--primary-color)]">
                           <span>Upload a file</span>
                           <input id="file-upload" name="file-upload" type="file" className="sr-only" accept="image/*" onChange={(e)=>{if(e.target.files) handleFile(e.target.files[0])}} />
                         </label>
@@ -251,12 +251,12 @@ const PosePage = () => {
               )}
 
               {uiState === 'output' ? (
-                <button className="w-full flex items-center justify-center gap-2 rounded-lg h-12 px-6 bg-[var(--primary-color)] text-white text-base font-semibold tracking-wide hover:bg-blue-600 transition-colors duration-150" type="button" onClick={()=>setUiState('idle')}>
+                <button className="w-full flex items-center justify-center gap-2 rounded-lg h-12 px-6 bg-[var(--primary-color)] text-white text-base font-semibold tracking-wide hover:bg-[var(--primary-color-hover)] transition-colors duration-150" type="button" onClick={()=>setUiState('idle')}>
                   <span className="material-symbols-outlined">restart_alt</span>
                   New Image
                 </button>
               ) : (
-                <button className="w-full flex items-center justify-center gap-2 rounded-lg h-12 px-6 bg-[var(--primary-color)] text-white text-base font-semibold tracking-wide hover:bg-blue-600 transition-colors duration-150" type="button" disabled={uiState==='processing' || !originalPreview} onClick={handleGenerate}>
+                <button className="w-full flex items-center justify-center gap-2 rounded-lg h-12 px-6 bg-[var(--primary-color)] text-white text-base font-semibold tracking-wide hover:bg-[var(--primary-color-hover)] transition-colors duration-150" type="button" disabled={uiState==='processing' || !originalPreview} onClick={handleGenerate}>
                   <span className="material-symbols-outlined">auto_awesome</span>
                   {uiState==='loading_model' ? 'Loading model…' : uiState==='processing' ? 'Estimating…' : 'Estimate Pose'}
                 </button>

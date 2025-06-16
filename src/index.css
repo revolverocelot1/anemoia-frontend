@@ -11,13 +11,21 @@
   --accent-color-3: #ec4899;
   --accent-color-4: #8b5cf6;
 
+  /* Input elements */
+  --input-background: #1A1A1A;
+  --input-border-color: #444444;
+
+  /* Borders & Backgrounds */
+  --header-footer-border: #282828; /* Define explicitly */
+  --main-bg-color: #0A0A0A; /* Define explicitly */
+
   font-family: "Space Grotesk", "Noto Sans", sans-serif;
   line-height: 1.5;
   font-weight: 400;
 
   color-scheme: light dark;
   color: var(--text-primary);
-  background-color: #0A0A0A;
+  background-color: var(--main-bg-color);
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -39,7 +47,7 @@ body {
   min-width: 320px;
   min-height: 100vh;
   font-family: "Space Grotesk", "Noto Sans", sans-serif;
-  background-color: #0A0A0A;
+  background-color: var(--main-bg-color);
   color: var(--text-primary);
 }
 
@@ -67,7 +75,7 @@ header {
   align-items: center;
   justify-content: space-between;
   white-space: nowrap;
-  border-bottom: 1px solid #282828;
+  border-bottom: 1px solid var(--header-footer-border);
   padding: 1rem 2.5rem;
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
 }
@@ -98,7 +106,7 @@ main {
 footer {
   text-align: center;
   padding: 2rem 0;
-  border-top: 1px solid #282828;
+  border-top: 1px solid var(--header-footer-border);
   margin-top: auto;
 }
 

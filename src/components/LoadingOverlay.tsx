@@ -19,9 +19,9 @@ const LoadingOverlay = ({ message, progress }: LoadingOverlayProps) => {
           </motion.span>
           <p className="text-[var(--text-primary)] text-lg font-medium text-center">{message}</p>
           <div className="w-full">
-            <div className="w-full bg-gray-600 rounded-full h-2.5">
+            <div className="w-full bg-white bg-opacity-20 rounded-full h-2.5">
               <div
-                className="bg-blue-500 h-2.5 rounded-full transition-all duration-300 ease-out"
+                className="bg-[var(--primary-color)] h-2.5 rounded-full transition-all duration-300 ease-out"
                 style={{ width: `${progress}%` }}
               />
             </div>

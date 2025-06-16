@@ -42,7 +42,7 @@ const ToolCard = ({ title, description, icon, accent, path }: ToolCardProps) => 
           <p className="text-sm text-[var(--text-secondary)]">{description}</p>
         </div>
       </div>
-    </Link>
+    </MotionLink>
   );
 };
 

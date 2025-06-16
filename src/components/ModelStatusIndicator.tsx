@@ -19,7 +19,7 @@ const ModelStatusIndicator = ({ modelName, status, progress }: ModelStatusIndica
         </div>
       </div>
       {status === 'downloading' && (
-        <div className="w-full bg-[#2d3f53] rounded-full h-1.5">
+        <div className="w-full bg-white bg-opacity-20 rounded-full h-1.5">
           <div 
             className="bg-[var(--primary-color)] h-1.5 rounded-full transition-all duration-300 ease-out"
             style={{ width: `${progress}%` }}
