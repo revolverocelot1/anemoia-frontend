@@ -64,6 +64,22 @@ const UpscalerInput: React.FC<UpscalerInputProps> = ({ onImageUploaded, isProces
     multiple: false,
   });
 
+  // To prevent type conflicts between react-dropzone and framer-motion,
+  // we destructure out all incompatible event handlers.
+  const {
+    ref,
+    // Animation/Transition events
+    onAnimationStart,
+    onAnimationEnd,
+    onAnimationIteration,
+    onTransitionEnd,
+    // Drag events
+    onDrag,
+    onDragStart,
+    onDragEnd,
+    ...rootProps
+  } = getRootProps();
+
   const handleUpscaleClick = () => {
     if (selectedFile) {
       onImageUploaded(selectedFile, selectedScale);
@@ -100,7 +116,8 @@ const UpscalerInput: React.FC<UpscalerInputProps> = ({ onImageUploaded, isProces
       </motion.div>
 
       <motion.div
-        {...getRootProps()}
+        {...rootProps}
+        ref={ref}
         variants={itemVariants}
         className={`upload-area ${isDragActive ? 'drag-over' : ''}`}
       >

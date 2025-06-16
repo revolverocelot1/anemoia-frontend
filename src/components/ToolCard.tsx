@@ -1,9 +1,6 @@
 import { Link } from 'react-router-dom';
 import { motion, type Variants } from 'framer-motion';
 
-// Create a motion-compatible Link component
-const MotionLink = motion(Link);
-
 interface ToolCardProps {
   title: string;
   description: string;

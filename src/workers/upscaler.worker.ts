@@ -217,7 +217,7 @@ const upscaler = new ImageUpscaler();
 
 // Message handler
 self.onmessage = async (event: MessageEvent) => {
-  const { command, imageData, scaleFactor, backend } = event.data;
+  const { command, imageData, scaleFactor } = event.data;
   
   try {
     switch (command) {
