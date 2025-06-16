@@ -21,6 +21,7 @@ const PosePage = () => {
 
   // Three separate previews so we don't overwrite the original file after drawing overlays
   const [originalPreview, setOriginalPreview] = useState<string | null>(null);
+  const originalPreviewRef = useRef<string | null>(null);
   const [overlayPreview, setOverlayPreview] = useState<string | null>(null);
   const [skeletonPreview, setSkeletonPreview] = useState<string | null>(null);
 
@@ -45,28 +46,18 @@ const PosePage = () => {
           break;
         case 'complete':
           // If original preview available, redirect to dedicated results page
-          if (originalPreview) {
-            createPreviewURLs(originalPreview, workerPoses).then(({overlay, skeleton}) => {
-              navigate('/pose-estimation/results', {
-                state: {
-                  image: originalPreview,
-                  overlay,
-                  skeleton,
-                  poses: workerPoses,
-                }
-              });
+          const previewSrc = originalPreviewRef.current;
+          if (!previewSrc) return;
+          createPreviewURLs(previewSrc, workerPoses).then(({overlay, skeleton}) => {
+            navigate('/pose-estimation/results', {
+              state: {
+                image: previewSrc,
+                overlay,
+                skeleton,
+                poses: workerPoses,
+              }
             });
-          } else {
-            // Fallback: render inline (should rarely happen)
-            setUiState('output');
-            setPoses(workerPoses);
-            if (originalPreview) {
-              createPreviewURLs(originalPreview, workerPoses).then(({ overlay, skeleton }) => {
-                setOverlayPreview(overlay);
-                setSkeletonPreview(skeleton);
-              });
-            }
-          }
+          });
           break;
         case 'error':
           setUiState('error');
@@ -94,7 +85,9 @@ const PosePage = () => {
         workerRef.current?.postMessage({ command: 'estimate', imageData });
       };
       img.src = ev.target?.result as string;
-      setOriginalPreview(ev.target?.result as string);
+      const dataUrl = ev.target?.result as string;
+      setOriginalPreview(dataUrl);
+      originalPreviewRef.current = dataUrl;
     };
     reader.readAsDataURL(file);
   };
@@ -168,7 +161,7 @@ const PosePage = () => {
               {uiState !== 'output' && (
                 <div>
                   <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2" htmlFor="image-upload">Upload Image</label>
-                  <div className="mt-1 flex justify-center px-6 pt-10 pb-12 border-2 border-[var(--input-background)] border-dashed rounded-md hover:border-[var(--primary-color)] transition-colors duration-150">
+                  <div className="mt-1 flex justify-center px-6 pt-10 pb-12 border-2 border-[var(--input-background)] border-dashed rounded-md hover:border-[var(--primary-color)] transition-colors duration-150" onDragOver={(e)=>e.preventDefault()} onDrop={(e)=>{e.preventDefault(); if(e.dataTransfer.files && e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);}}>
                     <div className="space-y-1 text-center">
                       <span className="material-symbols-outlined text-5xl text-[var(--text-secondary)]">cloud_upload</span>
                       <div className="flex text-sm text-[var(--text-secondary)]">
