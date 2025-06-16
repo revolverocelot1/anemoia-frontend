@@ -1,10 +1,10 @@
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import ToolCard from '../components/ToolCard';
-import { motion, type Variants } from 'framer-motion';
+import { motion, type Variants, type Transition } from 'framer-motion';
 
-const containerVariants: Variants = { // Added : Variants
-  hidden: { opacity: 1 }, // Container itself can be initially visible or fade in
+const containerVariants: Variants = {
+  hidden: { opacity: 1 },
   visible: {
     opacity: 1,
     transition: {
@@ -14,12 +14,18 @@ const containerVariants: Variants = { // Added : Variants
   },
 };
 
-const itemVariants: Variants = { // Added : Variants
+const itemTransition: Transition = {
+  type: 'spring', // No 'as const' needed here due to explicit Transition typing
+  stiffness: 120,
+  damping: 12
+};
+
+const itemVariants: Variants = {
   hidden: { opacity: 0, y: 30 },
   visible: {
     opacity: 1,
     y: 0,
-    transition: { type: 'spring' as const, stiffness: 120, damping: 12 } // Added 'as const'
+    transition: itemTransition // Use the explicitly typed object
   },
 };
 

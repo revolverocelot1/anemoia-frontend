@@ -1,4 +1,4 @@
-import { motion } from 'framer-motion';
+import { motion, type Transition } from 'framer-motion';
 import React from 'react';
 
 interface AnimatedPageProps {
@@ -20,9 +20,9 @@ const pageVariants = {
   },
 };
 
-const pageTransition = {
-  type: 'tween' as const,
-  ease: 'easeInOut',
+const pageTransition: Transition = {
+  type: 'tween', // No longer need 'as const' here if pageTransition is typed
+  ease: [0.42, 0, 0.58, 1], // Standard easeInOut cubic-bezier
   duration: 0.5,
 };
 
