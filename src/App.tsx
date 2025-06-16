@@ -7,6 +7,8 @@ import SettingsPage from './pages/SettingsPage';
 import FAQPage from './pages/FAQPage';
 import PosePage from './pages/PosePage';
 import PoseResultsPage from './pages/PoseResultsPage';
+import UpscalerPage from './pages/UpscalerPage';
+import UpscalerResultsPage from './pages/UpscalerResultsPage';
 import { AccountPage } from './pages/AccountPage';
 // We will create these pages next
 // import PosePage from './pages/PosePage';
@@ -24,6 +26,8 @@ function App() {
       <Route path="/faq" element={<FAQPage />} />
       <Route path="/pose-estimation" element={<PosePage />} />
       <Route path="/pose-estimation/results" element={<PoseResultsPage />} />
+      <Route path="/upscaler" element={<UpscalerPage />} />
+      <Route path="/upscaler/results" element={<UpscalerResultsPage />} />
       {/* <Route path="/pose-estimation" element={<PosePage />} /> */}
     </Routes>
   );

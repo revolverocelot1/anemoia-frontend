@@ -32,8 +32,8 @@ const HomePage = () => {
               />
               <ToolCard
                 title="AI Upscaler"
-                description="Upscale your images up to 4x their size with incredible detail."
-                icon="photo_filter"
+                description="Enhance image resolution using Real-ESRGAN AI technology"
+                icon="auto_awesome"
                 accent="3"
                 path="/upscaler"
               />
