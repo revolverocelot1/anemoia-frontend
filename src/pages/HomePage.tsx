@@ -1,6 +1,27 @@
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import ToolCard from '../components/ToolCard';
+import { motion } from 'framer-motion';
+
+const containerVariants = {
+  hidden: { opacity: 1 }, // Container itself can be initially visible or fade in
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.15, // Adjust timing as needed
+      delayChildren: 0.2, // Optional delay before children start animating
+    },
+  },
+};
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 30 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: { type: 'spring', stiffness: 120, damping: 12 }
+  },
+};
 
 const HomePage = () => {
   return (
@@ -15,8 +36,14 @@ const HomePage = () => {
                 Unlock the power of AI to transform your images. Explore our tools and create something amazing.
               </p>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 w-full">
+            <motion.div
+              className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 w-full"
+              variants={containerVariants}
+              initial="hidden"
+              animate="visible"
+            >
               <ToolCard
+                variants={itemVariants}
                 title="Depth Map"
                 description="Generate stunning 3D depth maps from any 2D image."
                 icon="layers"
@@ -24,6 +51,7 @@ const HomePage = () => {
                 path="/depth-map"
               />
               <ToolCard
+                variants={itemVariants}
                 title="Pose Estimation"
                 description="Detect and visualize human body poses in your photos."
                 icon="accessibility_new"
@@ -31,20 +59,22 @@ const HomePage = () => {
                 path="/pose-estimation"
               />
               <ToolCard
+                variants={itemVariants}
                 title="AI Upscaler"
                 description="Upscale your images up to 4x their size with incredible detail."
-                icon="photo_filter"
+                icon="zoom_in"
                 accent="3"
                 path="/upscaler"
               />
               <ToolCard
+                variants={itemVariants}
                 title="Image Editor"
                 description="Perform quick crops, and color adjustments to perfect your images."
                 icon="tune"
                 accent="4"
                 path="/editor"
               />
-            </div>
+            </motion.div>
           </div>
         </main>
         <Footer />

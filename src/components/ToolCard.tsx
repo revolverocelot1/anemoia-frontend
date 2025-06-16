@@ -1,4 +1,8 @@
 import { Link } from 'react-router-dom';
+import { motion } from 'framer-motion';
+
+// Create a motion-compatible Link component
+const MotionLink = motion(Link);
 
 interface ToolCardProps {
   title: string;
@@ -13,9 +17,12 @@ const ToolCard = ({ title, description, icon, accent, path }: ToolCardProps) => 
   const accentColor = accent || 'accent-color-1';
 
   return (
-    <Link
+    <MotionLink
       to={path}
-      className={`group relative flex flex-col overflow-hidden rounded-xl bg-[var(--secondary-color)] p-6 transition-all hover:scale-[1.02] hover:shadow-lg`}
+      className={`group relative flex flex-col overflow-hidden rounded-xl bg-[var(--secondary-color)] p-6 transition-shadow duration-300 hover:shadow-lg`}
+      whileHover={{ scale: 1.05, y: -5 }}
+      whileTap={{ scale: 0.98 }}
+      transition={{ type: 'spring', stiffness: 300, damping: 15 }}
     >
       {/* Accent bar */}
       <div className={`absolute left-0 top-0 h-full w-1 bg-[var(--${accentColor})]`} />

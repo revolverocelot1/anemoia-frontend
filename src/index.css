@@ -1,11 +1,13 @@
 /* Basic Reset and Font Setup */
 :root {
-  --primary-color: #0c7ff2;
-  --secondary-color: #1f2937;
+  --primary-color: #00AFFF;
+  --secondary-color: #121212;
   --text-primary: #ffffff;
-  --text-secondary: #90adcb;
+  --text-secondary: #a0a0a0;
   --accent-color-1: #34d399;
   --accent-color-2: #f59e0b;
+  --primary-color-hover: #33CFFF; /* Lighter shade of #00AFFF */
+  --primary-color-active: #007AAA; /* Darker shade of #00AFFF */
   --accent-color-3: #ec4899;
   --accent-color-4: #8b5cf6;
 
@@ -15,7 +17,7 @@
 
   color-scheme: light dark;
   color: var(--text-primary);
-  background-color: #101a23;
+  background-color: #0A0A0A;
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -37,7 +39,7 @@ body {
   min-width: 320px;
   min-height: 100vh;
   font-family: "Space Grotesk", "Noto Sans", sans-serif;
-  background-color: #101a23;
+  background-color: #0A0A0A;
   color: var(--text-primary);
 }
 
@@ -65,7 +67,7 @@ header {
   align-items: center;
   justify-content: space-between;
   white-space: nowrap;
-  border-bottom: 1px solid #223649;
+  border-bottom: 1px solid #282828;
   padding: 1rem 2.5rem;
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
 }
@@ -96,7 +98,7 @@ main {
 footer {
   text-align: center;
   padding: 2rem 0;
-  border-top: 1px solid #223649;
+  border-top: 1px solid #282828;
   margin-top: auto;
 }
 
@@ -179,12 +181,12 @@ footer {
 
 .button:hover {
   box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
-  background-color: #3b82f6;
+  background-color: var(--primary-color-hover);
   transform: translateY(-2px);
 }
 
 .button:active {
-  background-color: #2563eb;
+  background-color: var(--primary-color-active);
   transform: translateY(0);
 }
 

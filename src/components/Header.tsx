@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 import { openAuthPopup } from '../utils/authPopup';
 
@@ -44,7 +45,7 @@ const Header = () => {
             {/* Debug: Clear tokens button */}
             <button
               onClick={clearTokens}
-              className="text-xs text-gray-400 hover:text-gray-200 underline"
+              className="text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] underline"
               title="Clear all tokens and reload"
             >
               Clear Cache
@@ -63,9 +64,12 @@ const Header = () => {
             </button>
           </div>
         ) : (
-          <button 
+          <motion.button
             onClick={handleLogin}
-            className="group flex items-center gap-2 min-w-[84px] max-w-[480px] cursor-pointer justify-center overflow-hidden rounded-lg h-10 px-4 bg-[var(--primary-color)] text-white text-sm font-bold tracking-[0.015em] shadow-md hover:shadow-lg hover:bg-blue-500 active:bg-blue-700 transition-all duration-200 ease-in-out transform hover:-translate-y-0.5 active:translate-y-0"
+            className="group flex items-center gap-2 min-w-[84px] max-w-[480px] cursor-pointer justify-center overflow-hidden rounded-lg h-10 px-4 bg-[var(--primary-color)] text-white text-sm font-bold tracking-[0.015em] shadow-md hover:shadow-lg hover:bg-blue-500 active:bg-blue-700"
+            whileHover={{ scale: 1.05, y: -2 }}
+            whileTap={{ scale: 0.95, y: 0 }}
+            transition={{ type: "spring", stiffness: 300, damping: 10 }}
           >
             <svg className="h-5 w-5 transition-transform duration-200 group-hover:rotate-6" height="24px" viewBox="0 0 48 48" width="24px" xmlns="http://www.w3.org/2000/svg">
               <path d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12c0-6.627,5.373-12,12-12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C12.955,4,4,12.955,4,24s8.955,20,20,20s20-8.955,20-20C44,22.659,43.862,21.35,43.611,20.083z" fill="#FFC107"></path>
@@ -74,7 +78,7 @@ const Header = () => {
               <path d="M43.611,20.083H42V20H24v8h11.303c-0.792,2.237-2.231,4.166-4.087,5.574l6.19,5.238C39.99,36.096,44,30.693,44,24C44,22.659,43.862,21.35,43.611,20.083z" fill="#1976D2"></path>
             </svg>
             <span className="truncate">Login with Google</span>
-          </button>
+          </motion.button>
         )}
       </nav>
     </header>
