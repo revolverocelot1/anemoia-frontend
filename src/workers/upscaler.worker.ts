@@ -35,26 +35,46 @@ self.onmessage = async (event: MessageEvent<any>) => {
     }
 
     const currentBackend = backend || 'webgl';
+    self.postMessage({ status: 'info', message: `Attempting to set backend to: ${currentBackend}` });
+    console.log("Available TFJS backends before setBackend:", Object.keys(tf.engine().registryFactory));
+    self.postMessage({ status: 'info', message: `Available backends before set: ${Object.keys(tf.engine().registryFactory).join(', ')}` });
+
     try {
-      if (!(await tf.setBackend(currentBackend))) {
-        self.postMessage({
-          status: 'error',
-          error: `${currentBackend} is not supported in your browser.`,
-        });
-        return;
-      } else {
-        console.log(`TF.js backend set to: ${tf.getBackend()}`);
+      await tf.env().setBackend(currentBackend); // Use tf.env()
+
+      // Verify if backend was set
+      const actualBackend = tf.env().getBackend();
+      console.log(`TF.js backend set to: ${actualBackend}`);
+
+      if (actualBackend !== currentBackend) {
+        // Fallback or error if desired backend couldn't be set
+        console.warn(`Failed to set backend to ${currentBackend}. Actual backend: ${actualBackend}. Attempting to set again or falling back to webgl if different.`);
+        // Optionally, try to set to webgl if currentBackend !== 'webgl' and failed
+        if (currentBackend !== 'webgl') {
+            await tf.env().setBackend('webgl');
+            const fallbackBackend = tf.env().getBackend();
+            console.log(`Fell back to webgl. Actual backend: ${fallbackBackend}`);
+            if (fallbackBackend !== 'webgl') {
+                 throw new Error(`Failed to set backend to ${currentBackend} or fallback webgl. Current is ${fallbackBackend}`);
+            }
+        } else {
+            throw new Error(`Failed to set backend to ${currentBackend}. Current is ${actualBackend}`);
+        }
       }
+      self.postMessage({ status: 'info', message: `TF.js backend successfully set to: ${tf.env().getBackend()}` });
+
+      await tf.ready();
+      self.postMessage({ status: 'info', message: 'TF.js backend is ready.' });
+
     } catch (e) {
-        self.postMessage({
-          status: 'error',
-          error: `Failed to set TF.js backend to ${currentBackend}: ${(e as Error).message}`,
-        });
-        return;
+      console.error(`Error setting backend or backend not ready:`, e);
+      self.postMessage({
+        status: 'error',
+        error: `Failed to set TF.js backend to ${currentBackend}: ${(e as Error).message}. Available: ${Object.keys(tf.engine().registryFactory).join(', ')}`,
+      });
+      return; // Stop if backend can't be set
     }
-
-    await tf.ready(); // Ensure backend is ready
-
+    // ... rest of model loading ...
     let model;
     try {
       console.log(`Attempting to load model from IndexedDB: indexeddb://${model_name_for_db}`);

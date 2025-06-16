@@ -81,7 +81,8 @@ const NewUpscalerPage: React.FC = () => {
             upscalerWorkerRef.current?.postMessage({
                 command: 'upscale',
                 imageData: imageRepresentation, // Send file or its data
-                scaleFactor: sf
+                scaleFactor: sf,
+                backend: 'webgl' // Add this line, defaulting to webgl for now
             });
         };
         img.src = e.target?.result as string;
