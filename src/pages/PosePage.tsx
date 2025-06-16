@@ -98,6 +98,17 @@ const PosePage = () => {
   const drawSkeleton = (ctx: CanvasRenderingContext2D, keypoints: Keypoint[]) => {
     ctx.lineWidth = 2;
     ctx.strokeStyle = '#0c7ff2';
+    // draw joints
+    keypoints.forEach(kp => {
+      if ((kp.score ?? 0) > 0.3) {
+        ctx.beginPath();
+        ctx.arc(kp.x, kp.y, 4, 0, Math.PI * 2);
+        ctx.fillStyle = '#34d399';
+        ctx.fill();
+      }
+    });
+
+    // draw limbs
     POSE_CONNECTIONS.forEach(([i, j]) => {
       const kp1 = keypoints[i];
       const kp2 = keypoints[j];
