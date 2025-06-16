@@ -34,11 +34,13 @@ const UpscalerPage = () => {
           const previewSrc = originalPreviewRef.current;
           if (!previewSrc) return;
           
-          // Navigate to results page with original and upscaled images
+          const { upscaledBlob } = e.data;
+          const upscaledUrl = URL.createObjectURL(upscaledBlob);
+
           navigate('/upscaler/results', {
             state: {
               original: previewSrc,
-              upscaled: upscaledImage,
+              upscaled: upscaledUrl,
               scaleFactor,
               model: 'Real-ESRGAN',
             }
