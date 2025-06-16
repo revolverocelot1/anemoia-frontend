@@ -11,7 +11,7 @@ const NewUpscalerPage: React.FC = () => {
   const [originalImage, setOriginalImage] = useState<File | null>(null);
   const [upscaledImageUrl, setUpscaledImageUrl] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [selectedScaleFactor, setSelectedScaleFactor] = useState<number>(4);
+  // const [selectedScaleFactor, setSelectedScaleFactor] = useState<number>(4); // Removed
   const [statusMessage, setStatusMessage] = useState<string>('');
   // Add more state as needed: error, progress, stats etc.
 
@@ -60,13 +60,9 @@ const NewUpscalerPage: React.FC = () => {
   // Placeholder functions
   const handleImageUploaded = (file: File, sf: number) => {
     setOriginalImage(file);
-    setSelectedScaleFactor(sf); // New state for selected scale factor
+    // setSelectedScaleFactor(sf); // Removed
     setIsProcessing(true);
     setStatusMessage('Preparing image...'); // Initial status
-
-    // Determine modelBasePath (this will be refined when models are self-hosted)
-    // For now, it's not strictly used by the placeholder worker but good to plan for.
-    const modelBasePath = '/models/upscaler/'; // Example
 
     // Create a simplified representation for the worker for now
     // A real implementation would send ImageData or an ImageBitmap
@@ -85,8 +81,7 @@ const NewUpscalerPage: React.FC = () => {
             upscalerWorkerRef.current?.postMessage({
                 command: 'upscale',
                 imageData: imageRepresentation, // Send file or its data
-                scaleFactor: sf,
-                modelBasePath: modelBasePath
+                scaleFactor: sf
             });
         };
         img.src = e.target?.result as string;

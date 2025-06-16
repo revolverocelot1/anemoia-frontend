@@ -30,18 +30,6 @@ const UpscalerInputView: React.FC<UpscalerInputViewProps> = ({ onImageUploaded, 
     disabled: isProcessing,
   });
 
-  const handleManualUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (event.target.files && event.target.files[0]) {
-      const file = event.target.files[0];
-      setSelectedFile(file);
-      const reader = new FileReader();
-      reader.onload = () => {
-        setPreviewUrl(reader.result as string);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
   const handleUpscaleClick = () => {
     if (selectedFile) {
       onImageUploaded(selectedFile, scaleFactor);
