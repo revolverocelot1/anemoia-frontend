@@ -8,13 +8,13 @@ const MODEL_CONFIGS = {
     name: 'Real-CUGAN x2 Conservative',
     scaleFactor: 2,
     tileSize: 64,
-    modelPath: 'https://raw.githubusercontent.com/xororz/web-realesrgan/master/public/models/cugan_2x_conservative_64/model.json',
+    modelPath: 'https://raw.githubusercontent.com/xororz/web-realesrgan/master/public/models/cugan_2x_conservative/model.json',
   },
   x4: {
     name: 'Real-ESRGAN x4 General+',
     scaleFactor: 4,
     tileSize: 64,
-    modelPath: 'https://raw.githubusercontent.com/xororz/web-realesrgan/master/public/models/realesrgan_x4_general_plus_64/model.json',
+    modelPath: 'https://raw.githubusercontent.com/xororz/web-realesrgan/master/public/models/realesrgan_x4_general_plus/model.json',
   },
 };
 
