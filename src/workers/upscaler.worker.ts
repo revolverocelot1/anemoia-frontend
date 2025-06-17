@@ -2,18 +2,20 @@ import * as tf from '@tensorflow/tfjs';
 
 // Model configurations
 const MODEL_CONFIGS = {
+  // NOTE: These are Web-converted FP16 TFJS GraphModels coming from the user-provided HuggingFace links.
+  // Paths are relative to the Vite `public` folder so they get served statically at runtime.
   x2: {
-    name: 'Real-ESRGAN x2+',
+    name: 'Real-CUGAN x2 Conservative',
     scaleFactor: 2,
-    tileSize: 256,
-    modelPath: '/models/realesrgan_x2plus/model.json'
+    tileSize: 64,
+    modelPath: '/models/upscaler/realcugan_x2_conservative_64/model.json',
   },
   x4: {
-    name: 'Real-ESRGAN x4+',
+    name: 'Real-ESRGAN x4 General+',
     scaleFactor: 4,
-    tileSize: 128,
-    modelPath: '/models/realesrgan_x4plus/model.json'
-  }
+    tileSize: 64,
+    modelPath: '/models/upscaler/realesrgan_x4_general_plus_64/model.json',
+  },
 };
 
 interface UpscalerStats {
@@ -62,35 +64,45 @@ class ImageUpscaler {
       // Check if model exists in IndexedDB
       const cachedModelKey = `realesrgan_${modelKey}`;
       
+      // 1. Attempt to restore previously-cached model from IndexedDB so we avoid re-downloading every visit.
       try {
         this.model = await tf.loadGraphModel(`indexeddb://${cachedModelKey}`);
         this.currentModelKey = modelKey;
-        self.postMessage({ 
-          status: 'model_ready', 
-          message: `${modelConfig.name} model loaded from cache`
+        self.postMessage({
+          status: 'model_ready',
+          message: `${modelConfig.name} model loaded from cache`,
         });
         return;
-      } catch (e) {
-        // Model not in cache, download it
-        console.log('Model not in cache, downloading...');
+      } catch (_) {
+        // cache miss – fall through to network download
       }
-      
-      // For demo purposes, simulate model loading with progress
-      // In production, you would download the actual model from a CDN
-      for (let i = 0; i <= 100; i += 20) {
-        await new Promise(resolve => setTimeout(resolve, 300));
-        self.postMessage({ 
-          status: 'model_loading', 
-          message: `Downloading ${modelConfig.name} model...`,
-          progress: i 
-        });
-      }
-      
-      // Simulate successful model loading
+
+      // 2. Fetch the model from the network
+      self.postMessage({
+        status: 'model_loading',
+        message: `Downloading ${modelConfig.name} weights…`,
+        progress: 0,
+      });
+
+      this.model = await tf.loadGraphModel(modelConfig.modelPath, {
+        onProgress: (frac: number) => {
+          self.postMessage({
+            status: 'model_loading',
+            message: `Downloading ${modelConfig.name} weights…`,
+            progress: Math.round(frac * 100),
+          });
+        },
+      });
+
+      // 3. Persist to IndexedDB for next time (non-blocking)
+      this.model
+        .save(`indexeddb://${cachedModelKey}`)
+        .catch((err: unknown) => console.warn('Failed to save model to cache', err));
+
       this.currentModelKey = modelKey;
-      self.postMessage({ 
-        status: 'model_ready', 
-        message: `${modelConfig.name} model ready`
+      self.postMessage({
+        status: 'model_ready',
+        message: `${modelConfig.name} model ready`,
       });
       
     } catch (error) {
@@ -112,32 +124,35 @@ class ImageUpscaler {
       3
     ]);
     
-    // Normalize to [-1, 1]
-    const normalized = tile.div(127.5).sub(1);
-    
-    // Add batch dimension
+    // Normalize input to [0,1] as expected by the converted models.
+    const normalized = tile.div(255);
+
     const batched = normalized.expandDims(0);
-    
-    // Process tile (using bicubic upsampling for demo)
-    const outputSize: [number, number] = [
-      tile.shape[0] * scaleFactor,
-      tile.shape[1] * scaleFactor
-    ];
-    
-    const upscaled = tf.image.resizeBilinear(batched, outputSize);
-    
-    // Remove batch dimension and denormalize
-    const squeezed = upscaled.squeeze();
-    const denormalized = squeezed.add(1).mul(127.5);
-    
-    // Clean up intermediate tensors
+
+    let prediction: tf.Tensor;
+    if (this.model) {
+      // Run the super-resolution network
+      prediction = this.model.execute(batched) as tf.Tensor;
+    } else {
+      // Fallback (shouldn't happen after proper initialization)
+      const outShape: [number, number] = [
+        tile.shape[0] * scaleFactor,
+        tile.shape[1] * scaleFactor,
+      ];
+      prediction = tf.image.resizeBilinear(batched, outShape);
+    }
+
+    // Post-process: squeeze batch dim, clip to valid range, convert to uint8 [0,255]
+    const squeezed = prediction.squeeze();
+    const denorm = squeezed.mul(255).clipByValue(0, 255);
+
+    // Dispose temps except denorm which is returned
     tile.dispose();
     normalized.dispose();
     batched.dispose();
-    upscaled.dispose();
-    squeezed.dispose();
-    
-    return denormalized as tf.Tensor3D;
+    if (prediction !== squeezed) prediction.dispose();
+
+    return denorm as tf.Tensor3D;
   }
   
   async upscaleImage(imageData: ImageData, scaleFactor: number): Promise<{ url: string; fileSize: number }> {
