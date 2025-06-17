@@ -34,7 +34,6 @@ interface UpscalerStats {
 
 class ImageUpscaler {
   private model: tf.GraphModel | null = null;
-  private currentModelKey: string | null = null;
   private currentModelConfig: typeof MODEL_CONFIGS[keyof typeof MODEL_CONFIGS] | null = null;
   
   async initialize() {
@@ -58,7 +57,6 @@ class ImageUpscaler {
     console.log(`Loading model: ${config.name} (using optimized bicubic interpolation)`);
     
     this.currentModelConfig = config;
-    this.currentModelKey = modelKey;
     
     // Simulate model loading time for UX consistency
     await new Promise(resolve => setTimeout(resolve, 1000));
