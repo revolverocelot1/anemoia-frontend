@@ -37,9 +37,9 @@ const HomePage = () => {
         <main className="px-10 md:px-20 lg:px-40 flex flex-1 justify-center py-12">
           <div className="layout-content-container flex flex-col items-center max-w-5xl flex-1 w-full">
             <div className="text-center mb-12">
-              <h2 className="text-4xl md:text-5xl font-bold mb-4 tracking-tighter">AI Photo Editing Suite</h2>
+              <h2 className="text-4xl md:text-5xl font-bold mb-4 tracking-tighter">AI Photo Studio — powered by WebGPU</h2>
               <p className="text-lg md:text-xl text-[var(--text-secondary)] max-w-2xl mx-auto">
-                Unlock the power of AI to transform your images. Explore our tools and create something amazing.
+                All models run <strong>directly in your browser</strong> using WebGPU/WebGL — no images ever leave your device. That means instant processing, full privacy and zero server-side costs.
               </p>
             </div>
             <motion.div
