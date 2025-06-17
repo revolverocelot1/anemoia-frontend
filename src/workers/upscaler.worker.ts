@@ -8,13 +8,13 @@ const MODEL_CONFIGS = {
     name: 'Real-CUGAN x2 Conservative',
     scaleFactor: 2,
     tileSize: 64,
-    modelPath: '/models/upscaler/realcugan_x2_conservative_64/model.json',
+    modelPath: 'https://cdn.jsdelivr.net/npm/@upscalerjs/esrgan-thick@4.4.1/dist/umd/2x/model.json',
   },
   x4: {
     name: 'Real-ESRGAN x4 General+',
     scaleFactor: 4,
     tileSize: 64,
-    modelPath: '/models/upscaler/realesrgan_x4_general_plus_64/model.json',
+    modelPath: 'https://cdn.jsdelivr.net/npm/@upscalerjs/esrgan-thick@4.4.1/dist/umd/4x/model.json',
   },
 };
 
