@@ -1,4 +1,5 @@
 import * as tf from '@tensorflow/tfjs';
+import '@tensorflow/tfjs-backend-wasm';
 import ssim from 'ssim.js';
 import pixelmatch from 'pixelmatch';
 import { createScheduler, createWorker } from 'tesseract.js';
