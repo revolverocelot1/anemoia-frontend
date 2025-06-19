@@ -13,6 +13,8 @@ import { AccountPage } from './pages/AccountPage';
 import NewUpscalerPage from './pages/NewUpscalerPage';
 // We will create these pages next
 // import PosePage from './pages/PosePage';
+import ImageComparisonPage from './pages/ImageComparisonPage';
+import ImageComparisonResultsPage from './pages/ImageComparisonResultsPage';
 
 function App() {
   const location = useLocation();
@@ -97,6 +99,22 @@ function App() {
           element={
             <AnimatedPage>
               <NewUpscalerPage />
+            </AnimatedPage>
+          }
+        />
+        <Route
+          path="/compare"
+          element={
+            <AnimatedPage>
+              <ImageComparisonPage />
+            </AnimatedPage>
+          }
+        />
+        <Route
+          path="/compare/results"
+          element={
+            <AnimatedPage>
+              <ImageComparisonResultsPage />
             </AnimatedPage>
           }
         />

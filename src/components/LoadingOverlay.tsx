@@ -2,7 +2,7 @@ import { motion } from 'framer-motion';
 
 interface LoadingOverlayProps {
   message: string;
-  progress: number;
+  progress?: number;
 }
 
 const LoadingOverlay = ({ message, progress }: LoadingOverlayProps) => {
@@ -18,14 +18,16 @@ const LoadingOverlay = ({ message, progress }: LoadingOverlayProps) => {
             autorenew
           </motion.span>
           <p className="text-[var(--text-primary)] text-lg font-medium text-center">{message}</p>
-          <div className="w-full">
-            <div className="w-full bg-white bg-opacity-20 rounded-full h-2.5">
-              <div
-                className="bg-[var(--primary-color)] h-2.5 rounded-full transition-all duration-300 ease-out"
-                style={{ width: `${progress}%` }}
-              />
+          {progress !== undefined && (
+            <div className="w-full">
+              <div className="w-full bg-white bg-opacity-20 rounded-full h-2.5">
+                <div
+                  className="bg-[var(--primary-color)] h-2.5 rounded-full transition-all duration-300 ease-out"
+                  style={{ width: `${progress}%` }}
+                />
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
     </div>

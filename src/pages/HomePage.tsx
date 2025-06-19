@@ -74,11 +74,11 @@ const HomePage = () => {
               />
               <ToolCard
                 variants={itemVariants}
-                title="Image Editor"
-                description="Perform quick crops, and color adjustments to perfect your images."
-                icon="tune"
+                title="Image Comparison"
+                description="Compare two images and spot the differences with AI-powered analysis."
+                icon="compare_arrows"
                 accent="4"
-                path="/editor"
+                path="/compare"
               />
             </motion.div>
           </div>
