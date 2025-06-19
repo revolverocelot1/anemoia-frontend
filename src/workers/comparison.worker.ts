@@ -45,8 +45,6 @@ self.onmessage = async (event) => {
       throw new Error(`Images must have the same dimensions for comparison. Image 1: ${image1.width}x${image1.height}, Image 2: ${image2.width}x${image2.height}`);
     }
 
-    const { width, height } = image1;
-
     // --- 3. ANALYSIS TASKS ---
     
     const results: any = {
@@ -174,7 +172,6 @@ function findDifferenceRegions(diffImageData: ImageData, maxRegions: number) {
 
                 while (queue.length > 0) {
                     const [cx, cy] = queue.shift()!;
-                    const cIndex = cy * width + cx;
                     
                     region.x = Math.min(region.x, cx);
                     region.y = Math.min(region.y, cy);
@@ -268,7 +265,7 @@ async function performClassification(image1: ImageBitmap, image2: ImageBitmap) {
             .toFloat()
             .div(255); // Normalize to [0, 1]
 
-        const predictions = await model.predict(tensor) as tf.Tensor;
+        const predictions: any = await model.predict(tensor);
         const topK = await predictions.topk(3); // Get top 3 predictions
         
         // This part requires a map from indices to class names.
@@ -290,7 +287,8 @@ async function performClassification(image1: ImageBitmap, image2: ImageBitmap) {
     self.postMessage({ type: 'progress', payload: { message: 'Classifying Image 2...' } });
     const classification2 = await classify(image2);
 
-    tf.dispose(model); // Clean up the model
+    // Dispose the model to free memory
+    (model as any).dispose?.();
 
     return {
         image1: classification1,
