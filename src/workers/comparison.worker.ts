@@ -114,11 +114,11 @@ self.onmessage = async (event) => {
         if (enableClassification) {
             self.postMessage({ type: 'progress', payload: { message: 'Loading classification model...' } });
             
-            const modelUrl = 'https://tfhub.dev/google/tfjs-model/imagenet/densenet_121/classification/2/default/1';
+            const modelUrl = 'https://storage.googleapis.com/tfjs-models/tfjs/mobilenet_v2_1.0_224/model.json';
             const labelsUrl = 'https://storage.googleapis.com/download.tensorflow.org/data/imagenet_class_index.json';
 
             const [model, labels] = await Promise.all([
-              tf.loadGraphModel(modelUrl, { fromTFHub: true }) as Promise<tf.GraphModel>,
+              tf.loadGraphModel(modelUrl) as Promise<tf.GraphModel>,
               fetch(labelsUrl).then(res => res.json())
             ]);
  
