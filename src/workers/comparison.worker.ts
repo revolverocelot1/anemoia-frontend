@@ -130,12 +130,12 @@ function performPixelAnalysis(image1: ImageBitmap, image2: ImageBitmap) {
 
     // Run Pixelmatch
     const mismatchedPixels = pixelmatch(img1Data.data, img2Data.data, diffImageData.data, width, height, {
-        threshold: 0.1, // Lower threshold for more sensitivity
+        threshold: 0.05, // Lower threshold for more sensitivity
         includeAA: true, // Include anti-aliased pixels
     });
 
     // Run Bounding Box detection on the diff
-    const differences = findDifferenceRegions(diffImageData, 20);
+    const differences = findDifferenceRegions(diffImageData, 20, 10); // Ignore regions smaller than 10 pixels
 
     // Calculate advanced stats
     const mse = calculateMse(img1Data.data, img2Data.data);
@@ -147,6 +147,8 @@ function performPixelAnalysis(image1: ImageBitmap, image2: ImageBitmap) {
             differencesFound: differences.length,
             mse,
             ssim: ssimResult,
+            imageWidth: width,
+            imageHeight: height,
         },
         diffImageData,
         differences
@@ -160,7 +162,7 @@ function performPixelAnalysis(image1: ImageBitmap, image2: ImageBitmap) {
  * @param maxRegions The maximum number of regions to return, sorted by size.
  * @returns An array of difference objects.
  */
-function findDifferenceRegions(diffImageData: ImageData, maxRegions: number) {
+function findDifferenceRegions(diffImageData: ImageData, maxRegions: number, minArea: number) {
     const { width, height, data } = diffImageData;
     const visited = new Uint8Array(width * height);
     const regions = [];
@@ -205,11 +207,13 @@ function findDifferenceRegions(diffImageData: ImageData, maxRegions: number) {
                         }
                     });
                 }
-                regions.push({
-                    ...region,
-                    w: region.maxX - region.x + 1,
-                    h: region.maxY - region.y + 1,
-                });
+                if (region.area >= minArea) {
+                  regions.push({
+                      ...region,
+                      w: region.maxX - region.x + 1,
+                      h: region.maxY - region.y + 1,
+                  });
+                }
             }
         }
     }
@@ -246,9 +250,10 @@ async function performOcr(image1Url: string, image2Url: string) {
     scheduler.addWorker(worker1);
     scheduler.addWorker(worker2);
 
+    // Preprocess and recognize
     const [result1, result2] = await Promise.all([
-        scheduler.addJob('recognize', image1Url),
-        scheduler.addJob('recognize', image2Url)
+        preprocessImageForOcr(image1Url).then(dataUrl => scheduler.addJob('recognize', dataUrl)),
+        preprocessImageForOcr(image2Url).then(dataUrl => scheduler.addJob('recognize', dataUrl))
     ]);
     
     await scheduler.terminate();
@@ -257,6 +262,35 @@ async function performOcr(image1Url: string, image2Url: string) {
         image1: result1.data.text,
         image2: result2.data.text,
     };
+}
+
+/**
+ * Pre-processes an image to improve OCR accuracy.
+ * Converts to grayscale and increases contrast.
+ */
+async function preprocessImageForOcr(imageUrl: string): Promise<string> {
+  const image = await fetch(imageUrl).then(res => res.blob()).then(createImageBitmap);
+  const canvas = new OffscreenCanvas(image.width, image.height);
+  const ctx = canvas.getContext('2d');
+  
+  if (!ctx) {
+    throw new Error('Could not create canvas context for OCR preprocessing.');
+  }
+
+  ctx.drawImage(image, 0, 0);
+  
+  // Grayscale and contrast adjustments
+  ctx.filter = 'grayscale(1) contrast(150%)';
+  ctx.drawImage(canvas, 0, 0); // Apply filter
+
+  // Tesseract works best with a direct data URL of the processed image
+  const blob = await canvas.convertToBlob({ type: 'image/png' });
+  
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result as string);
+    reader.readAsDataURL(blob);
+  });
 }
 
 

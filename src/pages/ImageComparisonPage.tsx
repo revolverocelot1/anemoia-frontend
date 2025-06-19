@@ -92,7 +92,8 @@ const ImageComparisonPage: React.FC = () => {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-10">
             <FileInput 
-                id={1} 
+                id={1}
+                label="Original Image"
                 preview={image1Preview} 
                 onChange={handleFileChange} 
                 onDrop={handleDrop}
@@ -101,7 +102,8 @@ const ImageComparisonPage: React.FC = () => {
                 isDragging={isDragging === 1}
             />
             <FileInput 
-                id={2} 
+                id={2}
+                label="Edited Image"
                 preview={image2Preview}
                 onChange={handleFileChange} 
                 onDrop={handleDrop}
@@ -124,7 +126,7 @@ const ImageComparisonPage: React.FC = () => {
             <button
               onClick={handleCompare}
               disabled={!image1 || !image2}
-              className="flex items-center justify-center w-full max-w-xs h-14 px-8 rounded-full bg-blue-600 text-white text-lg font-bold shadow-lg hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed transition-all transform hover:scale-105 disabled:scale-100"
+              className="flex items-center justify-center w-full max-w-xs h-14 px-8 rounded-full bg-indigo-600 text-white text-lg font-bold shadow-lg hover:bg-indigo-700 disabled:bg-gray-600 disabled:cursor-not-allowed transition-all transform hover:scale-105 disabled:scale-100"
             >
               <svg className="w-6 h-6 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 17l-5-5 5-5m6 10l5-5-5-5"></path></svg>
               Analyze & Compare
@@ -141,6 +143,7 @@ const ImageComparisonPage: React.FC = () => {
 
 interface FileInputProps {
     id: number;
+    label: string;
     preview: string | null;
     onChange: (e: React.ChangeEvent<HTMLInputElement>, id: number) => void;
     onDrop: (e: React.DragEvent<HTMLLabelElement>, id: number) => void;
@@ -149,9 +152,9 @@ interface FileInputProps {
     isDragging: boolean;
 }
 
-const FileInput: React.FC<FileInputProps> = ({ id, preview, onChange, onDrop, onDragEnter, onDragLeave, isDragging }) => (
+const FileInput: React.FC<FileInputProps> = ({ id, label, preview, onChange, onDrop, onDragEnter, onDragLeave, isDragging }) => (
     <div className="flex flex-col">
-      <h3 className="text-xl font-semibold mb-4 text-center">Image {id}</h3>
+      <h3 className="text-xl font-semibold mb-4 text-center">{label}</h3>
       <label 
         htmlFor={`file-input-${id}`}
         onDrop={(e) => onDrop(e, id)}

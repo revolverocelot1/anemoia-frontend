@@ -4,6 +4,7 @@ import Header from '../components/Header';
 import Footer from '../components/Footer';
 import { motion } from 'framer-motion';
 import LoadingOverlay from '../components/LoadingOverlay';
+import { FaArrowLeft, FaExclamationTriangle, FaInfoCircle, FaCheckCircle, FaThumbsUp, FaEye } from 'react-icons/fa';
 
 // Define the structure of the results we expect from the worker
 interface AnalysisResults {
@@ -12,11 +13,12 @@ interface AnalysisResults {
     differencesFound?: number;
     mse?: number;
     ssim?: number;
-    processingTime?: string;
+    imageWidth?: number;
+    imageHeight?: number;
   };
   annotations?: {
     diffImageData: ImageData;
-    differences: any[];
+    differences: BoundingBox[];
   };
   ocr?: {
     image1: string;
@@ -27,6 +29,40 @@ interface AnalysisResults {
     image2: any[];
   };
 }
+
+interface BoundingBox {
+  id: number;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  area: number;
+}
+
+// Helper functions for stats interpretation
+const getSsimAnalysis = (ssimValue: number) => {
+  if (ssimValue > 0.99) return { level: 'Identical', color: 'text-green-400', icon: <FaCheckCircle /> };
+  if (ssimValue > 0.95) return { level: 'Very High Similarity', color: 'text-green-500', icon: <FaThumbsUp /> };
+  if (ssimValue > 0.85) return { level: 'High Similarity', color: 'text-yellow-400', icon: <FaEye /> };
+  if (ssimValue > 0.7) return { level: 'Moderate Similarity', color: 'text-orange-400', icon: <FaExclamationTriangle /> };
+  return { level: 'Low Similarity', color: 'text-red-500', icon: <FaExclamationTriangle /> };
+};
+
+const getMseAnalysis = (mseValue: number) => {
+  if (mseValue < 10) return { level: 'Very Low Difference', color: 'text-green-400', icon: <FaCheckCircle /> };
+  if (mseValue < 100) return { level: 'Low Difference', color: 'text-green-500', icon: <FaThumbsUp /> };
+  if (mseValue < 500) return { level: 'Noticeable Difference', color: 'text-yellow-400', icon: <FaEye /> };
+  if (mseValue < 1500) return { level: 'Significant Difference', color: 'text-orange-400', icon: <FaExclamationTriangle /> };
+  return { level: 'Very High Difference', color: 'text-red-500', icon: <FaExclamationTriangle /> };
+};
+
+const getMismatchAnalysis = (mismatchPercent: number) => {
+  if (mismatchPercent < 0.1) return { level: 'Negligible Mismatch', color: 'text-green-400', icon: <FaCheckCircle /> };
+  if (mismatchPercent < 1) return { level: 'Very Low Mismatch', color: 'text-green-500', icon: <FaThumbsUp /> };
+  if (mismatchPercent < 5) return { level: 'Low Mismatch', color: 'text-yellow-400', icon: <FaEye /> };
+  if (mismatchPercent < 15) return { level: 'Moderate Mismatch', color: 'text-orange-400', icon: <FaExclamationTriangle /> };
+  return { level: 'High Mismatch', color: 'text-red-500', icon: <FaExclamationTriangle /> };
+};
 
 const ImageComparisonResultsPage: React.FC = () => {
   const navigate = useNavigate();
@@ -40,7 +76,8 @@ const ImageComparisonResultsPage: React.FC = () => {
   const [showAnnotations, setShowAnnotations] = useState(true);
 
   const workerRef = useRef<Worker | null>(null);
-  const diffCanvasRef = useRef<HTMLCanvasElement>(null);
+  const annotatedCanvasRef = useRef<HTMLCanvasElement>(null);
+  const image2Ref = useRef<HTMLImageElement>(new Image());
 
   useEffect(() => {
     // If we land on this page without state, navigate back to the input page.
@@ -79,13 +116,18 @@ const ImageComparisonResultsPage: React.FC = () => {
       setLoading(false);
     };
     
-    // Start the analysis
-    setLoadingMessage('Starting analysis...');
-    workerRef.current.postMessage({
-      image1: image1,
-      image2: image2,
-      settings: { enableAnnotations, enableOcr, enableClassification },
-    });
+    // Set image source to trigger load
+    image2Ref.current.src = image2;
+
+    // Start the analysis only after the image is loaded
+    image2Ref.current.onload = () => {
+      setLoadingMessage('Starting analysis...');
+      workerRef.current?.postMessage({
+        image1: image1,
+        image2: image2,
+        settings: { enableAnnotations, enableOcr, enableClassification },
+      });
+    };
 
     // Cleanup function to terminate the worker when the component unmounts
     return () => {
@@ -93,38 +135,45 @@ const ImageComparisonResultsPage: React.FC = () => {
     };
   }, [image1, image2, enableAnnotations, enableOcr, enableClassification, navigate]);
 
-  // Effect to draw the diff canvas once results are available
+  // Effect to draw the annotated canvas once results are available
   useEffect(() => {
-    if (results?.annotations && diffCanvasRef.current) {
-      const canvas = diffCanvasRef.current;
+    if (results?.annotations && annotatedCanvasRef.current && image2Ref.current.complete) {
+      const canvas = annotatedCanvasRef.current;
       const ctx = canvas.getContext('2d');
-      const { diffImageData, differences } = results.annotations;
+      const { differences } = results.annotations;
+      const img = image2Ref.current;
 
-      canvas.width = diffImageData.width;
-      canvas.height = diffImageData.height;
+      canvas.width = img.naturalWidth;
+      canvas.height = img.naturalHeight;
       
       if (ctx) {
-        // Draw the base diff image
-        ctx.putImageData(diffImageData, 0, 0);
+        // Draw the "Edited" image as the base
+        ctx.drawImage(img, 0, 0);
 
-        // If annotations are enabled, draw the bounding boxes and numbers
-        if (showAnnotations) {
-          ctx.strokeStyle = 'magenta';
-          ctx.lineWidth = 2;
-          ctx.fillStyle = 'magenta';
-          ctx.font = 'bold 16px Arial';
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'middle';
+        // Draw the bounding boxes and numbers
+        ctx.strokeStyle = '#FF00FF'; // A vibrant magenta
+        ctx.lineWidth = Math.max(2, Math.min(img.width, img.height) * 0.005);
+        ctx.fillStyle = '#FF00FF';
+        const fontSize = Math.max(16, Math.min(img.width, img.height) * 0.02);
+        ctx.font = `bold ${fontSize}px sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
 
-          differences.forEach(d => {
-            ctx.strokeRect(d.x, d.y, d.w, d.h);
-            ctx.fillText(String(d.id), d.x + d.w / 2, d.y + d.h / 2);
-          });
-        }
+        differences.forEach(d => {
+          ctx.strokeRect(d.x, d.y, d.w, d.h);
+          // Draw a filled circle for the number background
+          const centerX = d.x + d.w / 2;
+          const centerY = d.y + d.h / 2;
+          ctx.beginPath();
+          ctx.arc(centerX, centerY, fontSize * 0.8, 0, 2 * Math.PI, false);
+          ctx.fill();
+          ctx.fillStyle = '#FFFFFF'; // White text
+          ctx.fillText(String(d.id), centerX, centerY);
+          ctx.fillStyle = '#FF00FF'; // Reset for next circle
+        });
       }
     }
-  }, [results, showAnnotations]);
-
+  }, [results]);
 
   if (loading) {
     return <LoadingOverlay message={loadingMessage} />;
@@ -134,88 +183,114 @@ const ImageComparisonResultsPage: React.FC = () => {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-gray-900 text-white p-4">
         <h2 className="text-2xl font-bold text-red-500 mb-4">Analysis Failed</h2>
-        <p className="text-lg mb-4 text-center">{error}</p>
+        <p className="text-lg mb-8 text-center">{error}</p>
         <button
           onClick={() => navigate('/compare')}
-          className="px-6 py-2 bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
+          className="flex items-center px-6 py-3 bg-indigo-600 text-white font-bold rounded-lg hover:bg-indigo-700 transition-colors shadow-lg"
         >
+          <FaArrowLeft className="mr-2" />
           Try Again
         </button>
       </div>
     );
   }
 
+  if (!results) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen bg-gray-900 text-white p-4">
+        <h2 className="text-2xl font-bold text-yellow-400 mb-4">No Results</h2>
+        <p className="text-lg mb-8 text-center">Could not retrieve analysis results.</p>
+        <button
+          onClick={() => navigate('/compare')}
+          className="flex items-center px-6 py-3 bg-indigo-600 text-white font-bold rounded-lg hover:bg-indigo-700 transition-colors shadow-lg"
+        >
+          <FaArrowLeft className="mr-2" />
+          Start New Comparison
+        </button>
+      </div>
+    );
+  }
+
+  const { stats, ocr, annotations } = results;
+  const mismatchPercent = stats.mismatchedPixels && stats.imageWidth && stats.imageHeight 
+      ? (stats.mismatchedPixels / (stats.imageWidth * stats.imageHeight)) * 100 
+      : 0;
+
+  const ssimAnalysis = stats.ssim ? getSsimAnalysis(stats.ssim) : null;
+  const mseAnalysis = stats.mse ? getMseAnalysis(stats.mse) : null;
+  const mismatchAnalysis = mismatchPercent ? getMismatchAnalysis(mismatchPercent) : null;
+
   return (
     <div className="bg-[#121212] text-white min-h-screen">
        <Header />
-       <main className="px-4 sm:px-8 md:px-16 lg:px-24 xl:px-40 py-8 sm:py-12">
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
-            <h2 className="text-3xl sm:text-4xl font-bold text-center mb-8">Comparison Results</h2>
+       <main className="px-4 sm:px-6 lg:px-8 py-8">
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className="max-w-7xl mx-auto">
+            <div className="flex justify-between items-center mb-8">
+                <h2 className="text-3xl sm:text-4xl font-bold tracking-tight">Comparison Results</h2>
+                <button
+                    onClick={() => navigate('/compare')}
+                    className="flex items-center px-6 py-3 bg-indigo-600 text-white font-bold rounded-lg hover:bg-indigo-700 transition-colors shadow-lg"
+                >
+                    <FaArrowLeft className="mr-2" />
+                    Start New Comparison
+                </button>
+            </div>
             
-            <section className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
-                <div>
-                    <h3 className="text-xl font-semibold mb-4 text-center">Image 1</h3>
-                    <img src={image1} alt="Original" className="rounded-lg shadow-lg w-full" />
+            <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
+              
+              {/* Left Column: Annotated Image */}
+              <div className="lg:col-span-3 bg-[#1E1E1E] p-4 rounded-lg shadow-2xl">
+                <h3 className="text-xl font-semibold mb-4 text-center">Edited Image with Differences</h3>
+                <div className="relative w-full">
+                  <canvas ref={annotatedCanvasRef} className="w-full h-auto rounded-lg shadow-lg"></canvas>
                 </div>
-                <div>
-                    <h3 className="text-xl font-semibold mb-4 text-center">Image 2</h3>
-                    <img src={image2} alt="Comparison" className="rounded-lg shadow-lg w-full" />
-                </div>
-            </section>
+              </div>
+
+              {/* Right Column: Stats */}
+              <div className="lg:col-span-2 space-y-6">
+                {ssimAnalysis && stats.ssim && (
+                  <StatCard title="Structural Similarity (SSIM)" value={stats.ssim.toFixed(5)} analysis={ssimAnalysis}>
+                    Measures perceptual difference between two images. A value of 1.0 means they are structurally identical.
+                  </StatCard>
+                )}
+                {mseAnalysis && stats.mse && (
+                  <StatCard title="Mean Squared Error (MSE)" value={stats.mse.toFixed(4)} analysis={mseAnalysis}>
+                    Calculates the average squared difference between pixels. Lower values indicate higher similarity. A value of 0 means they are identical.
+                  </StatCard>
+                )}
+                {mismatchAnalysis && (
+                  <StatCard title="Mismatched Pixels" value={`${mismatchPercent.toFixed(3)}%`} analysis={mismatchAnalysis}>
+                    Represents the percentage of pixels that are different between the two images, based on a sensitivity threshold.
+                  </StatCard>
+                )}
+                {typeof stats.differencesFound === 'number' && (
+                  <StatCard title="Distinct Difference Regions" value={stats.differencesFound} analysis={{ level: `${stats.differencesFound > 0 ? 'Detected' : 'None'}`, color: `${stats.differencesFound > 0 ? 'text-yellow-400' : 'text-green-400'}`, icon: <FaEye /> }}>
+                    The number of separate, contiguous areas where differences were detected by the algorithm.
+                  </StatCard>
+                )}
+              </div>
+            </div>
             
-            {results?.annotations && (
-              <ResultsSection title="Difference Analysis">
-                <div className="flex justify-center mb-4">
-                    <label className="flex items-center cursor-pointer">
-                        <span className="mr-3 text-lg">Show Annotations</span>
-                        <div className="relative">
-                            <input type="checkbox" className="sr-only" checked={showAnnotations} onChange={() => setShowAnnotations(!showAnnotations)} />
-                            <div className="w-14 h-8 bg-gray-600 rounded-full shadow-inner"></div>
-                            <div className={`dot absolute w-6 h-6 bg-white rounded-full shadow -left-1 -top-1 transition-transform ${showAnnotations ? 'transform translate-x-full bg-green-400' : ''}`}></div>
-                        </div>
-                    </label>
-                </div>
-                <canvas ref={diffCanvasRef} className="w-full rounded-lg shadow-lg"></canvas>
-              </ResultsSection>
-            )}
-
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              {results?.stats && (
-                <ResultsSection title="Processing Statistics">
-                  <StatItem label="Differences Found" value={results.stats.differencesFound ?? 'N/A'} />
-                  <StatItem label="Mismatched Pixels" value={results.stats.mismatchedPixels?.toLocaleString() ?? 'N/A'} />
-                  <StatItem label="Mean Squared Error (MSE)" value={results.stats.mse?.toFixed(6) ?? 'N/A'} />
-                  <StatItem label="Structural Similarity (SSIM)" value={results.stats.ssim?.toFixed(6) ?? 'N/A'} />
-                </ResultsSection>
-              )}
-
-              {results?.annotations && results.annotations.differences.length > 0 && (
-                <ResultsSection title="Top 20 Differences (by size)">
-                  <div className="space-y-2 text-sm max-h-80 overflow-y-auto">
-                      {results.annotations.differences.map((d: any) => (
-                          <p key={d.id} className="text-gray-300">
-                              <span className="font-bold text-magenta-400">Difference {d.id}:</span> Box at ({d.x}, {d.y}), Size ({d.w} x {d.h}), Area ({d.area} pixels)
-                          </p>
-                      ))}
+            {/* OCR and Difference Details Sections */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mt-8">
+              {ocr && (
+                <ResultsSection title="Extracted Text (OCR)">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <OcrResult title="Original" text={ocr.image1} />
+                    <OcrResult title="Edited" text={ocr.image2} />
                   </div>
                 </ResultsSection>
               )}
-
-              {results?.ocr && (
-                <ResultsSection title="OCR Text Extraction">
-                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <OcrResult title="Image 1 Text" text={results.ocr.image1} />
-                      <OcrResult title="Image 2 Text" text={results.ocr.image2} />
-                   </div>
-                </ResultsSection>
-              )}
-
-              {results?.classification && (
-                <ResultsSection title="Image Classification">
-                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <ClassificationResult title="Image 1 Classification" data={results.classification.image1} />
-                      <ClassificationResult title="Image 2 Classification" data={results.classification.image2} />
-                   </div>
+              
+              {annotations && annotations.differences.length > 0 && (
+                <ResultsSection title="Difference Details">
+                  <div className="space-y-2 text-sm max-h-60 overflow-y-auto pr-2">
+                      {annotations.differences.map((d: BoundingBox) => (
+                          <p key={d.id} className="text-gray-300 p-2 bg-gray-800/50 rounded">
+                              <span className="font-bold text-[#FF00FF]">Difference {d.id}:</span> Area of {d.area} pixels at ({d.x}, {d.y}) with size {d.w}x{d.h}.
+                          </p>
+                      ))}
+                  </div>
                 </ResultsSection>
               )}
             </div>
@@ -228,37 +303,35 @@ const ImageComparisonResultsPage: React.FC = () => {
 
 // Helper components for consistent styling
 const ResultsSection: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => (
-  <div className="bg-[#1E1E1E] p-6 rounded-lg shadow-2xl mb-8">
-    <h3 className="text-2xl font-bold mb-4">{title}</h3>
+  <div className="bg-[#1E1E1E] p-6 rounded-lg shadow-2xl">
+    <h3 className="text-xl font-bold mb-4">{title}</h3>
     {children}
   </div>
 );
 
-const StatItem: React.FC<{ label: string; value: string | number }> = ({ label, value }) => (
-  <div className="flex justify-between items-center py-2 border-b border-gray-700">
-    <p className="text-gray-300">{label}</p>
-    <p className="font-mono text-lg text-green-400">{value}</p>
+interface StatCardProps {
+    title: string;
+    value: string | number;
+    analysis: { level: string; color: string; icon: JSX.Element; };
+    children: React.ReactNode;
+}
+
+const StatCard: React.FC<StatCardProps> = ({ title, value, analysis, children }) => (
+  <div className="bg-[#1E1E1E] p-5 rounded-lg shadow-2xl border-l-4 border-indigo-500">
+    <h4 className="text-lg font-semibold text-gray-300">{title}</h4>
+    <div className="text-4xl font-bold my-2 text-white">{value}</div>
+    <div className={`flex items-center font-semibold text-lg ${analysis.color}`}>
+      {analysis.icon}
+      <span className="ml-2">{analysis.level}</span>
+    </div>
+    <p className="text-gray-400 mt-3 text-sm">{children}</p>
   </div>
 );
 
 const OcrResult: React.FC<{ title: string, text: string }> = ({ title, text }) => (
-  <div>
-    <h4 className="font-semibold mb-2">{title}</h4>
-    <p className="text-sm bg-black/20 p-3 rounded-md text-gray-400 whitespace-pre-wrap">{text || 'No text detected.'}</p>
-  </div>
-);
-
-const ClassificationResult: React.FC<{ title: string, data: any[] }> = ({ title, data }) => (
-   <div>
-    <h4 className="font-semibold mb-2">{title}</h4>
-    <ul className="space-y-1">
-      {data.map((item, index) => (
-        <li key={index} className="flex justify-between text-sm">
-          <span>{item.className}</span>
-          <span className="font-mono text-cyan-400">{(item.probability * 100).toFixed(2)}%</span>
-        </li>
-      ))}
-    </ul>
+  <div className="bg-gray-800/50 p-4 rounded-lg">
+    <h4 className="font-bold text-lg mb-2 text-gray-300">{title}</h4>
+    <p className="text-gray-400 whitespace-pre-wrap text-sm">{text || '(No text detected)'}</p>
   </div>
 );
 
