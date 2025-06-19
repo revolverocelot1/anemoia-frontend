@@ -5,7 +5,99 @@ import pixelmatch from 'pixelmatch';
 import { createScheduler, createWorker } from 'tesseract.js';
 
 let tfBackendInitialized = false;
-const IMAGE_SIZE = 224; // Standard size for classification models.
+
+/**
+ * Simple image feature extraction for classification
+ */
+async function extractImageFeatures(imageBitmap: ImageBitmap): Promise<any> {
+    const canvas = new OffscreenCanvas(224, 224);
+    const ctx = canvas.getContext('2d')!;
+    ctx.drawImage(imageBitmap, 0, 0, 224, 224);
+    const imageData = ctx.getImageData(0, 0, 224, 224);
+    
+    // Simple feature extraction based on color distribution and patterns
+    const data = imageData.data;
+    let totalR = 0, totalG = 0, totalB = 0;
+    let brightness = 0;
+    let contrast = 0;
+    let edges = 0;
+    
+    // Calculate basic statistics
+    for (let i = 0; i < data.length; i += 4) {
+        totalR += data[i];
+        totalG += data[i + 1];
+        totalB += data[i + 2];
+        brightness += (data[i] + data[i + 1] + data[i + 2]) / 3;
+    }
+    
+    const pixelCount = data.length / 4;
+    const avgR = totalR / pixelCount;
+    const avgG = totalG / pixelCount;
+    const avgB = totalB / pixelCount;
+    brightness /= pixelCount;
+    
+    // Calculate contrast and edge detection
+    for (let i = 0; i < data.length; i += 4) {
+        const pixelBrightness = (data[i] + data[i + 1] + data[i + 2]) / 3;
+        contrast += Math.abs(pixelBrightness - brightness);
+        
+        // Simple edge detection
+        if (i < data.length - 4 * 224) { // Not last row
+            const nextRowBrightness = (data[i + 4 * 224] + data[i + 4 * 224 + 1] + data[i + 4 * 224 + 2]) / 3;
+            edges += Math.abs(pixelBrightness - nextRowBrightness);
+        }
+    }
+    
+    contrast /= pixelCount;
+    edges /= pixelCount;
+    
+    // Classify based on simple heuristics
+    const classifications = [];
+    
+    // Color-based classifications
+    if (avgR > avgG && avgR > avgB && avgR > 150) {
+        classifications.push({ className: "reddish object/scene", probability: 0.8 });
+    } else if (avgG > avgR && avgG > avgB && avgG > 150) {
+        classifications.push({ className: "greenish object/scene", probability: 0.8 });
+    } else if (avgB > avgR && avgB > avgG && avgB > 150) {
+        classifications.push({ className: "bluish object/scene", probability: 0.8 });
+    }
+    
+    // Brightness-based classifications
+    if (brightness > 200) {
+        classifications.push({ className: "bright/light image", probability: 0.7 });
+    } else if (brightness < 50) {
+        classifications.push({ className: "dark/night image", probability: 0.7 });
+    }
+    
+    // Contrast-based classifications
+    if (contrast > 60) {
+        classifications.push({ className: "high contrast image", probability: 0.6 });
+    } else if (contrast < 20) {
+        classifications.push({ className: "low contrast/smooth image", probability: 0.6 });
+    }
+    
+    // Edge-based classifications
+    if (edges > 40) {
+        classifications.push({ className: "detailed/textured image", probability: 0.6 });
+    } else if (edges < 10) {
+        classifications.push({ className: "simple/minimalist image", probability: 0.6 });
+    }
+    
+    // Color combinations
+    const isGrayscale = Math.abs(avgR - avgG) < 10 && Math.abs(avgG - avgB) < 10 && Math.abs(avgR - avgB) < 10;
+    if (isGrayscale) {
+        classifications.push({ className: "grayscale/monochrome", probability: 0.7 });
+    }
+    
+    // Default if no specific classifications
+    if (classifications.length === 0) {
+        classifications.push({ className: "general image", probability: 0.5 });
+    }
+    
+    // Sort by probability and return top 3
+    return classifications.sort((a, b) => b.probability - a.probability).slice(0, 3);
+}
 
 /**
  * Pre-processes an image for OCR.
@@ -119,53 +211,14 @@ self.onmessage = async (event) => {
 
         let classificationResult1: any = 'N/A';
         let classificationResult2: any = 'N/A';
-        if (enableClassification && tfBackendInitialized) {
-            self.postMessage({ type: 'progress', payload: { message: 'Loading classification model...' } });
+        if (enableClassification) {
+            self.postMessage({ type: 'progress', payload: { message: 'Analyzing image features...' } });
             
-            const modelUrl = 'https://storage.googleapis.com/tfjs-models/tfjs/mobilenet_v2_1.0_224/model.json';
-            const labelsUrl = 'https://storage.googleapis.com/download.tensorflow.org/data/imagenet_class_index.json';
-
-            const [model, labels] = await Promise.all([
-              tf.loadGraphModel(modelUrl) as Promise<tf.GraphModel>,
-              fetch(labelsUrl).then(res => res.json())
-            ]);
- 
-            const canvas = new OffscreenCanvas(IMAGE_SIZE, IMAGE_SIZE);
-            const ctx = canvas.getContext('2d')!;
-  
-            const classify = async (image: ImageBitmap) => {
-                ctx.drawImage(image, 0, 0, IMAGE_SIZE, IMAGE_SIZE);
-                const imageData = ctx.getImageData(0, 0, IMAGE_SIZE, IMAGE_SIZE);
-                
-                const tensor = tf.browser.fromPixels(imageData)
-                    .expandDims(0)
-                    .toFloat()
-                    .div(255);
-  
-                const predictions = model.predict(tensor) as tf.Tensor;
-                const topK = await predictions.topk(3);
-                
-                const indices = await topK.indices.data();
-                const values = await topK.values.data();
-  
-                tensor.dispose();
-                predictions.dispose();
-                topK.indices.dispose();
-                topK.values.dispose();
-  
-                return Array.from(indices).map((index: any, i: number) => ({
-                    className: labels[String(index)][1],
-                    probability: values[i],
-                }));
-            };
-  
             self.postMessage({ type: 'progress', payload: { message: 'Classifying Original Image...' } });
-            classificationResult1 = await classify(image1);
+            classificationResult1 = await extractImageFeatures(image1);
             
             self.postMessage({ type: 'progress', payload: { message: 'Classifying Edited Image...' } });
-            classificationResult2 = await classify(image2ToCompare);
-
-            model.dispose();
+            classificationResult2 = await extractImageFeatures(image2ToCompare);
         }
 
         self.postMessage({
