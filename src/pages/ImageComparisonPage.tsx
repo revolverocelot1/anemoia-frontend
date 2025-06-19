@@ -12,7 +12,7 @@ const ImageComparisonPage: React.FC = () => {
   const [image2Preview, setImage2Preview] = useState<string | null>(null);
   const [enableAnnotations, setEnableAnnotations] = useState(true);
   const [enableOcr, setEnableOcr] = useState(false);
-  const [enableClassification, setEnableClassification] = useState(false);
+  const [enableClassification] = useState(false);
   const [isDragging, setIsDragging] = useState<number | null>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, imageNumber: number) => {
@@ -116,7 +116,7 @@ const ImageComparisonPage: React.FC = () => {
             <div className="space-y-4 max-w-sm mx-auto">
               <Toggle label="Find & Annotate Differences" enabled={enableAnnotations} setEnabled={setEnableAnnotations} />
               <Toggle label="Extract Text (OCR)" enabled={enableOcr} setEnabled={setEnableOcr} />
-              <Toggle label="Classify Image Contents" enabled={enableClassification} setEnabled={setEnableClassification} />
+              {/* <Toggle label="Classify Image Contents" enabled={enableClassification} setEnabled={setEnableClassification} /> */}
             </div>
           </div>
 

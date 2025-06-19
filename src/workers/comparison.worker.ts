@@ -1,7 +1,7 @@
 import pixelmatch from 'pixelmatch';
 import ssim from 'ssim.js';
 import { createScheduler, createWorker } from 'tesseract.js';
-import * as tf from '@tensorflow/tfjs';
+// import * as tf from '@tensorflow/tfjs';
 
 // A dedicated worker for handling the intensive image comparison tasks.
 
@@ -88,12 +88,14 @@ self.onmessage = async (event) => {
     }
 
     // ** C. Classification Task **
+    /*
     if (settings.enableClassification) {
       analysisPromises.push((async () => {
         self.postMessage({ type: 'progress', payload: { message: 'Classifying images...' } });
         results.classification = await performClassification(image1, image2ToCompare);
       })());
     }
+    */
 
     await Promise.all(analysisPromises);
 
@@ -261,6 +263,7 @@ async function performOcr(image1Url: string, image2Url: string) {
 /**
  * Performs image classification using TensorFlow.js and a pre-trained EfficientNet model.
  */
+/*
 async function performClassification(image1: ImageBitmap, image2: ImageBitmap) {
     self.postMessage({ type: 'progress', payload: { message: 'Loading classification model...' } });
     
@@ -273,7 +276,8 @@ async function performClassification(image1: ImageBitmap, image2: ImageBitmap) {
     const classify = async (image: ImageBitmap) => {
         // Draw the image to the canvas, which is the expected input type for fromPixels
         ctx.drawImage(image, 0, 0, 224, 224);
-        const tensor = tf.browser.fromPixels(canvas)
+        const imageData = ctx.getImageData(0, 0, 224, 224);
+        const tensor = tf.browser.fromPixels(imageData)
             .expandDims(0)
             .toFloat()
             .div(255); // Normalize to [0, 1]
@@ -301,10 +305,11 @@ async function performClassification(image1: ImageBitmap, image2: ImageBitmap) {
     const classification2 = await classify(image2);
 
     // Dispose the model to free memory
-    (model as any).dispose?.();
+    (model as any)?.dispose();
 
     return {
         image1: classification1,
         image2: classification2,
     };
 } 
+*/ 
