@@ -1,46 +1,299 @@
-// This is a web worker, so we can't use modules.
-// We'll use the global objects exposed by the CDN scripts.
+// A dedicated worker for handling the intensive image comparison tasks.
 
-declare const pixelmatch: any;
-declare const resemble: any;
-declare const cv: any;
-declare const Tesseract: any;
-declare const tf: any;
-declare const ssim: any;
+// --- 1. SCRIPT LOADING & INITIALIZATION ---
 
+// Use importScripts to load external libraries. This is the standard way for web workers.
+// It helps avoid polluting the global scope of the main application and fixes "module is not defined" errors.
+try {
+  importScripts(
+    'https://cdn.jsdelivr.net/npm/pixelmatch@5.3.0/index.js',
+    'https://unpkg.com/ssim.js@3.5.0/dist/ssim.web.js',
+    'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js',
+    'https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js',
+    // OpenCV is powerful but large. We'll load it on demand if needed for complex alignment.
+    // 'https://docs.opencv.org/4.x/opencv.js' 
+  );
+} catch (e) {
+  console.error('Worker Script Loading Error:', e);
+  // Inform the main thread that initialization failed.
+  self.postMessage({ type: 'error', payload: 'Could not load analysis libraries.' });
+}
+
+// Declare the global variables. The @ts-ignore is used because TypeScript struggles 
+// to reconcile the types for scripts loaded globally in a worker context.
+// @ts-ignore
+declare const pixelmatch: any, ssim: any, Tesseract: any, tf: any;
+// declare const cv: any;
+
+// --- 2. MAIN MESSAGE HANDLER ---
 
 self.onmessage = async (event) => {
-  const { image1, image2, settings } = event.data;
+  const { image1: image1blobUrl, image2: image2blobUrl, settings } = event.data;
 
-  console.log('Worker received data:', { image1, image2, settings });
+  try {
+    self.postMessage({ type: 'progress', payload: { message: 'Fetching images...' } });
 
-  // TODO: Implement the actual image processing logic here.
-  // This will involve:
-  // 1. Loading image data into a format that the libraries can use (e.g., ImageData).
-  // 2. Running pixelmatch, resemble, opencv for comparison if settings.enableAnnotations is true.
-  // 3. Running Tesseract for OCR if settings.enableOcr is true.
-  // 4. Running TensorFlow.js for classification if settings.enableClassification is true.
-  // 5. Running ssim.js for stats.
+    // Fetch and decode images simultaneously.
+    const [image1, image2] = await Promise.all([
+      fetch(image1blobUrl).then(res => res.blob()).then(createImageBitmap),
+      fetch(image2blobUrl).then(res => res.blob()).then(createImageBitmap)
+    ]);
 
-  const results = {
-    stats: {
-      processingTime: '0.00s', // Placeholder
-      differencesFound: 0, // Placeholder
-      mismatchedPixels: 0, // Placeholder
-      mse: 0, // Placeholder
-      ssim: 0, // Placeholder
-    },
-    ocr: {
-      image1: '', // Placeholder
-      image2: '', // Placeholder
-    },
-    classification: {
-      image1: '', // Placeholder
-      image2: '', // Placeholder
-    },
-    differences: [], // Placeholder
-  };
+    // Ensure images have the same dimensions for comparison.
+    if (image1.width !== image2.width || image1.height !== image2.height) {
+      // TODO: Implement resizing or alignment for mismatched images using OpenCV.js or other libs.
+      throw new Error(`Images must have the same dimensions for comparison. Image 1: ${image1.width}x${image1.height}, Image 2: ${image2.width}x${image2.height}`);
+    }
 
-  // Post the results back to the main thread
-  self.postMessage(results);
-}; 
+    const { width, height } = image1;
+
+    // --- 3. ANALYSIS TASKS ---
+    
+    const results: any = {
+      stats: {},
+      annotations: null,
+      ocr: null,
+      classification: null,
+    };
+
+    const analysisPromises = [];
+
+    // ** A. Annotation and Stats Calculation **
+    if (settings.enableAnnotations) {
+      analysisPromises.push((async () => {
+        self.postMessage({ type: 'progress', payload: { message: 'Analyzing differences...' } });
+        const { stats, diffImageData, differences } = performPixelAnalysis(image1, image2);
+        results.stats = { ...results.stats, ...stats };
+        results.annotations = { diffImageData, differences };
+      })());
+    }
+
+    // ** B. OCR Task **
+    if (settings.enableOcr) {
+      analysisPromises.push((async () => {
+        self.postMessage({ type: 'progress', payload: { message: 'Performing OCR...' } });
+        results.ocr = await performOcr(image1blobUrl, image2blobUrl);
+      })());
+    }
+
+    // ** C. Classification Task **
+    if (settings.enableClassification) {
+      analysisPromises.push((async () => {
+        self.postMessage({ type: 'progress', payload: { message: 'Classifying images...' } });
+        results.classification = await performClassification(image1, image2);
+      })());
+    }
+
+    await Promise.all(analysisPromises);
+
+    self.postMessage({ type: 'results', payload: results });
+
+  } catch (error: any) {
+    console.error('Worker processing failed:', error);
+    self.postMessage({ type: 'error', payload: error.message || 'An unknown error occurred during analysis.' });
+  }
+};
+
+
+// --- 4. IMAGE ANALYSIS FUNCTIONS ---
+
+/**
+ * Performs pixel-level analysis using pixelmatch and calculates advanced stats.
+ */
+function performPixelAnalysis(image1: ImageBitmap, image2: ImageBitmap) {
+    const { width, height } = image1;
+    
+    const canvas = new OffscreenCanvas(width, height);
+    const ctx = canvas.getContext('2d')!;
+
+    // Get image data for both images
+    ctx.drawImage(image1, 0, 0);
+    const img1Data = ctx.getImageData(0, 0, width, height);
+    
+    ctx.drawImage(image2, 0, 0);
+    const img2Data = ctx.getImageData(0, 0, width, height);
+
+    const diffImageData = new ImageData(width, height);
+
+    // Run Pixelmatch
+    const mismatchedPixels = pixelmatch(img1Data.data, img2Data.data, diffImageData.data, width, height, {
+        threshold: 0.1, // Lower threshold for more sensitivity
+        includeAA: true, // Include anti-aliased pixels
+    });
+
+    // Run Bounding Box detection on the diff
+    const differences = findDifferenceRegions(diffImageData, 20);
+
+    // Calculate advanced stats
+    const mse = calculateMse(img1Data.data, img2Data.data);
+    const ssimResult = ssim(img1Data, img2Data, { k1: 0.01, k2: 0.03, bitDepth: 8, windowSize: 8 }).mssim;
+
+    return {
+        stats: {
+            mismatchedPixels,
+            differencesFound: differences.length,
+            mse,
+            ssim: ssimResult,
+        },
+        diffImageData,
+        differences
+    };
+}
+
+/**
+ * Finds and analyzes contiguous regions of differences from a pixelmatch diff image.
+ * Uses a connected-component labeling algorithm (flood fill).
+ * @param diffImageData The raw image data from pixelmatch.
+ * @param maxRegions The maximum number of regions to return, sorted by size.
+ * @returns An array of difference objects.
+ */
+function findDifferenceRegions(diffImageData: ImageData, maxRegions: number) {
+    const { width, height, data } = diffImageData;
+    const visited = new Uint8Array(width * height);
+    const regions = [];
+
+    for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+            const index = (y * width + x);
+            if (visited[index]) continue;
+
+            // Check if the pixel is part of a difference (pixelmatch marks diffs in red)
+            const R = data[index * 4];
+            if (R > 100) { // It's a diff pixel
+                const region = {
+                    id: 0,
+                    x: x,
+                    y: y,
+                    maxX: x,
+                    maxY: y,
+                    area: 0,
+                };
+                
+                const queue = [[x, y]];
+                visited[index] = 1;
+
+                while (queue.length > 0) {
+                    const [cx, cy] = queue.shift()!;
+                    const cIndex = cy * width + cx;
+                    
+                    region.x = Math.min(region.x, cx);
+                    region.y = Math.min(region.y, cy);
+                    region.maxX = Math.max(region.maxX, cx);
+                    region.maxY = Math.max(region.maxY, cy);
+                    region.area++;
+                    
+                    // Check neighbors (4-connectivity)
+                    [[cx, cy - 1], [cx + 1, cy], [cx, cy + 1], [cx - 1, cy]].forEach(([nx, ny]) => {
+                        if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
+                            const nIndex = ny * width + nx;
+                            if (!visited[nIndex] && data[nIndex * 4] > 100) {
+                                visited[nIndex] = 1;
+                                queue.push([nx, ny]);
+                            }
+                        }
+                    });
+                }
+                regions.push({
+                    ...region,
+                    w: region.maxX - region.x + 1,
+                    h: region.maxY - region.y + 1,
+                });
+            }
+        }
+    }
+
+    // Sort by largest area and assign IDs
+    return regions
+        .sort((a, b) => b.area - a.area)
+        .slice(0, maxRegions)
+        .map((r, i) => ({ ...r, id: i + 1 }));
+}
+
+
+/**
+ * Calculates the Mean Squared Error between two images.
+ */
+function calculateMse(data1: Uint8ClampedArray, data2: Uint8ClampedArray): number {
+    let sum = 0;
+    for (let i = 0; i < data1.length; i += 4) {
+        const r = data1[i] - data2[i];
+        const g = data1[i + 1] - data2[i + 1];
+        const b = data1[i + 2] - data2[i + 2];
+        sum += r * r + g * g + b * b;
+    }
+    return sum / (data1.length / 4 * 3);
+}
+
+/**
+ * Performs OCR on both images using Tesseract.js
+ */
+async function performOcr(image1Url: string, image2Url: string) {
+    const scheduler = Tesseract.createScheduler();
+    const worker1 = await Tesseract.createWorker('eng');
+    const worker2 = await Tesseract.createWorker('eng');
+    scheduler.addWorker(worker1);
+    scheduler.addWorker(worker2);
+
+    const [result1, result2] = await Promise.all([
+        scheduler.addJob('recognize', image1Url),
+        scheduler.addJob('recognize', image2Url)
+    ]);
+    
+    await scheduler.terminate();
+
+    return {
+        image1: result1.data.text,
+        image2: result2.data.text,
+    };
+}
+
+
+/**
+ * Performs image classification using TensorFlow.js and a pre-trained EfficientNet model.
+ */
+async function performClassification(image1: ImageBitmap, image2: ImageBitmap) {
+    self.postMessage({ type: 'progress', payload: { message: 'Loading classification model...' } });
+    
+    // Load the model from TensorFlow Hub. Using graph model for performance.
+    const modelUrl = 'https://tfhub.dev/tensorflow/tfjs-model/efficientnet/b0/classification/1';
+    const model = await tf.loadGraphModel(modelUrl, { fromTFHub: true });
+    const canvas = new OffscreenCanvas(224, 224);
+    const ctx = canvas.getContext('2d')!;
+
+    const classify = async (image: ImageBitmap) => {
+        // Draw the image to the canvas, which is the expected input type for fromPixels
+        ctx.drawImage(image, 0, 0, 224, 224);
+        const tensor = tf.browser.fromPixels(canvas)
+            .expandDims(0)
+            .toFloat()
+            .div(255); // Normalize to [0, 1]
+
+        const predictions = await model.predict(tensor) as tf.Tensor;
+        const topK = await predictions.topk(3); // Get top 3 predictions
+        
+        // This part requires a map from indices to class names.
+        // For demonstration, we will just return indices and scores.
+        const indices = await topK.indices.data();
+        const values = await topK.values.data();
+
+        tf.dispose([tensor, predictions, topK]); // Clean up tensors
+
+        return Array.from(indices).map((index: any, i: number) => ({
+            className: `Class #${index}`, // Placeholder for real class name
+            probability: values[i],
+        }));
+    };
+
+    self.postMessage({ type: 'progress', payload: { message: 'Classifying Image 1...' } });
+    const classification1 = await classify(image1);
+    
+    self.postMessage({ type: 'progress', payload: { message: 'Classifying Image 2...' } });
+    const classification2 = await classify(image2);
+
+    tf.dispose(model); // Clean up the model
+
+    return {
+        image1: classification1,
+        image2: classification2,
+    };
+} 

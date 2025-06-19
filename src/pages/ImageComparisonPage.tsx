@@ -10,39 +10,59 @@ const ImageComparisonPage: React.FC = () => {
   const [image2, setImage2] = useState<File | null>(null);
   const [image1Preview, setImage1Preview] = useState<string | null>(null);
   const [image2Preview, setImage2Preview] = useState<string | null>(null);
-  const [enableAnnotations, setEnableAnnotations] = useState(false);
-  const [enableOcr, setEnableOcr] = useState(true);
+  const [enableAnnotations, setEnableAnnotations] = useState(true);
+  const [enableOcr, setEnableOcr] = useState(false);
   const [enableClassification, setEnableClassification] = useState(false);
+  const [isDragging, setIsDragging] = useState<number | null>(null);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, setImage: React.Dispatch<React.SetStateAction<File | null>>, setPreview: React.Dispatch<React.SetStateAction<string | null>>) => {
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, imageNumber: number) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
-      setImage(file);
-      setPreview(URL.createObjectURL(file));
+      const previewUrl = URL.createObjectURL(file);
+      if (imageNumber === 1) {
+        setImage1(file);
+        setImage1Preview(previewUrl);
+      } else {
+        setImage2(file);
+        setImage2Preview(previewUrl);
+      }
     }
   };
 
-  const handleDrop = (e: React.DragEvent<HTMLDivElement>, setImage: React.Dispatch<React.SetStateAction<File | null>>, setPreview: React.Dispatch<React.SetStateAction<string | null>>) => {
+  const handleDrop = (e: React.DragEvent<HTMLLabelElement>, imageNumber: number) => {
     e.preventDefault();
     e.stopPropagation();
+    setIsDragging(null);
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
       const file = e.dataTransfer.files[0];
-      setImage(file);
-      setPreview(URL.createObjectURL(file));
+       const previewUrl = URL.createObjectURL(file);
+      if (imageNumber === 1) {
+        setImage1(file);
+        setImage1Preview(previewUrl);
+      } else {
+        setImage2(file);
+        setImage2Preview(previewUrl);
+      }
     }
   };
-
-  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+  
+  const handleDragEvents = (e: React.DragEvent<HTMLLabelElement>, isEntering: boolean, imageNumber: number) => {
     e.preventDefault();
     e.stopPropagation();
+    if (isEntering) {
+      setIsDragging(imageNumber);
+    } else {
+      setIsDragging(null);
+    }
   };
 
   const handleCompare = () => {
     if (image1 && image2) {
+      // Pass the blob URLs directly to avoid creating new ones on the results page
       navigate('/compare/results', {
         state: {
-          image1: URL.createObjectURL(image1),
-          image2: URL.createObjectURL(image2),
+          image1: image1Preview,
+          image2: image2Preview,
           enableAnnotations,
           enableOcr,
           enableClassification,
@@ -53,140 +73,123 @@ const ImageComparisonPage: React.FC = () => {
     }
   };
 
-  const FileInput: React.FC<{
-    id: string;
-    image: File | null;
-    preview: string | null;
-    onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-    onDrop: (e: React.DragEvent<HTMLDivElement>) => void;
-  }> = ({ id, preview, onChange, onDrop }) => (
-    <div className="flex flex-col">
-      <h3 className="text-[var(--text-primary)] text-xl font-semibold leading-tight tracking-[-0.015em] px-4 pb-3 pt-2">{id}</h3>
-      <div
-        className="flex flex-col items-center justify-center gap-4 rounded-xl border-2 border-dashed border-[var(--border-color)] p-6 sm:p-8 md:p-10 aspect-[4/3] hover:border-[var(--text-primary)] transition-colors cursor-pointer group"
-        onDrop={onDrop}
-        onDragOver={handleDragOver}
-        onClick={() => document.getElementById(`file-input-${id.toLowerCase().replace(' ', '-')}`)?.click()}
-      >
-        {preview ? (
-          <img src={preview} alt="Preview" className="max-h-full max-w-full object-contain rounded-lg" />
-        ) : (
-          <>
-            <svg className="w-12 h-12 text-[var(--border-color)] group-hover:text-[var(--text-primary)] transition-colors" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-              <path d="M12 16.5V9.75m0 0 3 3m-3-3-3 3M6.75 19.5a4.5 4.5 0 0 1-1.41-8.775 5.25 5.25 0 0 1 10.338 2.169M15 19.5a4.5 4.5 0 0 1-1.41-8.775 5.25 5.25 0 0 1 10.338 2.169" strokeLinecap="round" strokeLinejoin="round"></path>
-            </svg>
-            <div className="flex flex-col items-center gap-1 text-center">
-              <p className="text-[var(--text-primary)] text-base sm:text-lg font-medium leading-tight">Upload {id}</p>
-              <p className="text-[var(--text-secondary)] text-xs sm:text-sm font-normal leading-normal">Drag & drop or click to browse</p>
-            </div>
-          </>
-        )}
-        <input id={`file-input-${id.toLowerCase().replace(' ', '-')}`} aria-label={`Upload ${id}`} className="sr-only" type="file" accept="image/*" onChange={onChange} />
-      </div>
-    </div>
-  );
-
-  const Toggle: React.FC<{
-    label: string;
-    enabled: boolean;
-    setEnabled: (enabled: boolean) => void;
-  }> = ({ label, enabled, setEnabled }) => (
-     <div className="flex items-center justify-between">
-      <span className="text-[var(--text-primary)] text-sm font-medium">{label}</span>
-      <div className="relative">
-        <input className="sr-only toggle-checkbox" id={`toggle-${label.toLowerCase().replace(/\s/g, '-')}`} type="checkbox" checked={enabled} onChange={() => setEnabled(!enabled)} />
-        <label className="toggle-label" htmlFor={`toggle-${label.toLowerCase().replace(/\s/g, '-')}`}></label>
-      </div>
-    </div>
-  );
-
   return (
-    <div className="bg-[var(--secondary-color)] text-[var(--text-primary)]">
-      <style>{`
-        :root {
-          --primary-color: #000000;
-          --secondary-color: #1a1a1a;
-          --accent-color: #363636;
-          --text-primary: #ffffff;
-          --text-secondary: #adadad;
-          --border-color: #4d4d4d;
-        }
-        body {
-          font-family: "Space Grotesk", "Noto Sans", sans-serif;
-        }
-        .toggle-checkbox:checked+.toggle-label {
-          background-color: var(--primary-color);
-        }
-        .toggle-checkbox:checked+.toggle-label::after {
-          transform: translateX(100%);
-          border-color: var(--primary-color);
-        }
-        .toggle-label {
-          width: 40px;
-          height: 20px;
-          background-color: var(--accent-color);
-          border-radius: 9999px;
-          position: relative;
-          transition: background-color 0.2s ease;
-          cursor: pointer;
-        }
-        .toggle-label::after {
-          content: '';
-          position: absolute;
-          top: 2px;
-          left: 2px;
-          width: 16px;
-          height: 16px;
-          background-color: white;
-          border-radius: 9999px;
-          transition: transform 0.2s ease;
-        }
-      `}</style>
-      <div className="relative flex size-full min-h-screen flex-col dark group/design-root overflow-x-hidden">
-        <div className="layout-container flex h-full grow flex-col">
-          <Header />
-          <main className="px-4 sm:px-8 md:px-16 lg:px-24 xl:px-40 flex flex-1 justify-center py-8 sm:py-12">
-            <motion.div 
-              className="layout-content-container flex flex-col w-full max-w-3xl py-5"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5 }}
+    <div className="bg-[#121212] text-white min-h-screen">
+      <Header />
+      <main className="px-4 sm:px-8 md:px-16 lg:px-24 xl:px-40 flex flex-1 justify-center py-8 sm:py-12">
+        <motion.div
+          className="w-full max-w-4xl"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+        >
+          <div className="text-center mb-10">
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight">Image Comparison Tool</h2>
+            <p className="mt-4 text-lg text-gray-400 max-w-2xl mx-auto">
+              Upload two images to perform a deep, scientific analysis of their differences.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-10">
+            <FileInput 
+                id={1} 
+                preview={image1Preview} 
+                onChange={handleFileChange} 
+                onDrop={handleDrop}
+                onDragEnter={(e) => handleDragEvents(e, true, 1)}
+                onDragLeave={(e) => handleDragEvents(e, false, 1)}
+                isDragging={isDragging === 1}
+            />
+            <FileInput 
+                id={2} 
+                preview={image2Preview}
+                onChange={handleFileChange} 
+                onDrop={handleDrop}
+                onDragEnter={(e) => handleDragEvents(e, true, 2)}
+                onDragLeave={(e) => handleDragEvents(e, false, 2)}
+                isDragging={isDragging === 2}
+            />
+          </div>
+          
+          <div className="bg-[#1E1E1E] p-6 rounded-lg shadow-2xl mb-10">
+            <h3 className="text-xl font-bold mb-4 text-center">Analysis Options</h3>
+            <div className="space-y-4 max-w-sm mx-auto">
+              <Toggle label="Find & Annotate Differences" enabled={enableAnnotations} setEnabled={setEnableAnnotations} />
+              <Toggle label="Extract Text (OCR)" enabled={enableOcr} setEnabled={setEnableOcr} />
+              <Toggle label="Classify Image Contents" enabled={enableClassification} setEnabled={setEnableClassification} />
+            </div>
+          </div>
+
+          <div className="flex justify-center">
+            <button
+              onClick={handleCompare}
+              disabled={!image1 || !image2}
+              className="flex items-center justify-center w-full max-w-xs h-14 px-8 rounded-full bg-blue-600 text-white text-lg font-bold shadow-lg hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed transition-all transform hover:scale-105 disabled:scale-100"
             >
-              <div className="flex flex-col items-center text-center gap-3 p-4 mb-8">
-                <h2 className="text-[var(--text-primary)] text-3xl sm:text-4xl font-bold leading-tight tracking-tight">Compare Images</h2>
-                <p className="text-[var(--text-secondary)] text-base sm:text-lg font-normal leading-normal max-w-md">
-                  Upload two images to compare their quality and details. Our AI will help you spot the differences.
-                </p>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 lg:gap-8">
-                <FileInput id="Image 1" image={image1} preview={image1Preview} onChange={(e) => handleFileChange(e, setImage1, setImage1Preview)} onDrop={(e) => handleDrop(e, setImage1, setImage1Preview)} />
-                <FileInput id="Image 2" image={image2} preview={image2Preview} onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleFileChange(e, setImage2, setImage2Preview)} onDrop={(e: React.DragEvent<HTMLDivElement>) => handleDrop(e, setImage2, setImage2Preview)} />
-              </div>
-              <div className="mt-8 px-4 space-y-4">
-                <Toggle label="Enable Annotations" enabled={enableAnnotations} setEnabled={setEnableAnnotations} />
-                <Toggle label="Enable OCR" enabled={enableOcr} setEnabled={setEnableOcr} />
-                <Toggle label="Enable Image Classification" enabled={enableClassification} setEnabled={setEnableClassification} />
-              </div>
-              <div className="flex px-4 py-8 justify-center">
-                <motion.button 
-                  className="flex min-w-[180px] max-w-[480px] cursor-pointer items-center justify-center overflow-hidden rounded-full h-12 px-8 bg-[var(--primary-color)] text-[var(--text-primary)] text-base font-bold leading-normal tracking-[0.015em] hover:opacity-90 transition-opacity shadow-lg"
-                  onClick={handleCompare}
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                >
-                  <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M3 7.5 7.5 3m0 0L12 7.5M7.5 3v13.5m13.5 0L16.5 21m0 0L12 16.5m4.5 4.5V7.5" strokeLinecap="round" strokeLinejoin="round"></path>
-                  </svg>
-                  <span className="truncate">Compare Images</span>
-                </motion.button>
-              </div>
-            </motion.div>
-          </main>
-          <Footer />
-        </div>
-      </div>
+              <svg className="w-6 h-6 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 17l-5-5 5-5m6 10l5-5-5-5"></path></svg>
+              Analyze & Compare
+            </button>
+          </div>
+        </motion.div>
+      </main>
+      <Footer />
     </div>
   );
 };
+
+// --- Helper Components ---
+
+interface FileInputProps {
+    id: number;
+    preview: string | null;
+    onChange: (e: React.ChangeEvent<HTMLInputElement>, id: number) => void;
+    onDrop: (e: React.DragEvent<HTMLLabelElement>, id: number) => void;
+    onDragEnter: (e: React.DragEvent<HTMLLabelElement>) => void;
+    onDragLeave: (e: React.DragEvent<HTMLLabelElement>) => void;
+    isDragging: boolean;
+}
+
+const FileInput: React.FC<FileInputProps> = ({ id, preview, onChange, onDrop, onDragEnter, onDragLeave, isDragging }) => (
+    <div className="flex flex-col">
+      <h3 className="text-xl font-semibold mb-4 text-center">Image {id}</h3>
+      <label 
+        htmlFor={`file-input-${id}`}
+        onDrop={(e) => onDrop(e, id)}
+        onDragOver={(e) => e.preventDefault()}
+        onDragEnter={onDragEnter}
+        onDragLeave={onDragLeave}
+        className={`relative flex flex-col items-center justify-center w-full aspect-video rounded-xl border-2 border-dashed transition-all duration-300 cursor-pointer
+        ${isDragging ? 'border-blue-500 bg-blue-900/20' : 'border-gray-600 hover:border-gray-400'}
+        ${preview ? 'border-solid' : ''}`}
+      >
+        {preview ? (
+          <img src={preview} alt={`Preview ${id}`} className="w-full h-full object-contain rounded-lg" />
+        ) : (
+          <div className="text-center text-gray-400">
+            <svg className="mx-auto h-12 w-12" stroke="currentColor" fill="none" viewBox="0 0 48 48" aria-hidden="true"><path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+            <p className="mt-2">Drag & drop or click to upload</p>
+          </div>
+        )}
+        <input id={`file-input-${id}`} type="file" className="sr-only" accept="image/*" onChange={(e) => onChange(e, id)} />
+      </label>
+    </div>
+);
+
+interface ToggleProps {
+  label: string;
+  enabled: boolean;
+  setEnabled: (enabled: boolean) => void;
+}
+
+const Toggle: React.FC<ToggleProps> = ({ label, enabled, setEnabled }) => (
+     <label className="flex items-center justify-between cursor-pointer">
+      <span className="text-lg font-medium">{label}</span>
+      <div className="relative">
+          <input type="checkbox" className="sr-only" checked={enabled} onChange={() => setEnabled(!enabled)} />
+          <div className="w-14 h-8 bg-gray-600 rounded-full shadow-inner"></div>
+          <div className={`absolute w-6 h-6 bg-white rounded-full shadow -left-1 top-1 transition-transform duration-300 ease-in-out ${enabled ? 'transform translate-x-full bg-blue-400' : ''}`}></div>
+      </div>
+    </label>
+);
 
 export default ImageComparisonPage; 

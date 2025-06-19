@@ -1,195 +1,265 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import { motion } from 'framer-motion';
 import LoadingOverlay from '../components/LoadingOverlay';
 
+// Define the structure of the results we expect from the worker
+interface AnalysisResults {
+  stats: {
+    mismatchedPixels?: number;
+    differencesFound?: number;
+    mse?: number;
+    ssim?: number;
+    processingTime?: string;
+  };
+  annotations?: {
+    diffImageData: ImageData;
+    differences: any[];
+  };
+  ocr?: {
+    image1: string;
+    image2: string;
+  };
+  classification?: {
+    image1: any[];
+    image2: any[];
+  };
+}
+
 const ImageComparisonResultsPage: React.FC = () => {
+  const navigate = useNavigate();
   const location = useLocation();
   const { image1, image2, enableAnnotations, enableOcr, enableClassification } = location.state || {};
-  const [showAnnotations, setShowAnnotations] = useState(enableAnnotations);
-  const [results, setResults] = useState<any>(null);
+
+  const [results, setResults] = useState<AnalysisResults | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadingMessage, setLoadingMessage] = useState('Initializing...');
+  const [error, setError] = useState<string | null>(null);
+  const [showAnnotations, setShowAnnotations] = useState(true);
+
   const workerRef = useRef<Worker | null>(null);
+  const diffCanvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
-    // Create a new worker
+    // If we land on this page without state, navigate back to the input page.
+    if (!image1 || !image2) {
+      navigate('/compare');
+      return;
+    }
+
+    // Initialize the web worker
     workerRef.current = new Worker(new URL('../workers/comparison.worker.ts', import.meta.url), {
       type: 'module',
     });
 
-    // Post a message to the worker to start processing
-    workerRef.current.postMessage({
-      image1,
-      image2,
-      settings: {
-        enableAnnotations,
-        enableOcr,
-        enableClassification,
-      },
-    });
-
-    // Listen for messages from the worker
-    workerRef.current.onmessage = (event) => {
-      setResults(event.data);
-      setLoading(false);
+    // Handle messages from the worker
+    workerRef.current.onmessage = (event: MessageEvent) => {
+      const { type, payload } = event.data;
+      switch (type) {
+        case 'progress':
+          setLoadingMessage(payload.message);
+          break;
+        case 'results':
+          setResults(payload);
+          setLoading(false);
+          break;
+        case 'error':
+          setError(payload);
+          setLoading(false);
+          break;
+      }
     };
 
-    // Terminate the worker when the component unmounts
+    // Handle any errors from the worker itself
+    workerRef.current.onerror = (err) => {
+      console.error("Worker error:", err);
+      setError(`An unexpected worker error occurred: ${err.message}`);
+      setLoading(false);
+    };
+    
+    // Start the analysis
+    setLoadingMessage('Starting analysis...');
+    workerRef.current.postMessage({
+      image1: image1,
+      image2: image2,
+      settings: { enableAnnotations, enableOcr, enableClassification },
+    });
+
+    // Cleanup function to terminate the worker when the component unmounts
     return () => {
       workerRef.current?.terminate();
     };
-  }, [image1, image2, enableAnnotations, enableOcr, enableClassification]);
+  }, [image1, image2, enableAnnotations, enableOcr, enableClassification, navigate]);
+
+  // Effect to draw the diff canvas once results are available
+  useEffect(() => {
+    if (results?.annotations && diffCanvasRef.current) {
+      const canvas = diffCanvasRef.current;
+      const ctx = canvas.getContext('2d');
+      const { diffImageData, differences } = results.annotations;
+
+      canvas.width = diffImageData.width;
+      canvas.height = diffImageData.height;
+      
+      if (ctx) {
+        // Draw the base diff image
+        ctx.putImageData(diffImageData, 0, 0);
+
+        // If annotations are enabled, draw the bounding boxes and numbers
+        if (showAnnotations) {
+          ctx.strokeStyle = 'magenta';
+          ctx.lineWidth = 2;
+          ctx.fillStyle = 'magenta';
+          ctx.font = 'bold 16px Arial';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+
+          differences.forEach(d => {
+            ctx.strokeRect(d.x, d.y, d.w, d.h);
+            ctx.fillText(String(d.id), d.x + d.w / 2, d.y + d.h / 2);
+          });
+        }
+      }
+    }
+  }, [results, showAnnotations]);
+
 
   if (loading) {
-    return <LoadingOverlay message="Our AI is comparing the images... this may take a moment." />;
+    return <LoadingOverlay message={loadingMessage} />;
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen bg-gray-900 text-white p-4">
+        <h2 className="text-2xl font-bold text-red-500 mb-4">Analysis Failed</h2>
+        <p className="text-lg mb-4 text-center">{error}</p>
+        <button
+          onClick={() => navigate('/compare')}
+          className="px-6 py-2 bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
+        >
+          Try Again
+        </button>
+      </div>
+    );
   }
 
   return (
-    <div className="bg-[var(--dark-bg)]" style={{ fontFamily: '"Space Grotesk", "Noto Sans", sans-serif' }}>
-       <style>{`
-        :root { --dark-bg: #111827;--card-bg: #1F2937;--primary-accent: #3B82F6;--text-primary: #F3F4F6;--text-secondary: #9CA3AF;--border-color: #374151;}
-        .toggle-switch-bg:checked { background-color: var(--primary-accent) !important; }
-        .toggle-switch-bg:checked + .toggle-switch-dot { transform: translateX(100%); }
-      `}</style>
-      <div className="relative flex size-full min-h-screen flex-col group/design-root overflow-x-hidden">
-        <div className="layout-container flex h-full grow flex-col">
-          <Header />
-          <main className="px-4 sm:px-8 md:px-16 lg:px-24 xl:px-40 flex flex-1 justify-center py-8">
-            <motion.div 
-              className="layout-content-container flex flex-col max-w-5xl w-full flex-1"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5 }}
-            >
-              <div className="mb-8 p-4">
-                <h1 className="text-[var(--text-primary)] tracking-tight text-3xl sm:text-4xl font-bold leading-tight">Image Comparison Output</h1>
-              </div>
-
-              <motion.section 
-                className="mb-8 bg-[var(--card-bg)] rounded-xl shadow-lg p-4 sm:p-6"
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: 0.1, duration: 0.4 }}
-              >
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
-                  <h2 className="text-[var(--text-primary)] text-xl sm:text-2xl font-semibold leading-tight tracking-[-0.015em] mb-2 sm:mb-0">Output Images</h2>
-                  {enableAnnotations && (
-                    <div className="flex items-center gap-2">
-                      <span className="text-[var(--text-secondary)] text-sm">Show Annotations:</span>
-                      <label className="relative inline-flex items-center cursor-pointer">
-                        <input className="sr-only peer toggle-switch-bg" type="checkbox" checked={showAnnotations} onChange={() => setShowAnnotations(!showAnnotations)} />
-                        <div className="w-11 h-6 bg-gray-500 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-[var(--primary-accent)] rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all toggle-switch-dot"></div>
-                      </label>
-                    </div>
-                  )}
+    <div className="bg-[#121212] text-white min-h-screen">
+       <Header />
+       <main className="px-4 sm:px-8 md:px-16 lg:px-24 xl:px-40 py-8 sm:py-12">
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
+            <h2 className="text-3xl sm:text-4xl font-bold text-center mb-8">Comparison Results</h2>
+            
+            <section className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+                <div>
+                    <h3 className="text-xl font-semibold mb-4 text-center">Image 1</h3>
+                    <img src={image1} alt="Original" className="rounded-lg shadow-lg w-full" />
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="relative aspect-[4/3] rounded-lg overflow-hidden group border-2 border-transparent hover:border-[var(--primary-accent)] transition-colors">
-                    <img src={image1} alt="Image 1" className="absolute inset-0 w-full h-full object-cover" />
-                    <div className="absolute top-2 left-2 bg-[var(--primary-accent)] text-white text-xs font-semibold px-2 py-1 rounded">Image 1</div>
-                     {showAnnotations && results?.differences.map((d: any) => (
-                        <div key={d.id} className="absolute border-2 border-red-500" style={{ left: `${d.x}px`, top: `${d.y}px`, width: `${d.w}px`, height: `${d.h}px` }}>
-                            <span className="absolute -top-5 -left-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">{d.id}</span>
-                        </div>
-                    ))}
-                  </div>
-                  <div className="relative aspect-[4/3] rounded-lg overflow-hidden group border-2 border-transparent hover:border-[var(--primary-accent)] transition-colors">
-                    <img src={image2} alt="Image 2" className="absolute inset-0 w-full h-full object-cover" />
-                    <div className="absolute top-2 left-2 bg-[var(--primary-accent)] text-white text-xs font-semibold px-2 py-1 rounded">Image 2</div>
-                     {showAnnotations && results?.differences.map((d: any) => (
-                        <div key={d.id} className="absolute border-2 border-red-500" style={{ left: `${d.x}px`, top: `${d.y}px`, width: `${d.w}px`, height: `${d.h}px` }}>
-                             <span className="absolute -top-5 -left-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">{d.id}</span>
-                        </div>
-                    ))}
-                  </div>
+                <div>
+                    <h3 className="text-xl font-semibold mb-4 text-center">Image 2</h3>
+                    <img src={image2} alt="Comparison" className="rounded-lg shadow-lg w-full" />
                 </div>
-              </motion.section>
+            </section>
+            
+            {results?.annotations && (
+              <ResultsSection title="Difference Analysis">
+                <div className="flex justify-center mb-4">
+                    <label className="flex items-center cursor-pointer">
+                        <span className="mr-3 text-lg">Show Annotations</span>
+                        <div className="relative">
+                            <input type="checkbox" className="sr-only" checked={showAnnotations} onChange={() => setShowAnnotations(!showAnnotations)} />
+                            <div className="w-14 h-8 bg-gray-600 rounded-full shadow-inner"></div>
+                            <div className={`dot absolute w-6 h-6 bg-white rounded-full shadow -left-1 -top-1 transition-transform ${showAnnotations ? 'transform translate-x-full bg-green-400' : ''}`}></div>
+                        </div>
+                    </label>
+                </div>
+                <canvas ref={diffCanvasRef} className="w-full rounded-lg shadow-lg"></canvas>
+              </ResultsSection>
+            )}
 
-              <motion.section 
-                className="grid grid-cols-1 md:grid-cols-1 gap-6 mb-8"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.2, duration: 0.5 }}
-              >
-                 <div className="bg-[var(--card-bg)] rounded-xl shadow-lg p-4 sm:p-6">
-                    <h3 className="text-[var(--text-primary)] text-lg font-semibold leading-tight tracking-[-0.015em] mb-3">Processing Statistics</h3>
-                    <p className="text-[var(--text-secondary)] text-sm font-normal leading-normal mb-1">Processing Time: <span className="text-[var(--text-primary)] font-medium">{results?.stats.processingTime}</span></p>
-                    <p className="text-[var(--text-secondary)] text-sm font-normal leading-normal mb-1">Differences Found: <span className="text-[var(--text-primary)] font-medium">{results?.stats.differencesFound}</span></p>
-                    <p className="text-[var(--text-secondary)] text-sm font-normal leading-normal mb-1">Mismatched Pixels: <span className="text-[var(--text-primary)] font-medium">{results?.stats.mismatchedPixels}</span></p>
-                    <p className="text-[var(--text-secondary)] text-sm font-normal leading-normal mb-1">Mean Squared Error: <span className="text-[var(--text-primary)] font-medium">{results?.stats.mse}</span></p>
-                    <p className="text-[var(--text-secondary)] text-sm font-normal leading-normal">Structural Similarity: <span className="text-[var(--text-primary)] font-medium">{results?.stats.ssim}</span></p>
-                 </div>
-              </motion.section>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              {results?.stats && (
+                <ResultsSection title="Processing Statistics">
+                  <StatItem label="Differences Found" value={results.stats.differencesFound ?? 'N/A'} />
+                  <StatItem label="Mismatched Pixels" value={results.stats.mismatchedPixels?.toLocaleString() ?? 'N/A'} />
+                  <StatItem label="Mean Squared Error (MSE)" value={results.stats.mse?.toFixed(6) ?? 'N/A'} />
+                  <StatItem label="Structural Similarity (SSIM)" value={results.stats.ssim?.toFixed(6) ?? 'N/A'} />
+                </ResultsSection>
+              )}
 
-              {enableOcr && (
-                <motion.section 
-                  className="bg-[var(--card-bg)] rounded-xl shadow-lg p-4 sm:p-6 mb-8"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: 0.3, duration: 0.5 }}
-                >
-                  <h3 className="text-[var(--text-primary)] text-lg font-semibold leading-tight tracking-[-0.015em] mb-3">OCR Text</h3>
-                  <div className="grid md:grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-[var(--text-secondary)] text-xs font-medium mb-1">Image 1:</p>
-                      <p className="text-[var(--text-primary)] text-sm font-normal leading-normal bg-[var(--dark-bg)] p-2 rounded-md">{results?.ocr.image1}</p>
-                    </div>
-                    <div>
-                      <p className="text-[var(--text-secondary)] text-xs font-medium mb-1">Image 2:</p>
-                      <p className="text-[var(--text-primary)] text-sm font-normal leading-normal bg-[var(--dark-bg)] p-2 rounded-md">{results?.ocr.image2}</p>
-                    </div>
+              {results?.annotations && results.annotations.differences.length > 0 && (
+                <ResultsSection title="Top 20 Differences (by size)">
+                  <div className="space-y-2 text-sm max-h-80 overflow-y-auto">
+                      {results.annotations.differences.map((d: any) => (
+                          <p key={d.id} className="text-gray-300">
+                              <span className="font-bold text-magenta-400">Difference {d.id}:</span> Box at ({d.x}, {d.y}), Size ({d.w} x {d.h}), Area ({d.area} pixels)
+                          </p>
+                      ))}
                   </div>
-                </motion.section>
+                </ResultsSection>
               )}
 
-              {enableClassification && (
-                 <motion.section 
-                  className="bg-[var(--card-bg)] rounded-xl shadow-lg p-4 sm:p-6 mb-8"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: 0.4, duration: 0.5 }}
-                >
-                  <h3 className="text-[var(--text-primary)] text-lg font-semibold leading-tight tracking-[-0.015em] mb-3">Image Classification</h3>
-                  <div className="grid md:grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-[var(--text-secondary)] text-xs font-medium mb-1">Image 1:</p>
-                      <p className="text-[var(--text-primary)] text-sm font-normal leading-normal bg-[var(--dark-bg)] p-2 rounded-md">{results?.classification.image1}</p>
-                    </div>
-                    <div>
-                      <p className="text-[var(--text-secondary)] text-xs font-medium mb-1">Image 2:</p>
-                      <p className="text-[var(--text-primary)] text-sm font-normal leading-normal bg-[var(--dark-bg)] p-2 rounded-md">{results?.classification.image2}</p>
-                    </div>
-                  </div>
-                </motion.section>
-              )}
-              
-              {showAnnotations && (
-                 <motion.section 
-                  className="bg-[var(--card-bg)] rounded-xl shadow-lg p-4 sm:p-6"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: 0.5, duration: 0.5 }}
-                >
-                    <h3 className="text-[var(--text-primary)] text-lg font-semibold leading-tight tracking-[-0.015em] mb-3">Annotation Details</h3>
-                    <div className="space-y-2 text-sm">
-                        {results?.differences.sort((a: any, b: any) => b.area - a.area).map((d: any) => (
-                            <p key={d.id} className="text-[var(--text-secondary)]">
-                                <span className="font-bold text-red-400">Difference {d.id}:</span> Box at ({d.x}, {d.y}), Size ({d.w} x {d.h}), Area ({d.area} pixels)
-                            </p>
-                        ))}
-                    </div>
-                 </motion.section>
+              {results?.ocr && (
+                <ResultsSection title="OCR Text Extraction">
+                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <OcrResult title="Image 1 Text" text={results.ocr.image1} />
+                      <OcrResult title="Image 2 Text" text={results.ocr.image2} />
+                   </div>
+                </ResultsSection>
               )}
 
-            </motion.div>
-          </main>
-          <Footer />
-        </div>
-      </div>
+              {results?.classification && (
+                <ResultsSection title="Image Classification">
+                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <ClassificationResult title="Image 1 Classification" data={results.classification.image1} />
+                      <ClassificationResult title="Image 2 Classification" data={results.classification.image2} />
+                   </div>
+                </ResultsSection>
+              )}
+            </div>
+        </motion.div>
+       </main>
+       <Footer />
     </div>
   );
 };
+
+// Helper components for consistent styling
+const ResultsSection: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => (
+  <div className="bg-[#1E1E1E] p-6 rounded-lg shadow-2xl mb-8">
+    <h3 className="text-2xl font-bold mb-4">{title}</h3>
+    {children}
+  </div>
+);
+
+const StatItem: React.FC<{ label: string; value: string | number }> = ({ label, value }) => (
+  <div className="flex justify-between items-center py-2 border-b border-gray-700">
+    <p className="text-gray-300">{label}</p>
+    <p className="font-mono text-lg text-green-400">{value}</p>
+  </div>
+);
+
+const OcrResult: React.FC<{ title: string, text: string }> = ({ title, text }) => (
+  <div>
+    <h4 className="font-semibold mb-2">{title}</h4>
+    <p className="text-sm bg-black/20 p-3 rounded-md text-gray-400 whitespace-pre-wrap">{text || 'No text detected.'}</p>
+  </div>
+);
+
+const ClassificationResult: React.FC<{ title: string, data: any[] }> = ({ title, data }) => (
+   <div>
+    <h4 className="font-semibold mb-2">{title}</h4>
+    <ul className="space-y-1">
+      {data.map((item, index) => (
+        <li key={index} className="flex justify-between text-sm">
+          <span>{item.className}</span>
+          <span className="font-mono text-cyan-400">{(item.probability * 100).toFixed(2)}%</span>
+        </li>
+      ))}
+    </ul>
+  </div>
+);
 
 export default ImageComparisonResultsPage; 
