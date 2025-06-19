@@ -314,9 +314,13 @@ async function preprocessImageForOcr(imageUrl: string): Promise<string> {
 async function performClassification(image1: ImageBitmap, image2: ImageBitmap): Promise<{ image1: any[], image2: any[] }> {
     self.postMessage({ type: 'progress', payload: { message: 'Loading classification model...' } });
     
-    // Load the model from TensorFlow Hub. Using graph model for performance.
-    const modelUrl = 'https://tfhub.dev/tensorflow/tfjs-model/efficientnet/b0/classification/1';
-    const model: tf.GraphModel = await tf.loadGraphModel(modelUrl, { fromTFHub: true });
+    // Load the model from our locally hosted files
+    const modelUrl = '/models/efficientnet/model.json';
+    const [model, labels] = await Promise.all([
+      tf.loadGraphModel(modelUrl) as Promise<tf.GraphModel>,
+      fetch('/models/efficientnet/imagenet_class_index.json').then(res => res.json())
+    ]);
+
     const canvas = new OffscreenCanvas(224, 224);
     const ctx = canvas.getContext('2d')!;
 
@@ -343,7 +347,7 @@ async function performClassification(image1: ImageBitmap, image2: ImageBitmap): 
         topK.values.dispose();
 
         return Array.from(indices).map((index: any, i: number) => ({
-            className: `Class #${index}`, // Placeholder for real class name
+            className: labels[String(index)][1], // Look up the human-readable name
             probability: values[i],
         }));
     };

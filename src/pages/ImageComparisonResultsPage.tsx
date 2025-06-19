@@ -300,6 +300,9 @@ const ImageComparisonResultsPage: React.FC = () => {
                       <ClassificationResultDisplay title="Original Image" data={results.classification.image1} />
                       <ClassificationResultDisplay title="Edited Image" data={results.classification.image2} />
                    </div>
+                   <p className="text-xs text-gray-500 mt-4">
+                    <strong>How this works:</strong> An AI model (EfficientNet B0) pre-trained on the ImageNet dataset analyzes each image and predicts the most likely objects it contains. This provides a high-level understanding of the image content.
+                  </p>
                 </ResultsSection>
               )}
 
@@ -363,7 +366,7 @@ const ClassificationResultDisplay: React.FC<{ title: string; data: Classificatio
       {data && data.length > 0 ? (
         data.map((item, index) => (
           <li key={index} className="flex justify-between items-center text-sm">
-            <span className="text-gray-300">{item.className.replace('Class #', '')}</span>
+            <span className="text-gray-300">{item.className}</span>
             <span className="font-mono text-cyan-400">{(item.probability * 100).toFixed(1)}%</span>
           </li>
         ))
