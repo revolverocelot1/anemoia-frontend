@@ -2,62 +2,73 @@
    Opens a popup window to the backend Google OAuth endpoint and resolves with
    the JWT when the popup posts a message back. */
 
-const POPUP_WIDTH = 500;
-const POPUP_HEIGHT = 600;
+export interface AuthResult {
+  token: string;
+  user: {
+    name: string;
+    email: string;
+    picture: string;
+    sub: string;
+  };
+}
 
-export function openAuthPopup(authUrl: string): Promise<string> {
+export function openAuthPopup(authUrl: string): Promise<AuthResult> {
   return new Promise((resolve, reject) => {
-    const dualScreenLeft = window.screenLeft ?? window.screenX ?? 0;
-    const dualScreenTop = window.screenTop ?? window.screenY ?? 0;
-
-    const width = window.innerWidth ?? document.documentElement.clientWidth ?? screen.width;
-    const height = window.innerHeight ?? document.documentElement.clientHeight ?? screen.height;
-
-    const systemZoom = width / window.screen.availWidth;
-
-    const left = (width - POPUP_WIDTH) / 2 / systemZoom + dualScreenLeft;
-    const top = (height - POPUP_HEIGHT) / 2 / systemZoom + dualScreenTop;
-
     const popup = window.open(
       authUrl,
-      'anemoia_google_login',
-      `scrollbars=yes, width=${POPUP_WIDTH / systemZoom}, height=${POPUP_HEIGHT / systemZoom}, top=${top}, left=${left}`
+      'google-auth',
+      'width=500,height=600,scrollbars=yes,resizable=yes,left=' +
+      (window.screen.width / 2 - 250) + ',top=' +
+      (window.screen.height / 2 - 300)
     );
 
     if (!popup) {
-      return reject(new Error('Failed to open authentication window'));
+      reject(new Error('Popup blocked'));
+      return;
     }
 
-    const timeout = setTimeout(() => {
-      cleanup();
-      reject(new Error('Login timed out'));
-    }, 2 * 60 * 1000); // 2 minutes
-
-    function cleanup() {
-      clearTimeout(timeout);
-      window.removeEventListener('message', onMessage);
-    }
-
-    function onMessage(e: MessageEvent) {
-      try {
-        console.log('Popup message received:', e.data, 'from origin:', e.origin);
-        const originOk = new URL(authUrl).origin === e.origin;
-        console.log('Origin check:', originOk, 'expected:', new URL(authUrl).origin);
-        if (!originOk) return; // ignore other origins
-        const { token } = e.data || {};
-        if (typeof token === 'string') {
-          console.log('Valid token received, closing popup');
-          cleanup();
-          resolve(token);
-          if (popup && !popup.closed) {
-            popup.close();
-          }
-        }
-      } catch {
-        console.warn('Error processing popup message:', e);
+    const handleMessage = (event: MessageEvent) => {
+      // Check origin for security
+      if (event.origin !== window.location.origin && 
+          !event.origin.includes('anemoias.me') && 
+          !event.origin.includes('anemoia-api.onrender.com')) {
+        return;
       }
-    }
 
-    window.addEventListener('message', onMessage, false);
+      if (event.data && event.data.token) {
+        // Clean up
+        window.removeEventListener('message', handleMessage);
+        popup.close();
+        
+        // Parse user info from JWT token
+        try {
+          const payload = JSON.parse(atob(event.data.token.split('.')[1]));
+          const user = {
+            name: payload.name || 'User',
+            email: payload.email || '',
+            picture: payload.picture || '/A_logo.png',
+            sub: payload.sub || payload.user_id || ''
+          };
+          
+          resolve({
+            token: event.data.token,
+            user
+          });
+        } catch (error) {
+          reject(new Error('Invalid token format'));
+        }
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+
+    // Check if popup was closed without authentication
+    const checkClosed = setInterval(() => {
+      if (popup.closed) {
+        clearInterval(checkClosed);
+        window.removeEventListener('message', handleMessage);
+        reject(new Error('Authentication cancelled'));
+      }
+    }, 1000);
   });
 } 

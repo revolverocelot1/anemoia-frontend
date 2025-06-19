@@ -9,12 +9,14 @@ import SettingsPage from './pages/SettingsPage';
 import FAQPage from './pages/FAQPage';
 import PosePage from './pages/PosePage';
 import PoseResultsPage from './pages/PoseResultsPage';
-import { AccountPage } from './pages/AccountPage';
+import AccountPage from './pages/AccountPage';
 import NewUpscalerPage from './pages/NewUpscalerPage';
 // We will create these pages next
 // import PosePage from './pages/PosePage';
 import ImageComparisonPage from './pages/ImageComparisonPage';
 import ImageComparisonResultsPage from './pages/ImageComparisonResultsPage';
+import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
+import TermsOfServicePage from './pages/TermsOfServicePage';
 
 function App() {
   const location = useLocation();
@@ -115,6 +117,22 @@ function App() {
           element={
             <AnimatedPage>
               <ImageComparisonResultsPage />
+            </AnimatedPage>
+          }
+        />
+        <Route
+          path="/privacy"
+          element={
+            <AnimatedPage>
+              <PrivacyPolicyPage />
+            </AnimatedPage>
+          }
+        />
+        <Route
+          path="/terms"
+          element={
+            <AnimatedPage>
+              <TermsOfServicePage />
             </AnimatedPage>
           }
         />

@@ -8,10 +8,10 @@ const Header = () => {
 
   const handleLogin = async () => {
     const apiBaseUrl = import.meta.env.VITE_API_BASE_URL;
-    console.log('Auth URL:', `${apiBaseUrl}/auth/google?popup=1`);
+    console.log('Auth URL:', `${apiBaseUrl}/auth/google`);
     try {
-      const token = await openAuthPopup(`${apiBaseUrl}/auth/google?popup=1`);
-      setToken(token);
+      const authResult = await openAuthPopup(`${apiBaseUrl}/auth/google`);
+      setToken(authResult.token);
     } catch (err) {
       console.error('Login failed', err);
     }
