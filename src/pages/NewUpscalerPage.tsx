@@ -1,10 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import UpscalerInput from '../components/upscaler/UpscalerInput';
 import UpscalerOutput from '../components/upscaler/UpscalerOutput';
 import ProcessingOverlay from '../components/upscaler/ProcessingOverlay';
-import { AnimatePresence } from 'framer-motion';
+import AnimatedPage from '../components/AnimatedPage';
 
 type UpscalerView = 'input' | 'processing' | 'output';
 
@@ -36,7 +37,7 @@ const NewUpscalerPage: React.FC = () => {
       const { status, message, error: workerError, upscaledImageUrl: workerUpscaledUrl, stats: workerStats, progress: workerProgress } = event.data;
 
       if (message) setStatusMessage(message);
-      if (workerProgress) setProgress(workerProgress);
+      if (workerProgress !== undefined) setProgress(workerProgress);
       
       switch (status) {
         case 'worker_initialized':
@@ -63,7 +64,7 @@ const NewUpscalerPage: React.FC = () => {
     return () => workerRef.current?.terminate();
   }, []);
 
-  const handleImageUpload = (file: File, scaleFactor: number) => {
+  const handleImageUpload = (file: File, scaleFactor: number, modelType: string) => {
     setOriginalImage(file);
     setError(null);
     setProgress(0);
@@ -72,7 +73,7 @@ const NewUpscalerPage: React.FC = () => {
     reader.onload = (e) => {
       const imageData = {
         dataUrl: e.target?.result as string,
-        width: 0, // will be determined from image load
+        width: 0,
         height: 0,
         originalFileSize: formatFileSize(file.size)
       };
@@ -86,6 +87,7 @@ const NewUpscalerPage: React.FC = () => {
           command: 'upscale',
           imageData,
           scaleFactor,
+          modelType,
           backend: 'webgl'
         });
       };
@@ -104,36 +106,74 @@ const NewUpscalerPage: React.FC = () => {
     setStats(null);
     setError(null);
     setProgress(0);
+    setStatusMessage('');
   };
 
   return (
-    <div className="relative flex min-h-screen flex-col overflow-x-hidden">
-      <Header />
-      <main className="flex-1 flex justify-center py-12 px-4">
-        <div className="w-full max-w-4xl">
-          <AnimatePresence mode="wait">
-            {view === 'input' && (
+    <AnimatedPage>
+      <div className="relative flex min-h-screen flex-col bg-gray-950 text-white">
+        <Header />
+        
+        <AnimatePresence mode="wait">
+          {view === 'input' && (
+            <motion.div
+              key="input"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.5 }}
+            >
               <UpscalerInput onImageUploaded={handleImageUpload} isProcessing={false} />
-            )}
-            {view === 'output' && originalImage && (
+            </motion.div>
+          )}
+          
+          {view === 'output' && originalImage && (
+            <motion.div
+              key="output"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.5 }}
+              className="flex-1"
+            >
               <UpscalerOutput
                 originalImageFile={originalImage}
                 upscaledImageUrl={upscaledImageUrl}
                 stats={stats}
                 onReset={handleReset}
               />
-            )}
-          </AnimatePresence>
-          <AnimatePresence>
-            {view === 'processing' && (
-              <ProcessingOverlay statusMessage={statusMessage} progress={progress} />
-            )}
-          </AnimatePresence>
-          {error && <div className="text-red-400 text-center mt-4 p-4 bg-red-900/50 rounded-lg">{error}</div>}
-        </div>
-      </main>
-      <Footer />
-    </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <AnimatePresence>
+          {view === 'processing' && (
+            <ProcessingOverlay 
+              statusMessage={statusMessage} 
+              progress={progress} 
+            />
+          )}
+        </AnimatePresence>
+
+        {error && (
+          <motion.div 
+            className="fixed bottom-8 left-1/2 transform -translate-x-1/2 bg-red-500/10 border border-red-500/20 text-red-400 text-center px-6 py-4 rounded-xl backdrop-blur-sm z-50 max-w-md"
+            initial={{ opacity: 0, y: 100 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 100 }}
+          >
+            <div className="flex items-center space-x-2">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span>{error}</span>
+            </div>
+          </motion.div>
+        )}
+
+        <Footer />
+      </div>
+    </AnimatedPage>
   );
 };
 
