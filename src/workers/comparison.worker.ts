@@ -1,28 +1,33 @@
+import pixelmatch from 'pixelmatch';
+import ssim from 'ssim.js';
+import { createScheduler, createWorker } from 'tesseract.js';
+import * as tf from '@tensorflow/tfjs';
+
 // A dedicated worker for handling the intensive image comparison tasks.
 
 // --- 1. SCRIPT LOADING & INITIALIZATION ---
 
 // Use importScripts to load external libraries. This is the standard way for web workers.
 // It helps avoid polluting the global scope of the main application and fixes "module is not defined" errors.
-try {
-  importScripts(
-    'https://cdn.jsdelivr.net/npm/pixelmatch@5.3.0/index.js',
-    'https://unpkg.com/ssim.js@3.5.0/dist/ssim.web.js',
-    'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js',
-    'https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js',
-    // OpenCV is powerful but large. We'll load it on demand if needed for complex alignment.
-    // 'https://docs.opencv.org/4.x/opencv.js' 
-  );
-} catch (e) {
-  console.error('Worker Script Loading Error:', e);
-  // Inform the main thread that initialization failed.
-  self.postMessage({ type: 'error', payload: 'Could not load analysis libraries.' });
-}
+// try {
+//   importScripts(
+//     'https://cdn.jsdelivr.net/npm/pixelmatch@5.3.0/index.js',
+//     'https://unpkg.com/ssim.js@3.5.0/dist/ssim.web.js',
+//     'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js',
+//     'https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js',
+//     // OpenCV is powerful but large. We'll load it on demand if needed for complex alignment.
+//     // 'https://docs.opencv.org/4.x/opencv.js' 
+//   );
+// } catch (e) {
+//   console.error('Worker Script Loading Error:', e);
+//   // Inform the main thread that initialization failed.
+//   self.postMessage({ type: 'error', payload: 'Could not load analysis libraries.' });
+// }
 
 // Declare the global variables. The @ts-ignore is used because TypeScript struggles 
 // to reconcile the types for scripts loaded globally in a worker context.
 // @ts-ignore
-declare const pixelmatch: any, ssim: any, Tesseract: any, tf: any;
+// declare const pixelmatch: any, ssim: any, Tesseract: any, tf: any;
 // declare const cv: any;
 
 // --- 2. MAIN MESSAGE HANDLER ---
@@ -40,9 +45,17 @@ self.onmessage = async (event) => {
     ]);
 
     // Ensure images have the same dimensions for comparison.
+    let image2ToCompare = image2;
     if (image1.width !== image2.width || image1.height !== image2.height) {
-      // TODO: Implement resizing or alignment for mismatched images using OpenCV.js or other libs.
-      throw new Error(`Images must have the same dimensions for comparison. Image 1: ${image1.width}x${image1.height}, Image 2: ${image2.width}x${image2.height}`);
+      self.postMessage({ type: 'progress', payload: { message: 'Resizing images to match...' } });
+      const canvas = new OffscreenCanvas(image1.width, image1.height);
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.drawImage(image2, 0, 0, image1.width, image1.height);
+        image2ToCompare = await createImageBitmap(canvas);
+      } else {
+        throw new Error('Could not get 2D context to resize image.');
+      }
     }
 
     // --- 3. ANALYSIS TASKS ---
@@ -60,7 +73,7 @@ self.onmessage = async (event) => {
     if (settings.enableAnnotations) {
       analysisPromises.push((async () => {
         self.postMessage({ type: 'progress', payload: { message: 'Analyzing differences...' } });
-        const { stats, diffImageData, differences } = performPixelAnalysis(image1, image2);
+        const { stats, diffImageData, differences } = performPixelAnalysis(image1, image2ToCompare);
         results.stats = { ...results.stats, ...stats };
         results.annotations = { diffImageData, differences };
       })());
@@ -78,7 +91,7 @@ self.onmessage = async (event) => {
     if (settings.enableClassification) {
       analysisPromises.push((async () => {
         self.postMessage({ type: 'progress', payload: { message: 'Classifying images...' } });
-        results.classification = await performClassification(image1, image2);
+        results.classification = await performClassification(image1, image2ToCompare);
       })());
     }
 
@@ -225,9 +238,9 @@ function calculateMse(data1: Uint8ClampedArray, data2: Uint8ClampedArray): numbe
  * Performs OCR on both images using Tesseract.js
  */
 async function performOcr(image1Url: string, image2Url: string) {
-    const scheduler = Tesseract.createScheduler();
-    const worker1 = await Tesseract.createWorker('eng');
-    const worker2 = await Tesseract.createWorker('eng');
+    const scheduler = createScheduler();
+    const worker1 = await createWorker('eng');
+    const worker2 = await createWorker('eng');
     scheduler.addWorker(worker1);
     scheduler.addWorker(worker2);
 

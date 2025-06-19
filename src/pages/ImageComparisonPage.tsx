@@ -186,8 +186,8 @@ const Toggle: React.FC<ToggleProps> = ({ label, enabled, setEnabled }) => (
       <span className="text-lg font-medium">{label}</span>
       <div className="relative">
           <input type="checkbox" className="sr-only" checked={enabled} onChange={() => setEnabled(!enabled)} />
-          <div className="w-14 h-8 bg-gray-600 rounded-full shadow-inner"></div>
-          <div className={`absolute w-6 h-6 bg-white rounded-full shadow -left-1 top-1 transition-transform duration-300 ease-in-out ${enabled ? 'transform translate-x-full bg-blue-400' : ''}`}></div>
+          <div className={`w-14 h-8 rounded-full shadow-inner transition-colors duration-300 ease-in-out ${enabled ? 'bg-green-500' : 'bg-gray-600'}`}></div>
+          <div className={`absolute w-6 h-6 bg-white rounded-full shadow top-1 left-1 transition-transform duration-300 ease-in-out ${enabled ? 'transform translate-x-full' : ''}`}></div>
       </div>
     </label>
 );
