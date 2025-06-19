@@ -11,13 +11,14 @@ interface AnalysisResults {
   stats: {
     mismatchedPixels?: number;
     differencesFound?: number;
-    mse?: number;
-    ssim?: number;
+    mse?: number | null;
+    ssim?: number | null;
     imageWidth?: number;
     imageHeight?: number;
+    pixelDiffPercentage?: number;
   };
   annotations?: {
-    diffImageData: ImageData;
+    diffImageData: ImageData | null;
     differences: BoundingBox[];
   };
   ocr?: {
@@ -67,6 +68,14 @@ const getMismatchAnalysis = (mismatchPercent: number) => {
   if (mismatchPercent < 5) return { level: 'Low Mismatch', color: 'text-yellow-400', icon: <FaEye /> };
   if (mismatchPercent < 15) return { level: 'Moderate Mismatch', color: 'text-orange-400', icon: <FaExclamationTriangle /> };
   return { level: 'High Mismatch', color: 'text-red-500', icon: <FaExclamationTriangle /> };
+};
+
+// Helper function to safely format numbers
+const formatNumber = (value: number | null | undefined, decimalPlaces: number): string => {
+  if (value === null || value === undefined || isNaN(value)) {
+    return 'N/A';
+  }
+  return value.toFixed(decimalPlaces);
 };
 
 const ImageComparisonResultsPage: React.FC = () => {
@@ -125,7 +134,7 @@ const ImageComparisonResultsPage: React.FC = () => {
         enableAnnotations: true,
         enableOcr: false,
         enableClassification: false,
-        normalizeRatio: true,
+        normalizeAspectRatio: true,
     };
 
     // Set image source to trigger load
@@ -158,7 +167,7 @@ const ImageComparisonResultsPage: React.FC = () => {
       canvas.width = img.naturalWidth;
       canvas.height = img.naturalHeight;
       
-      if (ctx) {
+      if (ctx && differences && differences.length > 0) {
         // Draw the "Edited" image as the base
         ctx.drawImage(img, 0, 0);
 
@@ -183,6 +192,9 @@ const ImageComparisonResultsPage: React.FC = () => {
           ctx.fillText(String(d.id), centerX, centerY);
           ctx.fillStyle = '#FF00FF'; // Reset for next circle
         });
+      } else if (ctx) {
+        // Just draw the image without annotations
+        ctx.drawImage(img, 0, 0);
       }
     }
   }, [results]);
@@ -224,13 +236,11 @@ const ImageComparisonResultsPage: React.FC = () => {
   }
 
   const { stats, ocr, annotations } = results;
-  const mismatchPercent = stats.mismatchedPixels && stats.imageWidth && stats.imageHeight 
-      ? (stats.mismatchedPixels / (stats.imageWidth * stats.imageHeight)) * 100 
-      : 0;
+  const mismatchPercent = stats.pixelDiffPercentage || 0;
 
-  const ssimAnalysis = stats.ssim ? getSsimAnalysis(stats.ssim) : null;
-  const mseAnalysis = stats.mse ? getMseAnalysis(stats.mse) : null;
-  const mismatchAnalysis = mismatchPercent ? getMismatchAnalysis(mismatchPercent) : null;
+  const ssimAnalysis = (stats.ssim !== null && stats.ssim !== undefined) ? getSsimAnalysis(stats.ssim) : null;
+  const mseAnalysis = (stats.mse !== null && stats.mse !== undefined) ? getMseAnalysis(stats.mse) : null;
+  const mismatchAnalysis = mismatchPercent > 0 ? getMismatchAnalysis(mismatchPercent) : null;
 
   return (
     <div className="bg-[#121212] text-white min-h-screen">
@@ -260,18 +270,18 @@ const ImageComparisonResultsPage: React.FC = () => {
 
               {/* Right Column: Stats */}
               <div className="lg:col-span-2 space-y-6">
-                {ssimAnalysis && stats.ssim && (
-                  <StatCard title="Structural Similarity (SSIM)" value={stats.ssim.toFixed(5)} analysis={ssimAnalysis}>
+                {ssimAnalysis && (
+                  <StatCard title="Structural Similarity (SSIM)" value={formatNumber(stats.ssim, 5)} analysis={ssimAnalysis}>
                     Measures the perceptual difference between two images. A value of 1.0 means they are structurally identical.
                   </StatCard>
                 )}
-                {mseAnalysis && stats.mse && (
-                  <StatCard title="Mean Squared Error (MSE)" value={stats.mse.toFixed(4)} analysis={mseAnalysis}>
+                {mseAnalysis && (
+                  <StatCard title="Mean Squared Error (MSE)" value={formatNumber(stats.mse, 4)} analysis={mseAnalysis}>
                     Calculates the average squared difference between pixels. Lower values indicate higher similarity. A value of 0 means they are identical.
                   </StatCard>
                 )}
                 {mismatchAnalysis && (
-                  <StatCard title="Mismatched Pixels" value={`${mismatchPercent.toFixed(3)}%`} analysis={mismatchAnalysis}>
+                  <StatCard title="Mismatched Pixels" value={`${formatNumber(mismatchPercent, 3)}%`} analysis={mismatchAnalysis}>
                     Represents the percentage of pixels that are different between the two images, based on a sensitivity threshold.
                   </StatCard>
                 )}
@@ -301,12 +311,12 @@ const ImageComparisonResultsPage: React.FC = () => {
                       <ClassificationResultDisplay title="Edited Image" data={results.classification.image2} />
                    </div>
                    <p className="text-xs text-gray-500 mt-4">
-                    <strong>How this works:</strong> An AI model (EfficientNet B0) pre-trained on the ImageNet dataset analyzes each image and predicts the most likely objects it contains. This provides a high-level understanding of the image content.
+                    <strong>How this works:</strong> AI analyzes each image for basic features like color distribution, brightness, contrast, and texture patterns to provide descriptive classifications.
                   </p>
                 </ResultsSection>
               )}
 
-              {annotations && annotations.differences.length > 0 && (
+              {annotations && annotations.differences && annotations.differences.length > 0 && (
                 <ResultsSection title="Difference Details">
                   <div className="space-y-2 text-sm max-h-60 overflow-y-auto pr-2">
                       {annotations.differences.map((d: BoundingBox) => (
@@ -367,7 +377,7 @@ const ClassificationResultDisplay: React.FC<{ title: string; data: Classificatio
         data.map((item, index) => (
           <li key={index} className="flex justify-between items-center text-sm">
             <span className="text-gray-300">{item.className}</span>
-            <span className="font-mono text-cyan-400">{(item.probability * 100).toFixed(1)}%</span>
+            <span className="font-mono text-cyan-400">{formatNumber(item.probability * 100, 1)}%</span>
           </li>
         ))
       ) : (

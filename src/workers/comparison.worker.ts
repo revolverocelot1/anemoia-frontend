@@ -100,6 +100,102 @@ async function extractImageFeatures(imageBitmap: ImageBitmap): Promise<any> {
 }
 
 /**
+ * Calculate MSE (Mean Squared Error) between two images
+ */
+function calculateMSE(imageData1: ImageData, imageData2: ImageData): number {
+    const data1 = imageData1.data;
+    const data2 = imageData2.data;
+    let mse = 0;
+    
+    for (let i = 0; i < data1.length; i += 4) {
+        // Calculate squared differences for R, G, B channels
+        const rDiff = data1[i] - data2[i];
+        const gDiff = data1[i + 1] - data2[i + 1];
+        const bDiff = data1[i + 2] - data2[i + 2];
+        
+        mse += (rDiff * rDiff + gDiff * gDiff + bDiff * bDiff) / 3;
+    }
+    
+    return mse / (data1.length / 4);
+}
+
+/**
+ * Find connected components (difference regions) in the diff image
+ */
+function findDifferenceRegions(diffImageData: ImageData, minArea: number = 50): Array<{ id: number; x: number; y: number; w: number; h: number; area: number; }> {
+    const { width, height, data } = diffImageData;
+    const visited = new Array(width * height).fill(false);
+    const regions = [];
+    let regionId = 1;
+    
+    // Simple flood fill to find connected components
+    for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+            const index = y * width + x;
+            const pixelIndex = index * 4;
+            
+            // Check if this pixel has a difference (any RGB channel > 0) and hasn't been visited
+            if (!visited[index] && (data[pixelIndex] > 0 || data[pixelIndex + 1] > 0 || data[pixelIndex + 2] > 0)) {
+                const region = floodFill(diffImageData, visited, x, y, regionId);
+                if (region.area >= minArea) {
+                    regions.push(region);
+                    regionId++;
+                }
+            }
+        }
+    }
+    
+    return regions;
+}
+
+/**
+ * Flood fill algorithm to find connected difference regions
+ */
+function floodFill(imageData: ImageData, visited: boolean[], startX: number, startY: number, id: number) {
+    const { width, height, data } = imageData;
+    const stack = [{ x: startX, y: startY }];
+    let minX = startX, maxX = startX, minY = startY, maxY = startY;
+    let area = 0;
+    
+    while (stack.length > 0) {
+        const { x, y } = stack.pop()!;
+        
+        if (x < 0 || x >= width || y < 0 || y >= height) continue;
+        
+        const index = y * width + x;
+        const pixelIndex = index * 4;
+        
+        if (visited[index]) continue;
+        
+        // Check if this pixel has a difference
+        if (data[pixelIndex] === 0 && data[pixelIndex + 1] === 0 && data[pixelIndex + 2] === 0) continue;
+        
+        visited[index] = true;
+        area++;
+        
+        minX = Math.min(minX, x);
+        maxX = Math.max(maxX, x);
+        minY = Math.min(minY, y);
+        maxY = Math.max(maxY, y);
+        
+        // Add neighboring pixels to stack
+        stack.push({ x: x + 1, y });
+        stack.push({ x: x - 1, y });
+        stack.push({ x, y: y + 1 });
+        stack.push({ x, y: y - 1 });
+    }
+    
+    return {
+        id,
+        x: minX,
+        y: minY,
+        w: maxX - minX + 1,
+        h: maxY - minY + 1,
+        area
+    };
+}
+
+/**
  * Pre-processes an image for OCR.
  */
 async function preprocessOcrImage(imageBitmap: ImageBitmap): Promise<string> {
@@ -170,21 +266,47 @@ self.onmessage = async (event) => {
         ctx2.drawImage(image2ToCompare, 0, 0);
         const imageData2 = ctx2.getImageData(0, 0, image2ToCompare.width, image2ToCompare.height);
         
+        // Initialize default values
         let diffImageData: ImageData | null = null;
-        let pixelDiffPercentage: number | string = 'N/A';
-        let ssimValue: number | string = 'N/A';
+        let mismatchedPixels: number = 0;
+        let ssimValue: number | null = null;
+        let mseValue: number | null = null;
+        let differencesFound: number = 0;
+        let differences: any[] = [];
 
         if (enableAnnotations) {
             if (canPerformPixelComparison) {
                 self.postMessage({ type: 'progress', payload: { message: 'Calculating pixel differences...' } });
                 const diff = new ImageData(image1.width, image1.height);
-                const mismatchedPixels = pixelmatch(imageData1.data, imageData2.data, diff.data, image1.width, image1.height, { threshold: 0.1 });
-                pixelDiffPercentage = (mismatchedPixels / (image1.width * image1.height)) * 100;
+                mismatchedPixels = pixelmatch(imageData1.data, imageData2.data, diff.data, image1.width, image1.height, { threshold: 0.1 });
                 diffImageData = diff;
 
                 self.postMessage({ type: 'progress', payload: { message: 'Calculating SSIM...' } });
-                const ssimResult = ssim(imageData1, imageData2, { k1: 0.01, k2: 0.03, windowSize: 8 });
-                ssimValue = ssimResult.mssim;
+                try {
+                    const ssimResult = ssim(imageData1, imageData2, { k1: 0.01, k2: 0.03, windowSize: 8 });
+                    ssimValue = ssimResult.mssim;
+                } catch (error) {
+                    console.warn('SSIM calculation failed:', error);
+                    ssimValue = null;
+                }
+
+                self.postMessage({ type: 'progress', payload: { message: 'Calculating MSE...' } });
+                try {
+                    mseValue = calculateMSE(imageData1, imageData2);
+                } catch (error) {
+                    console.warn('MSE calculation failed:', error);
+                    mseValue = null;
+                }
+
+                self.postMessage({ type: 'progress', payload: { message: 'Finding difference regions...' } });
+                try {
+                    differences = findDifferenceRegions(diff);
+                    differencesFound = differences.length;
+                } catch (error) {
+                    console.warn('Difference region detection failed:', error);
+                    differences = [];
+                    differencesFound = 0;
+                }
             } else {
                  self.postMessage({ type: 'progress', payload: { message: 'Image dimensions do not match. Skipping pixel comparison.' } });
             }
@@ -194,19 +316,25 @@ self.onmessage = async (event) => {
         let ocrResult2 = 'N/A';
         if (enableOcr) {
             self.postMessage({ type: 'progress', payload: { message: 'Performing OCR...' } });
-            const scheduler = createScheduler();
-            const worker1 = await createWorker('eng');
-            const worker2 = await createWorker('eng');
-            scheduler.addWorker(worker1);
-            scheduler.addWorker(worker2);
-            
-            const [ocr1, ocr2] = await Promise.all([
-                scheduler.addJob('recognize', await preprocessOcrImage(image1)),
-                scheduler.addJob('recognize', await preprocessOcrImage(image2ToCompare))
-            ]);
-            ocrResult1 = ocr1.data.text;
-            ocrResult2 = ocr2.data.text;
-            await scheduler.terminate();
+            try {
+                const scheduler = createScheduler();
+                const worker1 = await createWorker('eng');
+                const worker2 = await createWorker('eng');
+                scheduler.addWorker(worker1);
+                scheduler.addWorker(worker2);
+                
+                const [ocr1, ocr2] = await Promise.all([
+                    scheduler.addJob('recognize', await preprocessOcrImage(image1)),
+                    scheduler.addJob('recognize', await preprocessOcrImage(image2ToCompare))
+                ]);
+                ocrResult1 = ocr1.data.text;
+                ocrResult2 = ocr2.data.text;
+                await scheduler.terminate();
+            } catch (error) {
+                console.warn('OCR failed:', error);
+                ocrResult1 = 'OCR processing failed';
+                ocrResult2 = 'OCR processing failed';
+            }
         }
 
         let classificationResult1: any = 'N/A';
@@ -214,22 +342,34 @@ self.onmessage = async (event) => {
         if (enableClassification) {
             self.postMessage({ type: 'progress', payload: { message: 'Analyzing image features...' } });
             
-            self.postMessage({ type: 'progress', payload: { message: 'Classifying Original Image...' } });
-            classificationResult1 = await extractImageFeatures(image1);
-            
-            self.postMessage({ type: 'progress', payload: { message: 'Classifying Edited Image...' } });
-            classificationResult2 = await extractImageFeatures(image2ToCompare);
+            try {
+                self.postMessage({ type: 'progress', payload: { message: 'Classifying Original Image...' } });
+                classificationResult1 = await extractImageFeatures(image1);
+                
+                self.postMessage({ type: 'progress', payload: { message: 'Classifying Edited Image...' } });
+                classificationResult2 = await extractImageFeatures(image2ToCompare);
+            } catch (error) {
+                console.warn('Classification failed:', error);
+                classificationResult1 = [];
+                classificationResult2 = [];
+            }
         }
 
         self.postMessage({
             type: 'results',
             payload: {
                 stats: {
-                    pixelDiffPercentage,
+                    mismatchedPixels,
+                    differencesFound,
+                    mse: mseValue,
                     ssim: ssimValue,
+                    imageWidth: image1.width,
+                    imageHeight: image1.height,
+                    pixelDiffPercentage: (mismatchedPixels / (image1.width * image1.height)) * 100
                 },
                 annotations: {
                     diffImageData,
+                    differences
                 },
                 ocr: {
                     image1: ocrResult1,
