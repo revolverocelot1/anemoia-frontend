@@ -1,7 +1,7 @@
 import pixelmatch from 'pixelmatch';
 import ssim from 'ssim.js';
 import { createScheduler, createWorker } from 'tesseract.js';
-// import * as tf from '@tensorflow/tfjs';
+import * as tf from '@tensorflow/tfjs';
 
 // A dedicated worker for handling the intensive image comparison tasks.
 
@@ -88,14 +88,12 @@ self.onmessage = async (event) => {
     }
 
     // ** C. Classification Task **
-    /*
     if (settings.enableClassification) {
       analysisPromises.push((async () => {
         self.postMessage({ type: 'progress', payload: { message: 'Classifying images...' } });
         results.classification = await performClassification(image1, image2ToCompare);
       })());
     }
-    */
 
     await Promise.all(analysisPromises);
 
@@ -130,12 +128,12 @@ function performPixelAnalysis(image1: ImageBitmap, image2: ImageBitmap) {
 
     // Run Pixelmatch
     const mismatchedPixels = pixelmatch(img1Data.data, img2Data.data, diffImageData.data, width, height, {
-        threshold: 0.05, // Lower threshold for more sensitivity
-        includeAA: true, // Include anti-aliased pixels
+        threshold: 0.2, // Increased threshold to reduce noise from compression artifacts
+        includeAA: true,
     });
 
     // Run Bounding Box detection on the diff
-    const differences = findDifferenceRegions(diffImageData, 20, 10); // Ignore regions smaller than 10 pixels
+    const differences = findDifferenceRegions(diffImageData, 20, 20); // Ignore regions smaller than 20 pixels in area
 
     // Calculate advanced stats
     const mse = calculateMse(img1Data.data, img2Data.data);
@@ -247,20 +245,29 @@ async function performOcr(image1Url: string, image2Url: string) {
     const scheduler = createScheduler();
     const worker1 = await createWorker('eng');
     const worker2 = await createWorker('eng');
+    
+    // Set parameters directly on the workers
+    await worker1.setParameters({
+      tessedit_char_whitelist: '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz',
+    });
+    await worker2.setParameters({
+      tessedit_char_whitelist: '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz',
+    });
+
     scheduler.addWorker(worker1);
     scheduler.addWorker(worker2);
 
     // Preprocess and recognize
-    const [result1, result2] = await Promise.all([
-        preprocessImageForOcr(image1Url).then(dataUrl => scheduler.addJob('recognize', dataUrl)),
-        preprocessImageForOcr(image2Url).then(dataUrl => scheduler.addJob('recognize', dataUrl))
-    ]);
+    const results = (await Promise.all([
+        scheduler.addJob('recognize', await preprocessImageForOcr(image1Url)),
+        scheduler.addJob('recognize', await preprocessImageForOcr(image2Url))
+    ])) as unknown as { data: { text: string } }[];
     
     await scheduler.terminate();
 
     return {
-        image1: result1.data.text,
-        image2: result2.data.text,
+        image1: results[0].data.text,
+        image2: results[1].data.text,
     };
 }
 
@@ -279,10 +286,17 @@ async function preprocessImageForOcr(imageUrl: string): Promise<string> {
 
   ctx.drawImage(image, 0, 0);
   
-  // Grayscale and contrast adjustments
-  ctx.filter = 'grayscale(1) contrast(150%)';
-  ctx.drawImage(canvas, 0, 0); // Apply filter
-
+  // Convert to grayscale and increase contrast for better OCR
+  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const data = imageData.data;
+  for (let i = 0; i < data.length; i += 4) {
+      const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
+      data[i] = avg; // red
+      data[i + 1] = avg; // green
+      data[i + 2] = avg; // blue
+  }
+  ctx.putImageData(imageData, 0, 0);
+  
   // Tesseract works best with a direct data URL of the processed image
   const blob = await canvas.convertToBlob({ type: 'image/png' });
   
@@ -297,13 +311,12 @@ async function preprocessImageForOcr(imageUrl: string): Promise<string> {
 /**
  * Performs image classification using TensorFlow.js and a pre-trained EfficientNet model.
  */
-/*
-async function performClassification(image1: ImageBitmap, image2: ImageBitmap) {
+async function performClassification(image1: ImageBitmap, image2: ImageBitmap): Promise<{ image1: any[], image2: any[] }> {
     self.postMessage({ type: 'progress', payload: { message: 'Loading classification model...' } });
     
     // Load the model from TensorFlow Hub. Using graph model for performance.
     const modelUrl = 'https://tfhub.dev/tensorflow/tfjs-model/efficientnet/b0/classification/1';
-    const model = await tf.loadGraphModel(modelUrl, { fromTFHub: true });
+    const model: tf.GraphModel = await tf.loadGraphModel(modelUrl, { fromTFHub: true });
     const canvas = new OffscreenCanvas(224, 224);
     const ctx = canvas.getContext('2d')!;
 
@@ -316,7 +329,7 @@ async function performClassification(image1: ImageBitmap, image2: ImageBitmap) {
             .toFloat()
             .div(255); // Normalize to [0, 1]
 
-        const predictions: any = await model.predict(tensor);
+        const predictions = await model.predict(tensor) as tf.Tensor;
         const topK = await predictions.topk(3); // Get top 3 predictions
         
         // This part requires a map from indices to class names.
@@ -339,11 +352,10 @@ async function performClassification(image1: ImageBitmap, image2: ImageBitmap) {
     const classification2 = await classify(image2);
 
     // Dispose the model to free memory
-    (model as any)?.dispose();
+    (model as any).dispose();
 
     return {
         image1: classification1,
         image2: classification2,
     };
 } 
-*/ 

@@ -25,8 +25,8 @@ interface AnalysisResults {
     image2: string;
   };
   classification?: {
-    image1: any[];
-    image2: any[];
+    image1: ClassificationResult[];
+    image2: ClassificationResult[];
   };
 }
 
@@ -37,6 +37,11 @@ interface BoundingBox {
   w: number;
   h: number;
   area: number;
+}
+
+interface ClassificationResult {
+  className: string;
+  probability: number;
 }
 
 // Helper functions for stats interpretation
@@ -116,6 +121,14 @@ const ImageComparisonResultsPage: React.FC = () => {
       setLoading(false);
     };
     
+    // Extract settings from location state
+    const settings = location.state?.settings || {
+        enableAnnotations: true,
+        enableOcr: false,
+        enableClassification: false,
+        normalizeRatio: true,
+    };
+
     // Set image source to trigger load
     image2Ref.current.src = image2;
 
@@ -125,7 +138,7 @@ const ImageComparisonResultsPage: React.FC = () => {
       workerRef.current?.postMessage({
         image1: image1,
         image2: image2,
-        settings: { enableAnnotations, enableOcr, enableClassification },
+        settings: settings,
       });
     };
 
@@ -250,7 +263,7 @@ const ImageComparisonResultsPage: React.FC = () => {
               <div className="lg:col-span-2 space-y-6">
                 {ssimAnalysis && stats.ssim && (
                   <StatCard title="Structural Similarity (SSIM)" value={stats.ssim.toFixed(5)} analysis={ssimAnalysis}>
-                    Measures perceptual difference between two images. A value of 1.0 means they are structurally identical.
+                    Measures the perceptual difference between two images. A value of 1.0 means they are structurally identical.
                   </StatCard>
                 )}
                 {mseAnalysis && stats.mse && (
@@ -276,12 +289,21 @@ const ImageComparisonResultsPage: React.FC = () => {
               {ocr && (
                 <ResultsSection title="Extracted Text (OCR)">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <OcrResult title="Original" text={ocr.image1} />
-                    <OcrResult title="Edited" text={ocr.image2} />
+                    <OcrResult title="Original Image" text={ocr.image1} />
+                    <OcrResult title="Edited Image" text={ocr.image2} />
                   </div>
                 </ResultsSection>
               )}
               
+              {results.classification && (
+                <ResultsSection title="AI Image Classification">
+                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <ClassificationResultDisplay title="Original Image" data={results.classification.image1} />
+                      <ClassificationResultDisplay title="Edited Image" data={results.classification.image2} />
+                   </div>
+                </ResultsSection>
+              )}
+
               {annotations && annotations.differences.length > 0 && (
                 <ResultsSection title="Difference Details">
                   <div className="space-y-2 text-sm max-h-60 overflow-y-auto pr-2">
@@ -329,9 +351,27 @@ const StatCard: React.FC<StatCardProps> = ({ title, value, analysis, children })
 );
 
 const OcrResult: React.FC<{ title: string, text: string }> = ({ title, text }) => (
-  <div className="bg-gray-800/50 p-4 rounded-lg">
+  <div className="bg-gray-800/50 p-4 rounded-lg h-full">
     <h4 className="font-bold text-lg mb-2 text-gray-300">{title}</h4>
     <p className="text-gray-400 whitespace-pre-wrap text-sm">{text || '(No text detected)'}</p>
+  </div>
+);
+
+const ClassificationResultDisplay: React.FC<{ title: string; data: ClassificationResult[] }> = ({ title, data }) => (
+  <div className="bg-gray-800/50 p-4 rounded-lg">
+    <h4 className="font-bold text-lg mb-2 text-gray-300">{title}</h4>
+    <ul className="space-y-2">
+      {data && data.length > 0 ? (
+        data.map((item, index) => (
+          <li key={index} className="flex justify-between items-center text-sm">
+            <span className="text-gray-300">{item.className.replace('Class #', '')}</span>
+            <span className="font-mono text-cyan-400">{(item.probability * 100).toFixed(1)}%</span>
+          </li>
+        ))
+      ) : (
+        <p className="text-gray-400 text-sm">No classification data.</p>
+      )}
+    </ul>
   </div>
 );
 

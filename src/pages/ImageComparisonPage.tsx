@@ -12,7 +12,8 @@ const ImageComparisonPage: React.FC = () => {
   const [image2Preview, setImage2Preview] = useState<string | null>(null);
   const [enableAnnotations, setEnableAnnotations] = useState(true);
   const [enableOcr, setEnableOcr] = useState(false);
-  const [enableClassification] = useState(false);
+  const [enableClassification, setEnableClassification] = useState(true);
+  const [normalizeRatio, setNormalizeRatio] = useState(true);
   const [isDragging, setIsDragging] = useState<number | null>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, imageNumber: number) => {
@@ -63,9 +64,12 @@ const ImageComparisonPage: React.FC = () => {
         state: {
           image1: image1Preview,
           image2: image2Preview,
-          enableAnnotations,
-          enableOcr,
-          enableClassification,
+          settings: {
+            enableAnnotations,
+            enableOcr,
+            enableClassification,
+            normalizeRatio,
+          }
         },
       });
     } else {
@@ -118,7 +122,8 @@ const ImageComparisonPage: React.FC = () => {
             <div className="space-y-4 max-w-sm mx-auto">
               <Toggle label="Find & Annotate Differences" enabled={enableAnnotations} setEnabled={setEnableAnnotations} />
               <Toggle label="Extract Text (OCR)" enabled={enableOcr} setEnabled={setEnableOcr} />
-              {/* <Toggle label="Classify Image Contents" enabled={enableClassification} setEnabled={setEnableClassification} /> */}
+              <Toggle label="Normalize Aspect Ratio" enabled={normalizeRatio} setEnabled={setNormalizeRatio} description="Prevents image distortion by padding the smaller image to match the other's aspect ratio." />
+              <Toggle label="Enable AI Classification" enabled={enableClassification} setEnabled={setEnableClassification} description="Uses an AI model to identify objects and concepts in the images." />
             </div>
           </div>
 
@@ -182,11 +187,15 @@ interface ToggleProps {
   label: string;
   enabled: boolean;
   setEnabled: (enabled: boolean) => void;
+  description?: string;
 }
 
-const Toggle: React.FC<ToggleProps> = ({ label, enabled, setEnabled }) => (
-     <label className="flex items-center justify-between cursor-pointer">
-      <span className="text-lg font-medium">{label}</span>
+const Toggle: React.FC<ToggleProps> = ({ label, enabled, setEnabled, description }) => (
+     <label className="flex items-center justify-between cursor-pointer group">
+      <div>
+        <span className="text-lg font-medium">{label}</span>
+        {description && <p className="text-sm text-gray-400 group-hover:text-gray-300 transition-colors">{description}</p>}
+      </div>
       <div className="relative">
           <input type="checkbox" className="sr-only" checked={enabled} onChange={() => setEnabled(!enabled)} />
           <div className={`w-14 h-8 rounded-full shadow-inner transition-colors duration-300 ease-in-out ${enabled ? 'bg-green-500' : 'bg-gray-600'}`}></div>
