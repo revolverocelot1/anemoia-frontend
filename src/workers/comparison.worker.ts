@@ -3,25 +3,18 @@ import ssim from 'ssim.js';
 import pixelmatch from 'pixelmatch';
 import { createScheduler, createWorker } from 'tesseract.js';
 
-// Set the backend to WASM for better performance.
-tf.setBackend('wasm');
-
-const IMAGE_SIZE = 224; // Standard size for many classification models.
+let tfBackendInitialized = false;
+const IMAGE_SIZE = 224; // Standard size for classification models.
 
 /**
- * Pre-processes an image for OCR by converting it to grayscale and increasing contrast.
- * @param {ImageBitmap} imageBitmap - The image to preprocess.
- * @returns {Promise<string>} A data URL of the processed image.
+ * Pre-processes an image for OCR.
  */
 async function preprocessOcrImage(imageBitmap: ImageBitmap): Promise<string> {
     const canvas = new OffscreenCanvas(imageBitmap.width, imageBitmap.height);
     const ctx = canvas.getContext('2d')!;
     ctx.drawImage(imageBitmap, 0, 0);
-
     const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
     const data = imageData.data;
-
-    // Convert to grayscale and apply contrast enhancement.
     for (let i = 0; i < data.length; i += 4) {
         const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
         const contrastedValue = avg < 128 ? avg * 0.8 : avg * 1.2;
@@ -34,34 +27,46 @@ async function preprocessOcrImage(imageBitmap: ImageBitmap): Promise<string> {
 }
 
 /**
- * The main message handler for the worker.
- * This function orchestrates the entire image comparison process.
+ * Main message handler for the worker.
  */
 self.onmessage = async (event) => {
+    // Initialize TF.js backend on first message
+    if (!tfBackendInitialized) {
+        try {
+            await tf.setBackend('wasm');
+            console.log('TF.js WASM backend initialized successfully.');
+            tfBackendInitialized = true;
+        } catch (error) {
+            console.error("Failed to set WASM backend:", error);
+            self.postMessage({ type: 'error', payload: 'Could not initialize AI backend (WASM). AI features may not work.' });
+        }
+    }
+
     const { image1: image1blobUrl, image2: image2blobUrl, settings } = event.data;
     const { enableAnnotations, enableOcr, enableClassification, normalizeAspectRatio } = settings;
 
     try {
         self.postMessage({ type: 'progress', payload: { message: 'Fetching and decoding images...' } });
         
-        // Step 1: Fetch and decode images
         const [image1, image2] = await Promise.all([
             fetch(image1blobUrl).then(res => res.blob()).then(createImageBitmap),
             fetch(image2blobUrl).then(res => res.blob()).then(createImageBitmap)
         ]);
 
-        // Step 2: Resize images if necessary
         let image2ToCompare = image2;
-        if (normalizeAspectRatio && (image1.width !== image2.width || image1.height !== image2.height)) {
+        const imagesHaveSameDimensions = image1.width === image2.width && image1.height === image2.height;
+        let canPerformPixelComparison = imagesHaveSameDimensions;
+
+        if (!imagesHaveSameDimensions && normalizeAspectRatio) {
             self.postMessage({ type: 'progress', payload: { message: 'Normalizing aspect ratio...' } });
             const canvas = new OffscreenCanvas(image1.width, image1.height);
             const ctx = canvas.getContext('2d');
             if (!ctx) throw new Error('Failed to get 2D context for resizing.');
             ctx.drawImage(image2, 0, 0, image1.width, image1.height);
             image2ToCompare = await createImageBitmap(canvas);
+            canPerformPixelComparison = true;
         }
 
-        // --- Analysis Tasks ---
         const canvas1 = new OffscreenCanvas(image1.width, image1.height);
         const ctx1 = canvas1.getContext('2d')!;
         ctx1.drawImage(image1, 0, 0);
@@ -72,27 +77,30 @@ self.onmessage = async (event) => {
         ctx2.drawImage(image2ToCompare, 0, 0);
         const imageData2 = ctx2.getImageData(0, 0, image2ToCompare.width, image2ToCompare.height);
         
-        // --- Annotation and Stats Calculation ---
         let diffImageData: ImageData | null = null;
-        let pixelDiffPercentage = 0;
-        let ssimValue = 0;
-        if (enableAnnotations) {
-            self.postMessage({ type: 'progress', payload: { message: 'Calculating pixel differences...' } });
-            const diff = new ImageData(image1.width, image1.height);
-            const mismatchedPixels = pixelmatch(imageData1.data, imageData2.data, diff.data, image1.width, image1.height, { threshold: 0.1 });
-            pixelDiffPercentage = (mismatchedPixels / (image1.width * image1.height)) * 100;
-            diffImageData = diff;
+        let pixelDiffPercentage: number | string = 'N/A';
+        let ssimValue: number | string = 'N/A';
 
-            self.postMessage({ type: 'progress', payload: { message: 'Calculating SSIM...' } });
-            const ssimResult = ssim(imageData1, imageData2, { k1: 0.01, k2: 0.03, windowSize: 8 });
-            ssimValue = ssimResult.mssim;
+        if (enableAnnotations) {
+            if (canPerformPixelComparison) {
+                self.postMessage({ type: 'progress', payload: { message: 'Calculating pixel differences...' } });
+                const diff = new ImageData(image1.width, image1.height);
+                const mismatchedPixels = pixelmatch(imageData1.data, imageData2.data, diff.data, image1.width, image1.height, { threshold: 0.1 });
+                pixelDiffPercentage = (mismatchedPixels / (image1.width * image1.height)) * 100;
+                diffImageData = diff;
+
+                self.postMessage({ type: 'progress', payload: { message: 'Calculating SSIM...' } });
+                const ssimResult = ssim(imageData1, imageData2, { k1: 0.01, k2: 0.03, windowSize: 8 });
+                ssimValue = ssimResult.mssim;
+            } else {
+                 self.postMessage({ type: 'progress', payload: { message: 'Image dimensions do not match. Skipping pixel comparison.' } });
+            }
         }
         
-        // --- OCR Task ---
         let ocrResult1 = 'N/A';
         let ocrResult2 = 'N/A';
         if (enableOcr) {
-            self.postMessage({ type: 'progress', payload: { message: 'Performing OCR on Original...' } });
+            self.postMessage({ type: 'progress', payload: { message: 'Performing OCR...' } });
             const scheduler = createScheduler();
             const worker1 = await createWorker('eng');
             const worker2 = await createWorker('eng');
@@ -108,10 +116,9 @@ self.onmessage = async (event) => {
             await scheduler.terminate();
         }
 
-        // --- AI Classification ---
         let classificationResult1: any = 'N/A';
         let classificationResult2: any = 'N/A';
-        if (enableClassification) {
+        if (enableClassification && tfBackendInitialized) {
             self.postMessage({ type: 'progress', payload: { message: 'Loading classification model...' } });
             
             const modelUrl = 'https://storage.googleapis.com/tfjs-models/tfjs/mobilenet_v2_1.0_224/model.json';
@@ -160,7 +167,6 @@ self.onmessage = async (event) => {
             model.dispose();
         }
 
-        // --- Final Results ---
         self.postMessage({
             type: 'results',
             payload: {
