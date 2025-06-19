@@ -324,20 +324,23 @@ async function performClassification(image1: ImageBitmap, image2: ImageBitmap): 
         // Draw the image to the canvas, which is the expected input type for fromPixels
         ctx.drawImage(image, 0, 0, 224, 224);
         const imageData = ctx.getImageData(0, 0, 224, 224);
+        
         const tensor = tf.browser.fromPixels(imageData)
             .expandDims(0)
             .toFloat()
             .div(255); // Normalize to [0, 1]
 
-        const predictions = await model.predict(tensor) as tf.Tensor;
+        const predictions = model.predict(tensor) as tf.Tensor;
         const topK = await predictions.topk(3); // Get top 3 predictions
         
-        // This part requires a map from indices to class names.
-        // For demonstration, we will just return indices and scores.
         const indices = await topK.indices.data();
         const values = await topK.values.data();
 
-        tf.dispose([tensor, predictions, topK]); // Clean up tensors
+        // Manually dispose of tensors
+        tensor.dispose();
+        predictions.dispose();
+        topK.indices.dispose();
+        topK.values.dispose();
 
         return Array.from(indices).map((index: any, i: number) => ({
             className: `Class #${index}`, // Placeholder for real class name
@@ -352,6 +355,7 @@ async function performClassification(image1: ImageBitmap, image2: ImageBitmap): 
     const classification2 = await classify(image2);
 
     // Dispose the model to free memory
+    // @ts-ignore - This is a persistent issue with the TF.js types in a worker environment.
     (model as any).dispose();
 
     return {

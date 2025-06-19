@@ -4,7 +4,7 @@ import Header from '../components/Header';
 import Footer from '../components/Footer';
 import { motion } from 'framer-motion';
 import LoadingOverlay from '../components/LoadingOverlay';
-import { FaArrowLeft, FaExclamationTriangle, FaInfoCircle, FaCheckCircle, FaThumbsUp, FaEye } from 'react-icons/fa';
+import { FaArrowLeft, FaExclamationTriangle, FaCheckCircle, FaThumbsUp, FaEye } from 'react-icons/fa';
 
 // Define the structure of the results we expect from the worker
 interface AnalysisResults {
@@ -72,13 +72,12 @@ const getMismatchAnalysis = (mismatchPercent: number) => {
 const ImageComparisonResultsPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { image1, image2, enableAnnotations, enableOcr, enableClassification } = location.state || {};
+  const { image1, image2, settings } = location.state || {};
 
   const [results, setResults] = useState<AnalysisResults | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadingMessage, setLoadingMessage] = useState('Initializing...');
   const [error, setError] = useState<string | null>(null);
-  const [showAnnotations, setShowAnnotations] = useState(true);
 
   const workerRef = useRef<Worker | null>(null);
   const annotatedCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -121,8 +120,8 @@ const ImageComparisonResultsPage: React.FC = () => {
       setLoading(false);
     };
     
-    // Extract settings from location state
-    const settings = location.state?.settings || {
+    // Start the analysis
+    const effectiveSettings = settings || {
         enableAnnotations: true,
         enableOcr: false,
         enableClassification: false,
@@ -138,7 +137,7 @@ const ImageComparisonResultsPage: React.FC = () => {
       workerRef.current?.postMessage({
         image1: image1,
         image2: image2,
-        settings: settings,
+        settings: effectiveSettings,
       });
     };
 
@@ -146,7 +145,7 @@ const ImageComparisonResultsPage: React.FC = () => {
     return () => {
       workerRef.current?.terminate();
     };
-  }, [image1, image2, enableAnnotations, enableOcr, enableClassification, navigate]);
+  }, [image1, image2, settings, navigate]);
 
   // Effect to draw the annotated canvas once results are available
   useEffect(() => {
