@@ -1,7 +1,9 @@
-import { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
+import AnimatedPage from '../components/AnimatedPage';
 
 interface Keypoint { x: number; y: number; score: number | undefined; name?: string; }
 
@@ -19,13 +21,8 @@ const PosePage = () => {
   const [uiState, setUiState] = useState<'idle' | 'loading_model' | 'processing' | 'output' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState('');
 
-  // Three separate previews so we don't overwrite the original file after drawing overlays
   const [originalPreview, setOriginalPreview] = useState<string | null>(null);
   const originalPreviewRef = useRef<string | null>(null);
-  const [overlayPreview, setOverlayPreview] = useState<string | null>(null);
-  const [skeletonPreview, setSkeletonPreview] = useState<string | null>(null);
-
-  const [poses, setPoses] = useState<any[]>([]);
   const workerRef = useRef<Worker | null>(null);
   const navigate = useNavigate();
 
@@ -45,13 +42,9 @@ const PosePage = () => {
           setUiState('processing');
           break;
         case 'complete':
-          // If original preview available, redirect to dedicated results page
           const previewSrc = originalPreviewRef.current;
           if (!previewSrc) return;
           createPreviewURLs(previewSrc, workerPoses).then(({overlay, skeleton}) => {
-            setOverlayPreview(overlay);
-            setSkeletonPreview(skeleton);
-            setPoses(workerPoses);
             navigate('/pose-estimation/results', {
               state: {
                 image: previewSrc,
@@ -97,7 +90,7 @@ const PosePage = () => {
 
   const drawSkeleton = (ctx: CanvasRenderingContext2D, keypoints: Keypoint[]) => {
     ctx.lineWidth = 2;
-    ctx.strokeStyle = '#00AFFF'; /* Corresponds to the new --primary-color */
+    ctx.strokeStyle = '#3B82F6';
     // draw joints
     keypoints.forEach(kp => {
       if ((kp.score ?? 0) > 0.3) {
@@ -121,7 +114,6 @@ const PosePage = () => {
     });
   };
 
-  // Helper that returns data URLs for overlay & skeleton canvases
   const createPreviewURLs = (imgSrc: string, detectedPoses: any[]) : Promise<{overlay: string; skeleton: string;}> => {
     return new Promise((resolve) => {
       const img = new Image();
@@ -153,120 +145,233 @@ const PosePage = () => {
     });
   };
 
-  const handleGenerate = () => {
-    // nothing extra; estimation happens on upload
+  const handleUpload = (file: File) => {
+    setUiState('processing');
+    handleFile(file);
   };
 
-  return (
-    <div className="relative flex min-h-screen flex-col overflow-x-hidden">
-      <div className="layout-container flex h-full grow flex-col">
-        <Header />
-        <main className="px-4 sm:px-6 md:px-10 flex flex-1 justify-center py-12">
-          <div className="layout-content-container flex flex-col items-center max-w-3xl flex-1 w-full">
-            <div className="text-center mb-10">
-              <h2 className="text-3xl md:text-4xl font-bold mb-3 tracking-tight text-[var(--text-primary)]">Pose Estimation</h2>
-              <p className="text-md md:text-lg text-[var(--text-secondary)] max-w-xl mx-auto">
-                Upload an image to detect and visualize human poses (supports multiple people) using our MoveNet Lightning model.
-              </p>
-            </div>
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      handleUpload(e.dataTransfer.files[0]);
+    }
+  };
 
-            <div className="w-full bg-[var(--secondary-color)] rounded-xl shadow-xl p-6 md:p-8 space-y-6">
-              {/* Upload area / result */}
-              {uiState !== 'output' && (
-                <div>
-                  <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2" htmlFor="image-upload">Upload Image</label>
-                  <div className="mt-1 flex justify-center px-6 pt-10 pb-12 border-2 border-[var(--input-border-color)] border-dashed rounded-md hover:border-[var(--primary-color)] transition-colors duration-150" onDragOver={(e)=>e.preventDefault()} onDrop={(e)=>{e.preventDefault(); if(e.dataTransfer.files && e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);}}>
-                    <div className="space-y-1 text-center">
-                      <span className="material-symbols-outlined text-5xl text-[var(--text-secondary)]">cloud_upload</span>
-                      <div className="flex text-sm text-[var(--text-secondary)]">
-                        <label htmlFor="file-upload" className="relative cursor-pointer bg-[var(--secondary-color)] rounded-md font-medium text-[var(--primary-color)] hover:text-[var(--primary-color-hover)] focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-offset-[var(--secondary-color)] focus-within:ring-[var(--primary-color)]">
-                          <span>Upload a file</span>
-                          <input id="file-upload" name="file-upload" type="file" className="sr-only" accept="image/*" onChange={(e)=>{if(e.target.files) handleFile(e.target.files[0])}} />
-                        </label>
-                        <p className="pl-1">or drag and drop</p>
-                      </div>
-                      <p className="text-xs text-[var(--text-secondary)]">PNG, JPG, GIF up to 10MB</p>
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const isDisabled = uiState === 'loading_model' || uiState === 'processing';
+
+  return (
+    <AnimatedPage>
+      <div className="relative flex min-h-screen flex-col bg-gray-950 text-white">
+        <Header />
+        
+        <main className="px-4 sm:px-6 lg:px-8 flex flex-1 justify-center py-12">
+          <div className="flex flex-col items-center max-w-4xl flex-1 w-full">
+            <motion.div 
+              className="text-center mb-12"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6 }}
+            >
+              <h2 className="text-4xl md:text-5xl font-bold mb-4 tracking-tight bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
+                Pose Estimation
+              </h2>
+              <p className="text-lg md:text-xl text-gray-400 max-w-2xl mx-auto">
+                Detect and analyze human poses in images using advanced AI. Supports multiple people and provides detailed keypoint data.
+              </p>
+            </motion.div>
+
+            <motion.div 
+              className="w-full bg-gray-900/50 backdrop-blur-sm rounded-2xl shadow-2xl border border-gray-800 p-8 space-y-8"
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.2 }}
+            >
+              <div>
+                <label className="block text-sm font-semibold text-gray-300 mb-4" htmlFor="image-upload">
+                  Upload Image for Pose Detection
+                </label>
+                <div 
+                  className="relative group flex justify-center px-6 pt-8 pb-10 border-2 border-dashed border-gray-600 rounded-xl hover:border-blue-400 hover:bg-gray-800/50 transition-all duration-300 cursor-pointer"
+                  onDragOver={handleDragOver} 
+                  onDrop={handleDrop}
+                >
+                  <div className="space-y-4 text-center">
+                    <motion.div
+                      className="mx-auto w-16 h-16 rounded-full bg-gradient-to-r from-blue-500/20 to-purple-500/20 flex items-center justify-center"
+                      whileHover={{ scale: 1.1, rotate: 5 }}
+                      transition={{ type: "spring", stiffness: 300, damping: 20 }}
+                    >
+                      <svg className="w-8 h-8 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                      </svg>
+                    </motion.div>
+                    <div className="text-sm text-gray-400">
+                      <label htmlFor="file-upload" className="relative cursor-pointer rounded-md font-semibold text-blue-400 hover:text-blue-300 focus-within:outline-none focus-within:ring-2 focus-within:ring-blue-500 focus-within:ring-offset-2 focus-within:ring-offset-gray-900 transition-colors">
+                        <span>Upload a file</span>
+                        <input 
+                          id="file-upload" 
+                          name="file-upload" 
+                          type="file" 
+                          className="sr-only" 
+                          accept="image/*" 
+                          onChange={(e) => {
+                            if (e.target.files && e.target.files[0]) {
+                              handleUpload(e.target.files[0]);
+                            }
+                          }} 
+                          disabled={isDisabled}
+                        />
+                      </label>
+                      <span className="pl-1">or drag and drop</span>
+                    </div>
+                    <p className="text-xs text-gray-500">PNG, JPG, GIF up to 10MB</p>
+                  </div>
+                </div>
+                
+                {originalPreview && (
+                  <motion.div 
+                    className="mt-6 rounded-xl overflow-hidden bg-gray-800 p-4"
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ duration: 0.3 }}
+                  >
+                    <h3 className="text-lg font-semibold text-white mb-3 flex items-center space-x-2">
+                      <svg className="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      <span>Image Uploaded - Processing...</span>
+                    </h3>
+                    <div className="aspect-square bg-gray-700 rounded-lg overflow-hidden max-w-md mx-auto">
+                      <img src={originalPreview} alt="preview" className="w-full h-full object-cover" />
+                    </div>
+                  </motion.div>
+                )}
+              </div>
+
+              {/* Processing status */}
+              {uiState === 'processing' && (
+                <motion.div 
+                  className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-6"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                >
+                  <div className="flex items-center space-x-3">
+                    <svg className="w-6 h-6 text-blue-400 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    <div>
+                      <p className="text-white font-semibold">Analyzing Poses...</p>
+                      <p className="text-blue-300 text-sm">Detecting human poses and keypoints using MoveNet Lightning</p>
                     </div>
                   </div>
-                  {originalPreview && (
-                    <img src={originalPreview} alt="preview" className="w-full rounded mt-6" />
-                  )}
-                </div>
+                </motion.div>
               )}
 
-              {uiState === 'output' && (
-                <div className="w-full grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8 mb-4">
-                  {/* Original */}
-                  <div className="flex flex-col items-center bg-[var(--secondary-color)] rounded-xl shadow-xl p-4">
-                    <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-2">Original Image</h3>
-                    {originalPreview && <img src={originalPreview} alt="Original" className="rounded-lg aspect-square object-cover w-full" />}
-                    {originalPreview && (
-                      <a href={originalPreview} download="original.png" className="mt-4 w-full flex items-center justify-center gap-2 rounded-lg h-10 px-4 bg-[var(--input-background)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] text-sm font-medium transition-colors duration-150">
-                        <span className="material-symbols-outlined text-base">download</span>
-                        Download
-                      </a>
-                    )}
-                  </div>
-
-                  {/* Overlay */}
-                  <div className="flex flex-col items-center bg-[var(--secondary-color)] rounded-xl shadow-xl p-4">
-                    <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-2">Pose Overlay</h3>
-                    {overlayPreview && <img src={overlayPreview} alt="Overlay" className="rounded-lg aspect-square object-cover w-full" />}
-                    {overlayPreview && (
-                      <a href={overlayPreview} download="pose_overlay.png" className="mt-4 w-full flex items-center justify-center gap-2 rounded-lg h-10 px-4 bg-[var(--input-background)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] text-sm font-medium transition-colors duration-150">
-                        <span className="material-symbols-outlined text-base">download</span>
-                        Download
-                      </a>
-                    )}
-                  </div>
-
-                  {/* Skeleton */}
-                  <div className="flex flex-col items-center bg-[var(--secondary-color)] rounded-xl shadow-xl p-4">
-                    <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-2">Pose Representation</h3>
-                    {skeletonPreview && <img src={skeletonPreview} alt="Skeleton" className="rounded-lg aspect-square object-cover w-full bg-black" />}
-                    {skeletonPreview && (
-                      <a href={skeletonPreview} download="pose_skeleton.png" className="mt-4 w-full flex items-center justify-center gap-2 rounded-lg h-10 px-4 bg-[var(--input-background)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] text-sm font-medium transition-colors duration-150">
-                        <span className="material-symbols-outlined text-base">download</span>
-                        Download
-                      </a>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Keypoints JSON */}
-              {uiState === 'output' && (
-                <details className="w-full bg-[var(--input-background)] rounded-md p-4 text-[var(--text-secondary)]">
-                  <summary className="cursor-pointer text-sm font-medium text-[var(--text-primary)] mb-2">Show keypoints JSON</summary>
-                  <pre className="overflow-x-auto text-xs whitespace-pre-wrap">{JSON.stringify(poses, null, 2)}</pre>
-                </details>
-              )}
-
-              {/* Footer area inside card */}
-              {uiState === 'processing' && (
-                <p className="text-center text-[var(--text-secondary)]">Processing...</p>
-              )}
               {uiState === 'error' && (
-                <p className="text-center text-red-500 text-sm">{errorMessage}</p>
+                <motion.div 
+                  className="bg-red-500/10 border border-red-500/20 rounded-xl p-6"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                >
+                  <div className="flex items-center space-x-3 text-red-400">
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <div>
+                      <p className="font-semibold">Error Processing Image</p>
+                      <p className="text-sm">{errorMessage}</p>
+                    </div>
+                  </div>
+                </motion.div>
               )}
 
-              {uiState === 'output' ? (
-                <button className="w-full flex items-center justify-center gap-2 rounded-lg h-12 px-6 bg-[var(--primary-color)] text-white text-base font-semibold tracking-wide hover:bg-[var(--primary-color-hover)] transition-colors duration-150" type="button" onClick={()=>setUiState('idle')}>
-                  <span className="material-symbols-outlined">restart_alt</span>
-                  New Image
-                </button>
-              ) : (
-                <button className="w-full flex items-center justify-center gap-2 rounded-lg h-12 px-6 bg-[var(--primary-color)] text-white text-base font-semibold tracking-wide hover:bg-[var(--primary-color-hover)] transition-colors duration-150" type="button" disabled={uiState==='processing' || !originalPreview} onClick={handleGenerate}>
-                  <span className="material-symbols-outlined">auto_awesome</span>
-                  {uiState==='loading_model' ? 'Loading model…' : uiState==='processing' ? 'Estimating…' : 'Estimate Pose'}
-                </button>
+              {/* Features */}
+              <motion.div 
+                className="bg-gray-800/30 rounded-xl p-6"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6, delay: 0.4 }}
+              >
+                <h3 className="text-lg font-semibold text-white mb-4 flex items-center space-x-2">
+                  <svg className="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  </svg>
+                  <span>Features</span>
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                    <span className="text-gray-300">Multi-person detection</span>
+                  </div>
+                  <div className="flex items-center space-x-3">
+                    <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
+                    <span className="text-gray-300">17 keypoint detection</span>
+                  </div>
+                  <div className="flex items-center space-x-3">
+                    <div className="w-2 h-2 bg-purple-400 rounded-full"></div>
+                    <span className="text-gray-300">Real-time processing</span>
+                  </div>
+                  <div className="flex items-center space-x-3">
+                    <div className="w-2 h-2 bg-yellow-400 rounded-full"></div>
+                    <span className="text-gray-300">JSON export available</span>
+                  </div>
+                </div>
+              </motion.div>
+
+              {/* Reset button for error state */}
+              {uiState === 'error' && (
+                <motion.button 
+                  onClick={() => {
+                    setUiState('idle');
+                    setErrorMessage('');
+                    setOriginalPreview(null);
+                    originalPreviewRef.current = null;
+                  }}
+                  className="w-full flex items-center justify-center space-x-2 px-6 py-3 rounded-xl text-base font-medium text-blue-400 hover:text-blue-300 hover:bg-blue-400/10 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-900 transition-all duration-300 border border-blue-400/30 hover:border-blue-400/50"
+                  whileHover={{ scale: 1.01 }}
+                  whileTap={{ scale: 0.99 }}
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  <span>Try Again</span>
+                </motion.button>
               )}
-            </div>
+            </motion.div>
           </div>
         </main>
+
+        {/* Loading status overlay */}
+        {uiState === 'loading_model' && (
+          <motion.div 
+            className="fixed bottom-8 left-1/2 transform -translate-x-1/2 bg-gray-900/90 backdrop-blur-sm border border-gray-700 rounded-xl p-6 shadow-2xl z-50 min-w-[300px]"
+            initial={{ opacity: 0, y: 100 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 100 }}
+          >
+            <div className="space-y-3">
+              <div className="flex items-center space-x-3">
+                <svg className="w-5 h-5 text-blue-400 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                <span className="font-medium text-white">Loading MoveNet Model...</span>
+              </div>
+              <div className="w-full bg-gray-800 rounded-full h-2 overflow-hidden">
+                <div className="bg-gradient-to-r from-blue-500 to-purple-500 h-2 rounded-full transition-all duration-300 ease-out animate-pulse w-full" />
+              </div>
+            </div>
+          </motion.div>
+        )}
+
         <Footer />
       </div>
-    </div>
+    </AnimatedPage>
   );
 };
 

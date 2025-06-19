@@ -1,45 +1,22 @@
 // src/pages/DepthMapPage.tsx -> THE FINAL, CORRECT VERSION
 import React, { useState, useRef, useEffect } from 'react';
+import { motion } from 'framer-motion';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
+import AnimatedPage from '../components/AnimatedPage';
 
 // Progress Bar component
 const ProgressBar = ({ message }: { message: string }) => (
-    <div className="w-full bg-white bg-opacity-20 rounded-full h-1.5">
+    <div className="w-full bg-gray-800 rounded-full h-2 overflow-hidden">
         <div 
-            className="bg-[var(--primary-color)] h-1.5 rounded-full transition-all duration-300 ease-out animate-pulse"
+            className="bg-gradient-to-r from-blue-500 to-purple-500 h-2 rounded-full transition-all duration-300 ease-out animate-pulse"
             style={{ width: '100%' }}
         />
-        <span className="text-sm text-[var(--text-secondary)] mt-2 block">{message}</span>
+        <span className="text-sm text-gray-400 mt-3 block">{message}</span>
     </div>
 );
 
-// Status Section component
-const StatusSection = ({ uiState, errorMessage }: {
-    uiState: 'idle' | 'loading_model' | 'processing' | 'output' | 'error';
-    errorMessage: string;
-}) => {
-    if (uiState === 'output') return null;
-    
-    return (
-        <div className="mt-4 p-4 bg-[var(--input-background)] rounded-lg">
-            <div className="flex items-center justify-between mb-2">
-                {uiState === 'error' ? (
-                    <span className="text-red-500">{errorMessage}</span>
-                ) : (
-                    <span className="text-[var(--text-secondary)]">
-                        {uiState === 'loading_model' ? 'Preparing AI Engine...' :
-                         uiState === 'processing' ? 'Processing Image...' :
-                         uiState === 'idle' ? 'Ready' : ''}
-                    </span>
-                )}
-            </div>
-            {(uiState === 'loading_model' || uiState === 'processing') && (
-                <ProgressBar message={uiState === 'loading_model' ? 'Loading model...' : 'Processing...'} />
-            )}
-        </div>
-    );
-};
+
 
 // Input View component
 const InputView = ({ onFileChange, onGenerate, imagePreview, isDisabled }: {
@@ -48,11 +25,9 @@ const InputView = ({ onFileChange, onGenerate, imagePreview, isDisabled }: {
     imagePreview: string | null;
     isDisabled: boolean;
 }) => {
-    // Drag state for styling
     const [dragActive, setDragActive] = React.useState(false);
     const inputRef = React.useRef<HTMLInputElement>(null);
 
-    // Handle drag events
     const handleDrag = (e: React.DragEvent<HTMLDivElement>) => {
         e.preventDefault();
         e.stopPropagation();
@@ -62,7 +37,7 @@ const InputView = ({ onFileChange, onGenerate, imagePreview, isDisabled }: {
             setDragActive(false);
         }
     };
-    // Handle drop event
+
     const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
         e.preventDefault();
         e.stopPropagation();
@@ -71,12 +46,11 @@ const InputView = ({ onFileChange, onGenerate, imagePreview, isDisabled }: {
             onFileChange(e.dataTransfer.files[0]);
         }
     };
-    // Handle file input change
+
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         onFileChange(e);
     };
 
-    // Handle click on upload area
     const handleUploadAreaClick = () => {
         if (!isDisabled && inputRef.current) {
             inputRef.current.click();
@@ -84,72 +58,120 @@ const InputView = ({ onFileChange, onGenerate, imagePreview, isDisabled }: {
     };
 
     return (
-        <div className="w-full bg-[var(--secondary-color)] rounded-xl shadow-lg p-8 space-y-8">
-            <div>
-                <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2" htmlFor="file-upload">
-                    Upload Image
-                </label>
-                <div
-                    className={`mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-[var(--input-border-color)] border-dashed rounded-md transition-colors cursor-pointer ${dragActive ? 'border-[var(--primary-color)] bg-[var(--primary-color)] bg-opacity-10' : 'hover:border-[var(--primary-color)]'} ${isDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
-                    onDragEnter={handleDrag}
-                    onDragOver={handleDrag}
-                    onDragLeave={handleDrag}
-                    onDrop={handleDrop}
-                    onClick={handleUploadAreaClick}
-                    tabIndex={0}
-                    onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') handleUploadAreaClick(); }}
-                    role="button"
-                    aria-label="Upload image by clicking or dragging"
+        <main className="px-4 sm:px-6 lg:px-8 flex flex-1 justify-center py-12">
+            <div className="flex flex-col items-center max-w-4xl flex-1 w-full">
+                <motion.div 
+                    className="text-center mb-12"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.6 }}
                 >
-                    <div className="space-y-1 text-center">
-                        <span className="material-symbols-outlined text-5xl text-[var(--text-secondary)]">cloud_upload</span>
-                        <div className="flex text-sm text-[var(--text-secondary)]">
-                            <label
-                                className="relative cursor-pointer bg-[var(--secondary-color)] rounded-md font-medium text-[var(--primary-color)] hover:text-[var(--primary-color-hover)] focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-offset-[var(--secondary-color)] focus-within:ring-[var(--primary-color)]"
-                                htmlFor="file-upload"
-                                tabIndex={-1}
-                            >
-                                <span>Upload a file</span>
-                                <input
-                                    className="sr-only"
-                                    id="file-upload"
-                                    name="file-upload"
-                                    type="file"
-                                    accept="image/*"
-                                    onChange={handleInputChange}
-                                    disabled={isDisabled}
-                                    ref={inputRef}
-                                />
-                            </label>
-                            <p className="pl-1">or drag and drop</p>
-                        </div>
-                        <p className="text-xs text-[var(--text-secondary)] opacity-75">PNG, JPG, GIF up to 10MB</p>
-                    </div>
-                </div>
-                {imagePreview && (
-                    <div className="mt-4 aspect-square bg-[var(--input-background)] rounded-lg overflow-hidden">
-                        <img
-                            src={imagePreview}
-                            alt="Preview"
-                            className="w-full h-full object-cover"
-                        />
-                    </div>
-                )}
-            </div>
+                    <h2 className="text-4xl md:text-5xl font-bold mb-4 tracking-tight bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
+                        Depth Map Generation
+                    </h2>
+                    <p className="text-lg md:text-xl text-gray-400 max-w-2xl mx-auto">
+                        Transform your images into stunning depth maps using advanced AI. Upload an image to get started.
+                    </p>
+                </motion.div>
 
-            <button
-                onClick={onGenerate}
-                disabled={isDisabled || !imagePreview}
-                className="w-full flex items-center justify-center gap-2 px-6 py-3 border border-transparent rounded-md shadow-sm text-base font-medium text-white bg-[var(--primary-color)] hover:bg-[var(--primary-color-hover)] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-[var(--secondary-color)] focus:ring-[var(--primary-color)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-                <span className="material-symbols-outlined">layers</span>
-                Generate Depth Map
-            </button>
-        </div>
+                <motion.div 
+                    className="w-full bg-gray-900/50 backdrop-blur-sm rounded-2xl shadow-2xl border border-gray-800 p-8 space-y-8"
+                    initial={{ opacity: 0, y: 30 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.6, delay: 0.2 }}
+                >
+                    <div>
+                        <label className="block text-sm font-semibold text-gray-300 mb-4" htmlFor="file-upload">
+                            Upload Image
+                        </label>
+                        <div
+                            className={`relative group flex justify-center px-6 pt-8 pb-10 border-2 border-dashed rounded-xl transition-all duration-300 cursor-pointer ${
+                                dragActive 
+                                    ? 'border-blue-400 bg-blue-400/5 scale-[1.02]' 
+                                    : 'border-gray-600 hover:border-blue-400 hover:bg-gray-800/50'
+                            } ${isDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                            onDragEnter={handleDrag}
+                            onDragOver={handleDrag}
+                            onDragLeave={handleDrag}
+                            onDrop={handleDrop}
+                            onClick={handleUploadAreaClick}
+                            tabIndex={0}
+                            onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') handleUploadAreaClick(); }}
+                            role="button"
+                            aria-label="Upload image by clicking or dragging"
+                        >
+                            <div className="space-y-4 text-center">
+                                <motion.div
+                                    className="mx-auto w-16 h-16 rounded-full bg-gradient-to-r from-blue-500/20 to-purple-500/20 flex items-center justify-center"
+                                    whileHover={{ scale: 1.1, rotate: 5 }}
+                                    transition={{ type: "spring", stiffness: 300, damping: 20 }}
+                                >
+                                    <svg className="w-8 h-8 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                                    </svg>
+                                </motion.div>
+                                <div className="text-sm text-gray-400">
+                                    <label
+                                        className="relative cursor-pointer rounded-md font-semibold text-blue-400 hover:text-blue-300 focus-within:outline-none focus-within:ring-2 focus-within:ring-blue-500 focus-within:ring-offset-2 focus-within:ring-offset-gray-900 transition-colors"
+                                        htmlFor="file-upload"
+                                        tabIndex={-1}
+                                    >
+                                        <span>Upload a file</span>
+                                        <input
+                                            className="sr-only"
+                                            id="file-upload"
+                                            name="file-upload"
+                                            type="file"
+                                            accept="image/*"
+                                            onChange={handleInputChange}
+                                            disabled={isDisabled}
+                                            ref={inputRef}
+                                        />
+                                    </label>
+                                    <span className="pl-1">or drag and drop</span>
+                                </div>
+                                <p className="text-xs text-gray-500">PNG, JPG, GIF up to 10MB</p>
+                            </div>
+                        </div>
+                        
+                        {imagePreview && (
+                            <motion.div 
+                                className="mt-6 rounded-xl overflow-hidden bg-gray-800 p-4"
+                                initial={{ opacity: 0, scale: 0.9 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                transition={{ duration: 0.3 }}
+                            >
+                                <h3 className="text-lg font-semibold text-white mb-3">Preview</h3>
+                                <div className="aspect-square bg-gray-700 rounded-lg overflow-hidden">
+                                    <img
+                                        src={imagePreview}
+                                        alt="Preview"
+                                        className="w-full h-full object-cover"
+                                    />
+                                </div>
+                            </motion.div>
+                        )}
+                    </div>
+
+                    <motion.button
+                        onClick={onGenerate}
+                        disabled={isDisabled || !imagePreview}
+                        className="w-full flex items-center justify-center space-x-3 px-6 py-4 rounded-xl text-base font-semibold text-white bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-900 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:from-blue-600 disabled:hover:to-purple-600 shadow-lg hover:shadow-xl"
+                        whileHover={{ scale: isDisabled ? 1 : 1.02 }}
+                        whileTap={{ scale: isDisabled ? 1 : 0.98 }}
+                    >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+                        </svg>
+                        <span>Generate Depth Map</span>
+                    </motion.button>
+                </motion.div>
+            </div>
+        </main>
     );
 };
 
-// Output View component (matches provided HTML template)
+// Output View component
 const OutputView = ({ 
     imagePreview, 
     outputUrl,
@@ -167,55 +189,142 @@ const OutputView = ({
     onEdit: () => void;
     onReset: () => void;
 }) => (
-    <main className="px-10 md:px-20 lg:px-40 flex flex-1 justify-center py-12">
-      <div className="layout-content-container flex flex-col items-center max-w-4xl flex-1 w-full">
-        <div className="text-center mb-12">
-          <h2 className="text-4xl md:text-5xl font-bold mb-4 tracking-tighter">Depth Map Output</h2>
-          <p className="text-lg md:text-xl text-[var(--text-secondary)] max-w-2xl mx-auto">
-            Your generated depth map is ready! Review the output and save it to your device.
-          </p>
+    <main className="px-4 sm:px-6 lg:px-8 flex flex-1 justify-center py-12">
+        <div className="flex flex-col items-center max-w-6xl flex-1 w-full">
+            <motion.div 
+                className="text-center mb-12"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6 }}
+            >
+                <h2 className="text-4xl md:text-5xl font-bold mb-4 tracking-tight bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
+                    Depth Map Generated
+                </h2>
+                <p className="text-lg md:text-xl text-gray-400 max-w-2xl mx-auto">
+                    Your depth map has been successfully generated! Compare the results and download your output.
+                </p>
+            </motion.div>
+
+            <motion.div 
+                className="w-full bg-gray-900/50 backdrop-blur-sm rounded-2xl shadow-2xl border border-gray-800 p-8 space-y-8"
+                initial={{ opacity: 0, y: 30 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6, delay: 0.2 }}
+            >
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    <motion.div 
+                        className="space-y-4"
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ duration: 0.6, delay: 0.3 }}
+                    >
+                        <h3 className="text-xl font-semibold text-white flex items-center space-x-2">
+                            <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            </svg>
+                            <span>Original Image</span>
+                        </h3>
+                        <div className="aspect-square bg-gray-800 rounded-xl overflow-hidden ring-1 ring-gray-700">
+                            <img alt="Original uploaded image" className="w-full h-full object-cover" src={imagePreview || ''} />
+                        </div>
+                    </motion.div>
+
+                    <motion.div 
+                        className="space-y-4"
+                        initial={{ opacity: 0, x: 20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ duration: 0.6, delay: 0.4 }}
+                    >
+                        <h3 className="text-xl font-semibold text-white flex items-center space-x-2">
+                            <svg className="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+                            </svg>
+                            <span>Generated Depth Map</span>
+                        </h3>
+                        <div className="aspect-square bg-gray-800 rounded-xl overflow-hidden ring-1 ring-gray-700">
+                            {outputUrl && <img alt="Generated depth map" className="w-full h-full object-cover" src={outputUrl} />}
+                        </div>
+                    </motion.div>
+                </div>
+
+                <motion.div 
+                    className="border-t border-gray-700 pt-8"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.6, delay: 0.5 }}
+                >
+                    <div className="bg-gray-800/50 rounded-xl p-6 mb-8">
+                        <h4 className="text-lg font-semibold text-white mb-4 flex items-center space-x-2">
+                            <svg className="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            <span>Processing Details</span>
+                        </h4>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                            <div className="flex items-center space-x-3 p-3 bg-gray-900/50 rounded-lg">
+                                <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
+                                <div>
+                                    <p className="text-gray-400">Model Used</p>
+                                    <p className="text-white font-medium">Depth-Anything-V2-Small</p>
+                                </div>
+                            </div>
+                            <div className="flex items-center space-x-3 p-3 bg-gray-900/50 rounded-lg">
+                                <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                                <div>
+                                    <p className="text-gray-400">Processing Time</p>
+                                    <p className="text-white font-medium">{processingTime?.toFixed(1)}s</p>
+                                </div>
+                            </div>
+                            <div className="flex items-center space-x-3 p-3 bg-gray-900/50 rounded-lg">
+                                <div className="w-2 h-2 bg-purple-400 rounded-full"></div>
+                                <div>
+                                    <p className="text-gray-400">Resolution</p>
+                                    <p className="text-white font-medium">{outputResolution}</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row gap-4">
+                        <motion.button 
+                            onClick={onSave} 
+                            className="flex-1 flex items-center justify-center space-x-2 px-6 py-3 rounded-xl text-base font-semibold text-white bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-900 transition-all duration-300 shadow-lg hover:shadow-xl"
+                            whileHover={{ scale: 1.02 }}
+                            whileTap={{ scale: 0.98 }}
+                        >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                            <span>Download Depth Map</span>
+                        </motion.button>
+                        
+                        <motion.button 
+                            onClick={onEdit} 
+                            className="flex-1 flex items-center justify-center space-x-2 px-6 py-3 rounded-xl text-base font-semibold text-gray-400 bg-gray-800 hover:text-white hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 focus:ring-offset-gray-900 transition-all duration-300 border border-gray-600 hover:border-gray-500"
+                            whileHover={{ scale: 1.02 }}
+                            whileTap={{ scale: 0.98 }}
+                        >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                            </svg>
+                            <span>Edit Further</span>
+                        </motion.button>
+                    </div>
+
+                    <motion.button 
+                        onClick={onReset} 
+                        className="w-full mt-4 flex items-center justify-center space-x-2 px-6 py-3 rounded-xl text-base font-medium text-blue-400 hover:text-blue-300 hover:bg-blue-400/10 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-900 transition-all duration-300 border border-blue-400/30 hover:border-blue-400/50"
+                        whileHover={{ scale: 1.01 }}
+                        whileTap={{ scale: 0.99 }}
+                    >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                        <span>Generate New Depth Map</span>
+                    </motion.button>
+                </motion.div>
+            </motion.div>
         </div>
-        <div className="w-full bg-[var(--secondary-color)] rounded-xl shadow-lg p-8 space-y-8">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
-            <div>
-              <h3 className="text-xl font-semibold text-[var(--text-primary)] mb-4">Original Image</h3>
-              <div className="aspect-square bg-[var(--input-background)] rounded-lg overflow-hidden">
-                <img alt="Original uploaded image" className="w-full h-full object-cover" src={imagePreview || ''} />
-              </div>
-            </div>
-            <div>
-              <h3 className="text-xl font-semibold text-[var(--text-primary)] mb-4">Generated Depth Map</h3>
-              <div className="aspect-square bg-[var(--input-background)] rounded-lg overflow-hidden">
-                {outputUrl && <img alt="Generated depth map" className="w-full h-full object-cover" src={outputUrl} />}
-              </div>
-            </div>
-          </div>
-          <div className="border-t border-[var(--input-border-color)] pt-8 space-y-6">
-            <div>
-              <h4 className="text-lg font-medium text-[var(--text-secondary)] mb-2">Processing Details:</h4>
-              <ul className="list-disc list-inside text-[var(--text-secondary)] space-y-1 text-sm">
-                <li>Model Used: <span className="text-[var(--text-primary)] font-medium">Depth-Anything-V2-Small</span></li>
-                <li>Processing Time: <span className="text-[var(--text-primary)] font-medium">{processingTime?.toFixed(1)} seconds</span></li>
-                <li>Output Resolution: <span className="text-[var(--text-primary)] font-medium">{outputResolution}</span></li>
-              </ul>
-            </div>
-            <div className="flex flex-col sm:flex-row gap-4">
-              <button onClick={onSave} className="w-full flex items-center justify-center gap-2 px-6 py-3 border border-transparent rounded-md shadow-sm text-base font-medium text-white bg-[var(--primary-color)] hover:bg-[var(--primary-color-hover)] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-[var(--secondary-color)] focus:ring-[var(--primary-color)] transition-colors" type="button">
-                <span className="material-symbols-outlined">save</span>
-                Save Depth Map
-              </button>
-              <button onClick={onEdit} className="w-full flex items-center justify-center gap-2 px-6 py-3 border border-[var(--input-border-color)] rounded-md shadow-sm text-base font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--primary-color)] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-[var(--secondary-color)] focus:ring-[var(--primary-color)] transition-colors" type="button">
-                <span className="material-symbols-outlined">edit</span>
-                Edit Further
-              </button>
-            </div>
-            <button onClick={onReset} className="w-full flex items-center justify-center gap-2 px-6 py-3 border border-transparent rounded-md text-base font-medium text-[var(--primary-color)] hover:text-[var(--primary-color-hover)] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-[var(--secondary-color)] focus:ring-[var(--primary-color)] transition-colors" type="button">
-              <span className="material-symbols-outlined">restart_alt</span>
-              Generate New Depth Map
-            </button>
-          </div>
-        </div>
-      </div>
     </main>
 );
 
@@ -278,7 +387,6 @@ const DepthMapPage = () => {
                 setUiState('error');
             };
 
-            // Set initial state to idle
             setUiState('idle');
         } catch (error) {
             console.error('Failed to initialize worker:', error);
@@ -341,7 +449,6 @@ const DepthMapPage = () => {
                 imageData: processedImageData,
             });
 
-            // Listen for completion to calculate processing time
             const tempListener = (e: MessageEvent) => {
                 if (e.data.status === 'complete') {
                     const endTime = performance.now();
@@ -365,10 +472,11 @@ const DepthMapPage = () => {
             a.click();
         }
     };
+
     const handleEdit = () => {
-        // Placeholder for edit functionality
         alert('Edit functionality coming soon!');
     };
+
     const handleReset = () => {
         setImagePreview(null);
         setProcessedImageData(null);
@@ -380,9 +488,10 @@ const DepthMapPage = () => {
     };
 
     return (
-        <div className="relative flex size-full min-h-screen flex-col dark group/design-root overflow-x-hidden">
-            <div className="layout-container flex h-full grow flex-col">
+        <AnimatedPage>
+            <div className="relative flex min-h-screen flex-col bg-gray-950 text-white">
                 <Header />
+                
                 {uiState === 'output' ? (
                     <OutputView
                         imagePreview={imagePreview}
@@ -401,10 +510,41 @@ const DepthMapPage = () => {
                         isDisabled={uiState === 'loading_model' || uiState === 'processing'}
                     />
                 )}
-                <StatusSection uiState={uiState} errorMessage={errorMessage} />
+
+                {/* Status Section */}
+                {(uiState === 'loading_model' || uiState === 'processing' || uiState === 'error') && (
+                    <motion.div 
+                        className="fixed bottom-8 left-1/2 transform -translate-x-1/2 bg-gray-900/90 backdrop-blur-sm border border-gray-700 rounded-xl p-6 shadow-2xl z-50 min-w-[300px]"
+                        initial={{ opacity: 0, y: 100 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: 100 }}
+                    >
+                        {uiState === 'error' ? (
+                            <div className="flex items-center space-x-3 text-red-400">
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                <span className="font-medium">{errorMessage}</span>
+                            </div>
+                        ) : (
+                            <div className="space-y-3">
+                                <div className="flex items-center space-x-3">
+                                    <svg className="w-5 h-5 text-blue-400 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                    </svg>
+                                    <span className="font-medium text-white">
+                                        {uiState === 'loading_model' ? 'Preparing AI Engine...' : 'Processing Image...'}
+                                    </span>
+                                </div>
+                                <ProgressBar message={uiState === 'loading_model' ? 'Loading model...' : 'Processing...'} />
+                            </div>
+                        )}
+                    </motion.div>
+                )}
+
                 <Footer />
             </div>
-        </div>
+        </AnimatedPage>
     );
 };
 
