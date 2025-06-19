@@ -11,7 +11,7 @@ const ImageComparisonPage: React.FC = () => {
   const [image1Preview, setImage1Preview] = useState<string | null>(null);
   const [image2Preview, setImage2Preview] = useState<string | null>(null);
   const [enableAnnotations, setEnableAnnotations] = useState(true);
-  const [enableOcr, setEnableOcr] = useState(false);
+  const [enableOcr, setEnableOcr] = useState(true);
   const [enableClassification, setEnableClassification] = useState(true);
   const [normalizeRatio, setNormalizeRatio] = useState(true);
   const [isDragging, setIsDragging] = useState<number | null>(null);
@@ -68,7 +68,7 @@ const ImageComparisonPage: React.FC = () => {
             enableAnnotations,
             enableOcr,
             enableClassification,
-            normalizeRatio,
+            normalizeAspectRatio: normalizeRatio,
           }
         },
       });
@@ -121,9 +121,9 @@ const ImageComparisonPage: React.FC = () => {
             <h3 className="text-xl font-bold mb-4 text-center">Analysis Options</h3>
             <div className="space-y-4 max-w-sm mx-auto">
               <Toggle label="Find & Annotate Differences" enabled={enableAnnotations} setEnabled={setEnableAnnotations} />
-              <Toggle label="Extract Text (OCR)" enabled={enableOcr} setEnabled={setEnableOcr} />
+              <Toggle label="Extract Text (OCR)" enabled={enableOcr} setEnabled={setEnableOcr} description="Enhanced OCR with preprocessing for better text recognition in documents and images." />
               <Toggle label="Normalize Aspect Ratio" enabled={normalizeRatio} setEnabled={setNormalizeRatio} description="Prevents image distortion by padding the smaller image to match the other's aspect ratio." />
-              <Toggle label="Enable AI Classification" enabled={enableClassification} setEnabled={setEnableClassification} description="Uses an AI model to identify objects and concepts in the images." />
+              <Toggle label="Enable AI Classification" enabled={enableClassification} setEnabled={setEnableClassification} description="COCO-SSD object detection for people, vehicles, animals, etc. with fallback feature analysis." />
             </div>
           </div>
 
