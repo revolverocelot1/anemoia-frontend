@@ -2,7 +2,6 @@ import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
-import LoadingOverlay from '../components/LoadingOverlay';
 
 interface Point {
   x: number;
@@ -34,8 +33,7 @@ const InpaintingPage = () => {
   const [showComparison, setShowComparison] = useState(0);
   const [zoom, setZoom] = useState(1);
   const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
-  const [isDragging, setIsDragging] = useState(false);
-  const [lastPanPoint, setLastPanPoint] = useState<Point | null>(null);
+  const [isDragging] = useState(false);
 
   const [history, setHistory] = useState<HistoryState[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);

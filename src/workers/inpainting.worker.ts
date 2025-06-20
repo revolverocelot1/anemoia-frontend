@@ -421,9 +421,8 @@ class AOTGANInpainter {
   /**
    * Post-processing to smooth edges and blend seamlessly
    */
-  private async postProcessResult(result: ImageData, original: ImageData, maskData: ImageData): Promise<void> {
+  private async postProcessResult(result: ImageData, _original: ImageData, maskData: ImageData): Promise<void> {
     const smoothingRadius = 3;
-    const blendingStrength = 0.8;
     
     // Create a temporary copy for edge smoothing
     const temp = new ImageData(result.width, result.height);
