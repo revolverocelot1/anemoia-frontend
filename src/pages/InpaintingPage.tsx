@@ -748,15 +748,34 @@ const InpaintingPage = () => {
                               )}
                               
                               {processedImage && (
-                                <motion.button
-                                  initial={{ opacity: 0, y: 10 }}
-                                  animate={{ opacity: 1, y: 0 }}
-                                  onClick={downloadResult}
-                                  className="w-full py-3 bg-purple-500 hover:bg-purple-600 text-white rounded-xl transition-colors duration-200 flex items-center justify-center space-x-2 shadow-lg"
-                                >
-                                  <span className="material-symbols-outlined">download</span>
-                                  <span>Download Result</span>
-                                </motion.button>
+                                <div className="space-y-3">
+                                  <motion.button
+                                    initial={{ opacity: 0, y: 10 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    onClick={downloadResult}
+                                    className="w-full py-3 bg-purple-500 hover:bg-purple-600 text-white rounded-xl transition-colors duration-200 flex items-center justify-center space-x-2 shadow-lg"
+                                  >
+                                    <span className="material-symbols-outlined">download</span>
+                                    <span>Download Result</span>
+                                  </motion.button>
+                                  
+                                  <motion.button
+                                    initial={{ opacity: 0, y: 10 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ delay: 0.1 }}
+                                    onClick={() => {
+                                      setOriginalImage(null);
+                                      setProcessedImage(null);
+                                      setShowComparison(0);
+                                      setHistory([]);
+                                      setHistoryIndex(-1);
+                                    }}
+                                    className="w-full py-3 bg-gray-500 hover:bg-gray-600 text-white rounded-xl transition-colors duration-200 flex items-center justify-center space-x-2 shadow-lg"
+                                  >
+                                    <span className="material-symbols-outlined">add_photo_alternate</span>
+                                    <span>Try New Image</span>
+                                  </motion.button>
+                                </div>
                               )}
 
                               <div className="bg-green-50 dark:bg-green-900/20 rounded-xl p-4">
@@ -793,59 +812,59 @@ const InpaintingPage = () => {
                   className="h-full bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-900 overflow-hidden relative"
                   onWheel={handleWheel}
                 >
-                  {/* Canvas Container */}
-                  <div className="absolute inset-0 flex items-center justify-center p-4">
-                    <div className="relative" style={canvasStyle}>
-                      {/* Original Image Canvas */}
-                      <canvas
-                        ref={canvasRef}
-                        className="rounded-xl shadow-2xl border-4 border-white dark:border-gray-700"
-                        style={{
-                          maxWidth: '100%',
-                          maxHeight: '100%',
-                          clipPath: processedImage ? `inset(0 ${100 - showComparison}% 0 0)` : undefined
-                        }}
-                      />
-                      
-                      {/* Processed Image Canvas */}
-                      {processedImage && (
-                        <canvas
-                          className="absolute top-0 left-0 rounded-xl shadow-2xl border-4 border-white dark:border-gray-700"
-                          width={processedImage.width}
-                          height={processedImage.height}
-                          style={{
-                            maxWidth: '100%',
-                            maxHeight: '100%',
-                            clipPath: `inset(0 0 0 ${showComparison}%)`
-                          }}
-                          ref={(canvas) => {
-                            if (canvas && processedImage) {
-                              const ctx = canvas.getContext('2d');
-                              if (ctx) {
-                                ctx.clearRect(0, 0, canvas.width, canvas.height);
-                                ctx.drawImage(processedImage, 0, 0);
-                              }
-                            }
-                          }}
-                        />
-                      )}
-                      
-                      {/* Mask Canvas */}
-                      <canvas
-                        ref={maskCanvasRef}
-                        className="absolute top-0 left-0 rounded-xl"
-                        style={{ 
-                          maxWidth: '100%',
-                          maxHeight: '100%',
-                          mixBlendMode: 'multiply'
-                        }}
-                        onMouseDown={startPainting}
-                        onMouseMove={paint}
-                        onMouseUp={stopPainting}
-                        onMouseLeave={stopPainting}
-                      />
-                    </div>
-                  </div>
+                                        {/* Canvas Container */}
+                      <div className="absolute inset-0 flex items-center justify-center p-4">
+                        <div className="relative" style={canvasStyle}>
+                          {/* Original Image Canvas */}
+                          <canvas
+                            ref={canvasRef}
+                            className="rounded-xl shadow-2xl border-4 border-white dark:border-gray-700"
+                            style={{
+                              maxWidth: '100%',
+                              maxHeight: '100%',
+                              clipPath: processedImage ? `inset(0 ${100 - showComparison}% 0 0)` : undefined
+                            }}
+                          />
+                          
+                          {/* Processed Image Canvas */}
+                          {processedImage && (
+                            <canvas
+                              className="absolute top-0 left-0 rounded-xl shadow-2xl border-4 border-white dark:border-gray-700"
+                              width={processedImage.width}
+                              height={processedImage.height}
+                              style={{
+                                maxWidth: '100%',
+                                maxHeight: '100%',
+                                clipPath: `inset(0 0 0 ${showComparison}%)`
+                              }}
+                              ref={(canvas) => {
+                                if (canvas && processedImage) {
+                                  const ctx = canvas.getContext('2d');
+                                  if (ctx) {
+                                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                                    ctx.drawImage(processedImage, 0, 0);
+                                  }
+                                }
+                              }}
+                            />
+                          )}
+                          
+                          {/* Mask Canvas - Only show when painting and no processed image */}
+                          <canvas
+                            ref={maskCanvasRef}
+                            className={`absolute top-0 left-0 rounded-xl ${processedImage ? 'opacity-0 pointer-events-none' : 'opacity-50'}`}
+                            style={{ 
+                              maxWidth: '100%',
+                              maxHeight: '100%',
+                              mixBlendMode: processedImage ? 'normal' : 'multiply'
+                            }}
+                            onMouseDown={startPainting}
+                            onMouseMove={paint}
+                            onMouseUp={stopPainting}
+                            onMouseLeave={stopPainting}
+                          />
+                        </div>
+                      </div>
 
                   {/* Comparison Line */}
                   {processedImage && (
