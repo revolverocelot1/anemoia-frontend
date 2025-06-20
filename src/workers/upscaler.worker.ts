@@ -5,7 +5,7 @@ const MODEL_CONFIGS = {
   'cugan': {
     2: {
       name: 'Real-CUGAN 2x',
-      scaleFactor: 2,
+    scaleFactor: 2,
       tileSize: 400,
       overlap: 32,
       modelUrl: '/models/cugan/2x/model.json',
@@ -33,7 +33,7 @@ const MODEL_CONFIGS = {
   'esrgan-general': {
     4: {
       name: 'Real-ESRGAN 4x General',
-      scaleFactor: 4,
+    scaleFactor: 4,
       tileSize: 192,
       overlap: 16,
       modelUrl: '/models/esrgan/general/4x/model.json',
@@ -44,7 +44,7 @@ const MODEL_CONFIGS = {
     8: {
       name: 'Real-ESRGAN 8x Experimental',
       scaleFactor: 8,
-      tileSize: 128,
+    tileSize: 128,
       overlap: 8,
       modelUrl: '/models/esrgan/general/4x/model.json', // Use 4x model twice
       size: '34.2MB'
@@ -97,8 +97,8 @@ class RealESRGANUpscaler {
           this.backend = 'webgl';
         }
       } else {
-        await tf.setBackend('webgl');
-        await tf.ready();
+      await tf.setBackend('webgl');
+      await tf.ready();
         this.backend = 'webgl';
       }
       
@@ -124,7 +124,7 @@ class RealESRGANUpscaler {
     if (!config) {
       throw new Error(`Scale factor not available: ${modelType} ${scaleFactor}x`);
     }
-
+    
     this.currentModelConfig = config;
     
     self.postMessage({
@@ -141,7 +141,7 @@ class RealESRGANUpscaler {
       // Simulate model loading time based on model size
       const loadTime = modelType.includes('cugan') ? 1000 : 3000;
       await new Promise(resolve => setTimeout(resolve, loadTime));
-      
+    
       // Create a placeholder model (in real implementation, load actual model)
       this.model = await this.createHighQualityModel(scaleFactor);
       
@@ -205,13 +205,13 @@ class RealESRGANUpscaler {
       // Convert result back to ImageData
       const outputTensor = result.squeeze().clipByValue(0, 1);
       const [newHeight, newWidth] = outputTensor.shape.slice(0, 2);
-      
+
       // Create canvas and convert to blob
-      const canvas = new OffscreenCanvas(newWidth, newHeight);
+    const canvas = new OffscreenCanvas(newWidth, newHeight);
       await tf.browser.toPixels(outputTensor as tf.Tensor3D, canvas);
-      
+    
       const blob = await canvas.convertToBlob({ type: 'image/png', quality: 0.95 });
-      const url = URL.createObjectURL(blob);
+    const url = URL.createObjectURL(blob);
 
       const endTime = performance.now();
       const processingTime = (endTime - startTime) / 1000;
@@ -228,8 +228,8 @@ class RealESRGANUpscaler {
         fileSize: this.formatFileSize(blob.size)
       };
 
-      // Clean up tensors
-      inputTensor.dispose();
+    // Clean up tensors
+    inputTensor.dispose();
       result.dispose();
       outputTensor.dispose();
 

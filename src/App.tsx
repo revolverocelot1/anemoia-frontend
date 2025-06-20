@@ -15,6 +15,7 @@ import NewUpscalerPage from './pages/NewUpscalerPage';
 // import PosePage from './pages/PosePage';
 import ImageComparisonPage from './pages/ImageComparisonPage';
 import ImageComparisonResultsPage from './pages/ImageComparisonResultsPage';
+import InpaintingPage from './pages/InpaintingPage';
 import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
 import TermsOfServicePage from './pages/TermsOfServicePage';
 
@@ -117,6 +118,14 @@ function App() {
           element={
             <AnimatedPage>
               <ImageComparisonResultsPage />
+            </AnimatedPage>
+          }
+        />
+        <Route
+          path="/inpainting"
+          element={
+            <AnimatedPage>
+              <InpaintingPage />
             </AnimatedPage>
           }
         />

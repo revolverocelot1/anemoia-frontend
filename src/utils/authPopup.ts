@@ -41,7 +41,7 @@ export function openAuthPopup(authUrl: string): Promise<AuthResult> {
         popup.close();
         
         // Parse user info from JWT token
-        try {
+      try {
           const payload = JSON.parse(atob(event.data.token.split('.')[1]));
           const user = {
             name: payload.name || 'User',

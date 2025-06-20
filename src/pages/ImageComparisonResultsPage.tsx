@@ -148,10 +148,10 @@ const ImageComparisonResultsPage: React.FC = () => {
     image2Ref.current.onload = () => {
       setLoadingMessage('Starting comprehensive analysis...');
       workerRef.current?.postMessage({
-        image1: image1,
-        image2: image2,
+      image1: image1,
+      image2: image2,
         settings: effectiveSettings,
-      });
+    });
     };
 
     // Cleanup function to terminate the worker when the component unmounts
@@ -197,7 +197,7 @@ const ImageComparisonResultsPage: React.FC = () => {
           ctx.font = `bold ${fontSize}px sans-serif`;
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
-          
+
           // White circle background
           ctx.fillStyle = '#FFFFFF';
           ctx.beginPath();
@@ -303,10 +303,10 @@ const ImageComparisonResultsPage: React.FC = () => {
                 <FaChartBar className="mr-2" />
                 Statistical Analysis
               </button>
-            </div>
+                </div>
             
             <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
-              
+            
               {/* Left Column: Main Content */}
               <div className="lg:col-span-3">
                 {activeTab === 'slider' && (
@@ -346,7 +346,7 @@ const ImageComparisonResultsPage: React.FC = () => {
                         </div>
                       )}
                     </div>
-                  </div>
+                </div>
                 )}
 
                 {activeTab === 'analysis' && (
@@ -381,7 +381,7 @@ const ImageComparisonResultsPage: React.FC = () => {
                             {annotations.differences.length > 10 && (
                               <p className="text-xs text-gray-500 text-center">
                                 ... and {annotations.differences.length - 10} more regions
-                              </p>
+                          </p>
                             )}
                           </div>
                         </div>
@@ -402,7 +402,7 @@ const ImageComparisonResultsPage: React.FC = () => {
                   <StatCard title="Mean Squared Error (MSE)" value={formatNumber(stats.mse, 4)} analysis={mseAnalysis}>
                     Calculates the average squared difference between pixels. Lower values indicate higher similarity.
                   </StatCard>
-                )}
+              )}
                 {mismatchAnalysis && (
                   <StatCard title="Mismatched Pixels" value={`${formatNumber(mismatchPercent, 3)}%`} analysis={mismatchAnalysis}>
                     Percentage of pixels that differ between the two images using advanced detection algorithms.
@@ -427,13 +427,13 @@ const ImageComparisonResultsPage: React.FC = () => {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <OcrResult title="Original Image" text={ocr.image1} />
                     <OcrResult title="Edited Image" text={ocr.image2} />
-                  </div>
+                   </div>
                   <p className="text-xs text-gray-500 mt-4">
                     <strong>Enhanced OCR:</strong> Uses advanced preprocessing including upscaling, sharpening, and adaptive thresholding for better text recognition.
                   </p>
                 </ResultsSection>
               )}
-              
+
               {results.classification && (results.classification.image1.length > 0 || results.classification.image2.length > 0) && (
                 <ResultsSection title="AI Object & Scene Detection">
                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -505,12 +505,12 @@ const ClassificationResultDisplay: React.FC<{ title: string; data: Classificatio
               <span className="font-mono text-cyan-400 flex-shrink-0">
                 {formatNumber(item.probability * 100, 1)}%
               </span>
-            </li>
+        </li>
           ))
         ) : (
           <p className="text-gray-400 text-sm">No objects or features detected.</p>
         )}
-      </ul>
+    </ul>
     </div>
   </div>
 );

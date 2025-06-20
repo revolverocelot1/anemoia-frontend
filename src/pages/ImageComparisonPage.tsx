@@ -65,9 +65,9 @@ const ImageComparisonPage: React.FC = () => {
           image1: image1Preview,
           image2: image2Preview,
           settings: {
-            enableAnnotations,
-            enableOcr,
-            enableClassification,
+          enableAnnotations,
+          enableOcr,
+          enableClassification,
             normalizeAspectRatio: normalizeRatio,
           }
         },
@@ -96,7 +96,7 @@ const ImageComparisonPage: React.FC = () => {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-10">
             <FileInput 
-                id={1}
+                id={1} 
                 label="Original Image"
                 preview={image1Preview} 
                 onChange={handleFileChange} 
@@ -106,7 +106,7 @@ const ImageComparisonPage: React.FC = () => {
                 isDragging={isDragging === 1}
             />
             <FileInput 
-                id={2}
+                id={2} 
                 label="Edited Image"
                 preview={image2Preview}
                 onChange={handleFileChange} 
@@ -193,7 +193,7 @@ interface ToggleProps {
 const Toggle: React.FC<ToggleProps> = ({ label, enabled, setEnabled, description }) => (
      <label className="flex items-center justify-between cursor-pointer group">
       <div>
-        <span className="text-lg font-medium">{label}</span>
+      <span className="text-lg font-medium">{label}</span>
         {description && <p className="text-sm text-gray-400 group-hover:text-gray-300 transition-colors">{description}</p>}
       </div>
       <div className="relative">

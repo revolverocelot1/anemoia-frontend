@@ -43,7 +43,7 @@ const HomePage = () => {
               </p>
             </div>
             <motion.div
-              className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 w-full"
+              className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6 w-full"
               variants={containerVariants}
               initial="hidden"
               animate="visible"
@@ -79,6 +79,14 @@ const HomePage = () => {
                 icon="compare_arrows"
                 accent="4"
                 path="/compare"
+              />
+              <ToolCard
+                variants={itemVariants}
+                title="AI Inpainting"
+                description="Remove unwanted objects or fill missing areas using AOT-GAN."
+                icon="auto_fix_high"
+                accent="1"
+                path="/inpainting"
               />
             </motion.div>
           </div>

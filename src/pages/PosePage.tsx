@@ -192,7 +192,7 @@ const PosePage = () => {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.2 }}
             >
-              <div>
+                <div>
                 <label className="block text-sm font-semibold text-gray-300 mb-4" htmlFor="image-upload">
                   Upload Image for Pose Detection
                 </label>
@@ -213,7 +213,7 @@ const PosePage = () => {
                     </motion.div>
                     <div className="text-sm text-gray-400">
                       <label htmlFor="file-upload" className="relative cursor-pointer rounded-md font-semibold text-blue-400 hover:text-blue-300 focus-within:outline-none focus-within:ring-2 focus-within:ring-blue-500 focus-within:ring-offset-2 focus-within:ring-offset-gray-900 transition-colors">
-                        <span>Upload a file</span>
+                          <span>Upload a file</span>
                         <input 
                           id="file-upload" 
                           name="file-upload" 
@@ -227,7 +227,7 @@ const PosePage = () => {
                           }} 
                           disabled={isDisabled}
                         />
-                      </label>
+                        </label>
                       <span className="pl-1">or drag and drop</span>
                     </div>
                     <p className="text-xs text-gray-500">PNG, JPG, GIF up to 10MB</p>

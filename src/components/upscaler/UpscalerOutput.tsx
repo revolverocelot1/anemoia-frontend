@@ -37,9 +37,9 @@ const StatCard: React.FC<{
   >
     <div className="flex items-center space-x-3 mb-3">
       <div className={`w-10 h-10 rounded-lg bg-${color}-500/10 flex items-center justify-center text-${color}-400`}>
-        {icon}
+      {icon}
       </div>
-      <div>
+    <div>
         <h4 className="text-sm font-medium text-gray-400">{label}</h4>
       </div>
     </div>
@@ -98,7 +98,7 @@ const UpscalerOutput: React.FC<UpscalerOutputProps> = ({ originalImageFile, upsc
 
   return (
     <div className="min-h-screen bg-gray-950 text-white">
-      <motion.div 
+    <motion.div 
         className="max-w-6xl mx-auto px-4 py-12"
         variants={containerVariants}
         initial="hidden"
@@ -129,8 +129,8 @@ const UpscalerOutput: React.FC<UpscalerOutputProps> = ({ originalImageFile, upsc
                   {showComparison ? 'Split View' : 'Side by Side'}
                 </motion.button>
               </div>
-            </div>
-            
+      </div>
+
             {showComparison ? (
               <div className="relative overflow-hidden rounded-xl">
                 <div className="relative">
@@ -149,7 +149,7 @@ const UpscalerOutput: React.FC<UpscalerOutputProps> = ({ originalImageFile, upsc
                       className="w-full h-auto object-cover"
                       style={{ width: `${(100 / sliderPosition) * 100}%` }}
                     />
-                  </div>
+          </div>
                   
                   {/* Slider Handle */}
                   <div 
@@ -160,10 +160,10 @@ const UpscalerOutput: React.FC<UpscalerOutputProps> = ({ originalImageFile, upsc
                       <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 9l4-4 4 4m0 6l-4 4-4-4" />
                       </svg>
-                    </div>
-                  </div>
-                </div>
-                
+          </div>
+        </div>
+      </div>
+
                 {/* Slider Input */}
                 <input
                   type="range"
@@ -195,8 +195,8 @@ const UpscalerOutput: React.FC<UpscalerOutputProps> = ({ originalImageFile, upsc
                   <div className="rounded-xl overflow-hidden">
                     <img src={upscaledImageUrl} alt="Upscaled" className="w-full h-auto" />
                   </div>
-                </div>
-              </div>
+        </div>
+      </div>
             )}
           </div>
         </motion.div>
@@ -273,8 +273,8 @@ const UpscalerOutput: React.FC<UpscalerOutputProps> = ({ originalImageFile, upsc
               value={stats.backend.toUpperCase()}
               color="indigo"
             />
-          </div>
-        </motion.div>
+      </div>
+    </motion.div>
 
         {/* Action Buttons */}
         <motion.div variants={itemVariants} className="flex flex-col md:flex-row gap-4">

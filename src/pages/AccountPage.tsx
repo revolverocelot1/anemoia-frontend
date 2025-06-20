@@ -77,8 +77,8 @@ export default function AccountPage() {
         
         // Reload page to update auth state
         window.location.reload();
-      }
-    };
+    }
+  };
 
     window.addEventListener('message', handleMessage);
     
@@ -118,7 +118,7 @@ export default function AccountPage() {
             </div>
             <p className="mt-4 text-gray-400">Loading your account...</p>
           </div>
-        </div>
+      </div>
       </AnimatedPage>
     );
   }
@@ -151,7 +151,7 @@ export default function AccountPage() {
               </p>
               
               <motion.button
-                onClick={handleGoogleLogin}
+            onClick={handleGoogleLogin}
                 className="w-full flex items-center justify-center space-x-3 px-6 py-3 bg-white text-gray-800 rounded-xl font-semibold hover:bg-gray-100 transition-colors duration-300 shadow-lg"
                 whileHover={{ scale: 1.02, y: -2 }}
                 whileTap={{ scale: 0.98 }}
@@ -209,16 +209,16 @@ export default function AccountPage() {
                 whileHover={{ scale: 1.05 }}
                 transition={{ type: "spring", stiffness: 300 }}
               >
-                <img
-                  src={profile.picture}
-                  alt="Profile"
+            <img
+              src={profile.picture}
+              alt="Profile"
                   className="w-24 h-24 rounded-full border-4 border-blue-500/20 shadow-lg"
-                />
+            />
                 <div className="absolute -bottom-2 -right-2 w-8 h-8 bg-green-500 rounded-full border-4 border-gray-900 flex items-center justify-center">
                   <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                   </svg>
-                </div>
+            </div>
               </motion.div>
               
               <div className="flex-1 text-center md:text-left">
@@ -231,15 +231,15 @@ export default function AccountPage() {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
                     </svg>
                     <span className="font-mono font-semibold">ID: {profile.anemoId}</span>
-                  </div>
-                  
+          </div>
+
                   <div className="flex items-center space-x-2 text-green-400">
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                     <span>Verified</span>
                   </div>
-                </div>
+            </div>
               </div>
             </div>
           </motion.div>
@@ -310,7 +310,7 @@ export default function AccountPage() {
                   <p className="text-sm text-gray-400">{tool.description}</p>
                 </motion.a>
               ))}
-            </div>
+        </div>
           </motion.div>
 
           {/* Account Actions */}

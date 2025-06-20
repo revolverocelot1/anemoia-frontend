@@ -83,7 +83,7 @@ const ProcessingOverlay: React.FC<ProcessingOverlayProps> = ({ statusMessage, pr
                 className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
                 animate={{ x: ['0%', '100%'] }}
                 transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }}
-              />
+            />
             </motion.div>
           </div>
         </div>
@@ -133,7 +133,7 @@ const ProcessingOverlay: React.FC<ProcessingOverlayProps> = ({ statusMessage, pr
           <div className="flex items-center space-x-2 text-sm text-gray-400 mt-1">
             <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse" />
             <span>Deep Learning Enhancement</span>
-          </div>
+      </div>
         </motion.div>
       </motion.div>
     </motion.div>

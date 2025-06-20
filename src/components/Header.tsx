@@ -75,59 +75,59 @@ const Header = () => {
               }
             >
               FAQ
-            </NavLink>
+        </NavLink>
           </nav>
 
           {/* Auth Section */}
           <div className="flex items-center space-x-4">
-            {isAuthenticated ? (
+          {isAuthenticated ? (
               <div className="flex items-center space-x-3">
                 {/* Debug: Clear tokens button - only in development */}
                 {import.meta.env.DEV && (
-                  <button
-                    onClick={clearTokens}
+              <button
+                onClick={clearTokens}
                     className="text-xs text-gray-500 hover:text-gray-400 underline transition-colors"
-                    title="Clear all tokens and reload"
-                  >
-                    Clear Cache
-                  </button>
+                title="Clear all tokens and reload"
+              >
+                Clear Cache
+              </button>
                 )}
                 
                 {/* User Info */}
                 <div className="flex items-center space-x-3">
-                  {user?.picture && (
+              {user?.picture && (
                     <img 
                       src={user.picture} 
                       alt="Profile" 
                       className="w-8 h-8 rounded-full ring-2 ring-gray-600 hover:ring-blue-400 transition-all duration-300" 
                     />
-                  )}
+              )}
                   <span className="text-sm font-medium text-white truncate max-w-[120px] hidden sm:block">
-                    {user?.name || 'User'}
-                  </span>
+                {user?.name || 'User'}
+              </span>
                 </div>
 
                 {/* Logout Button */}
                 <motion.button
-                  onClick={handleLogout}
+                onClick={handleLogout}
                   className="flex items-center space-x-1 px-3 py-1.5 rounded-lg bg-red-500/10 text-red-400 border border-red-500/20 text-sm font-medium hover:bg-red-500/20 hover:border-red-500/40 transition-all duration-300"
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
-                >
+              >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
                   </svg>
                   <span className="hidden sm:inline">Logout</span>
                 </motion.button>
-              </div>
-            ) : (
-              <motion.button
-                onClick={handleLogin}
+            </div>
+          ) : (
+            <motion.button
+              onClick={handleLogin}
                 className="group flex items-center space-x-2 px-4 py-2 rounded-lg bg-gradient-to-r from-blue-600 to-purple-600 text-white text-sm font-semibold shadow-lg hover:shadow-xl hover:from-blue-500 hover:to-purple-500 transition-all duration-300"
                 whileHover={{ scale: 1.05, y: -1 }}
-                whileTap={{ scale: 0.95, y: 0 }}
+              whileTap={{ scale: 0.95, y: 0 }}
                 transition={{ type: "spring", stiffness: 300, damping: 15 }}
-              >
+            >
                 <svg className="h-4 w-4 transition-transform duration-200 group-hover:rotate-6" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                   <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
                   <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>

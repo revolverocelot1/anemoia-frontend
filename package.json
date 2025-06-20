@@ -25,6 +25,7 @@
     "@tensorflow/tfjs-backend-webgpu": "^4.22.0",
     "@tensorflow/tfjs-converter": "^4.22.0",
     "@tensorflow/tfjs-core": "^4.22.0",
+    "@tensorflow/tfjs-layers": "^4.22.0",
     "axios": "^1.9.0",
     "framer-motion": "^12.18.1",
     "jwt-decode": "^4.0.0",

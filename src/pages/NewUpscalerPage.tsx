@@ -112,10 +112,10 @@ const NewUpscalerPage: React.FC = () => {
   return (
     <AnimatedPage>
       <div className="relative flex min-h-screen flex-col bg-gray-950 text-white">
-        <Header />
+      <Header />
         
-        <AnimatePresence mode="wait">
-          {view === 'input' && (
+          <AnimatePresence mode="wait">
+            {view === 'input' && (
             <motion.div
               key="input"
               initial={{ opacity: 0, y: 20 }}
@@ -125,9 +125,9 @@ const NewUpscalerPage: React.FC = () => {
             >
               <UpscalerInput onImageUploaded={handleImageUpload} isProcessing={false} />
             </motion.div>
-          )}
+            )}
           
-          {view === 'output' && originalImage && (
+            {view === 'output' && originalImage && (
             <motion.div
               key="output"
               initial={{ opacity: 0, y: 20 }}
@@ -143,17 +143,17 @@ const NewUpscalerPage: React.FC = () => {
                 onReset={handleReset}
               />
             </motion.div>
-          )}
-        </AnimatePresence>
+            )}
+          </AnimatePresence>
 
-        <AnimatePresence>
-          {view === 'processing' && (
+          <AnimatePresence>
+            {view === 'processing' && (
             <ProcessingOverlay 
               statusMessage={statusMessage} 
               progress={progress} 
             />
-          )}
-        </AnimatePresence>
+            )}
+          </AnimatePresence>
 
         {error && (
           <motion.div 
@@ -167,12 +167,12 @@ const NewUpscalerPage: React.FC = () => {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
               <span>{error}</span>
-            </div>
+        </div>
           </motion.div>
         )}
 
-        <Footer />
-      </div>
+      <Footer />
+    </div>
     </AnimatedPage>
   );
 };

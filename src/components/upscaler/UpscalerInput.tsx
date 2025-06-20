@@ -42,10 +42,10 @@ const ModelCard: React.FC<ModelCardProps> = ({
     >
       <div className="p-5">
         <div className="flex items-center justify-between mb-3">
-          <h4 className="text-lg font-bold text-white">{title}</h4>
+        <h4 className="text-lg font-bold text-white">{title}</h4>
           <div className="flex items-center space-x-2">
-            <div className="text-xs font-bold bg-blue-500/20 text-blue-300 border border-blue-400/50 rounded-full px-3 py-1">
-              {scale}x
+        <div className="text-xs font-bold bg-blue-500/20 text-blue-300 border border-blue-400/50 rounded-full px-3 py-1">
+          {scale}x
             </div>
             {selected && (
               <motion.div
@@ -239,23 +239,23 @@ const UpscalerInput: React.FC<UpscalerInputProps> = ({ onImageUploaded, isProces
           </h2>
           <p className="text-lg md:text-xl text-gray-400 max-w-3xl mx-auto">
             Transform your images with cutting-edge AI. Choose from Real-CUGAN for speed or Real-ESRGAN for maximum quality.
-          </p>
-        </motion.div>
+        </p>
+      </motion.div>
 
         {/* Upload Area */}
-        <motion.div
-          {...rootProps}
-          ref={ref}
-          variants={itemVariants}
+      <motion.div
+        {...rootProps}
+        ref={ref}
+        variants={itemVariants}
           className={`relative group mb-8 p-8 border-2 border-dashed rounded-2xl transition-all duration-300 cursor-pointer ${
             isDragActive 
               ? 'border-blue-400 bg-blue-400/5 scale-[1.02]' 
               : 'border-gray-600 hover:border-blue-400 hover:bg-gray-800/50'
           } ${isProcessing ? 'opacity-50 cursor-not-allowed' : ''}`}
-        >
+      >
           <input {...getInputProps()} disabled={isProcessing} />
           
-          {previewUrl ? (
+        {previewUrl ? (
             <div className="text-center">
               <div className="relative inline-block">
                 <img 
@@ -300,9 +300,9 @@ const UpscalerInput: React.FC<UpscalerInputProps> = ({ onImageUploaded, isProces
               </p>
               <p className="text-gray-400 mb-1">or click to select a file</p>
               <p className="text-xs text-gray-500">Supports: PNG, JPG, WebP, BMP (max 10MB)</p>
-            </div>
-          )}
-        </motion.div>
+          </div>
+        )}
+      </motion.div>
 
         {error && (
           <motion.div 
@@ -320,7 +320,7 @@ const UpscalerInput: React.FC<UpscalerInputProps> = ({ onImageUploaded, isProces
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {models.map((model) => (
-              <ModelCard
+          <ModelCard
                 key={`${model.scale}-${model.type}`}
                 title={model.title}
                 description={model.description}
@@ -353,18 +353,18 @@ const UpscalerInput: React.FC<UpscalerInputProps> = ({ onImageUploaded, isProces
               <p className="mb-2"><strong className="text-purple-400">Large images:</strong> May take longer to process</p>
               <p className="mb-2"><strong className="text-orange-400">8x upscaling:</strong> Requires powerful device</p>
             </div>
-          </div>
-        </motion.div>
+        </div>
+      </motion.div>
 
         {/* Upscale Button */}
-        <motion.div variants={itemVariants}>
+      <motion.div variants={itemVariants}>
           <motion.button
-            onClick={handleUpscaleClick}
-            disabled={isProcessing || !selectedFile}
+          onClick={handleUpscaleClick}
+          disabled={isProcessing || !selectedFile}
             className="w-full flex items-center justify-center space-x-3 px-8 py-4 rounded-xl text-lg font-semibold text-white bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-900 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:from-blue-600 disabled:hover:to-purple-600 shadow-xl hover:shadow-2xl"
             whileHover={{ scale: isProcessing || !selectedFile ? 1 : 1.02, y: isProcessing || !selectedFile ? 0 : -2 }}
             whileTap={{ scale: isProcessing || !selectedFile ? 1 : 0.98 }}
-          >
+        >
             {isProcessing ? (
               <>
                 <svg className="w-5 h-5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -381,7 +381,7 @@ const UpscalerInput: React.FC<UpscalerInputProps> = ({ onImageUploaded, isProces
               </>
             )}
           </motion.button>
-        </motion.div>
+      </motion.div>
       </div>
     </motion.div>
   );

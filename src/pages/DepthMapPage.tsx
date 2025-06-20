@@ -80,26 +80,26 @@ const InputView = ({ onFileChange, onGenerate, imagePreview, isDisabled }: {
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.6, delay: 0.2 }}
                 >
-                    <div>
+            <div>
                         <label className="block text-sm font-semibold text-gray-300 mb-4" htmlFor="file-upload">
-                            Upload Image
-                        </label>
-                        <div
+                    Upload Image
+                </label>
+                <div
                             className={`relative group flex justify-center px-6 pt-8 pb-10 border-2 border-dashed rounded-xl transition-all duration-300 cursor-pointer ${
                                 dragActive 
                                     ? 'border-blue-400 bg-blue-400/5 scale-[1.02]' 
                                     : 'border-gray-600 hover:border-blue-400 hover:bg-gray-800/50'
                             } ${isDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
-                            onDragEnter={handleDrag}
-                            onDragOver={handleDrag}
-                            onDragLeave={handleDrag}
-                            onDrop={handleDrop}
-                            onClick={handleUploadAreaClick}
-                            tabIndex={0}
-                            onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') handleUploadAreaClick(); }}
-                            role="button"
-                            aria-label="Upload image by clicking or dragging"
-                        >
+                    onDragEnter={handleDrag}
+                    onDragOver={handleDrag}
+                    onDragLeave={handleDrag}
+                    onDrop={handleDrop}
+                    onClick={handleUploadAreaClick}
+                    tabIndex={0}
+                    onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') handleUploadAreaClick(); }}
+                    role="button"
+                    aria-label="Upload image by clicking or dragging"
+                >
                             <div className="space-y-4 text-center">
                                 <motion.div
                                     className="mx-auto w-16 h-16 rounded-full bg-gradient-to-r from-blue-500/20 to-purple-500/20 flex items-center justify-center"
@@ -111,30 +111,30 @@ const InputView = ({ onFileChange, onGenerate, imagePreview, isDisabled }: {
                                     </svg>
                                 </motion.div>
                                 <div className="text-sm text-gray-400">
-                                    <label
+                            <label
                                         className="relative cursor-pointer rounded-md font-semibold text-blue-400 hover:text-blue-300 focus-within:outline-none focus-within:ring-2 focus-within:ring-blue-500 focus-within:ring-offset-2 focus-within:ring-offset-gray-900 transition-colors"
-                                        htmlFor="file-upload"
-                                        tabIndex={-1}
-                                    >
-                                        <span>Upload a file</span>
-                                        <input
-                                            className="sr-only"
-                                            id="file-upload"
-                                            name="file-upload"
-                                            type="file"
-                                            accept="image/*"
-                                            onChange={handleInputChange}
-                                            disabled={isDisabled}
-                                            ref={inputRef}
-                                        />
-                                    </label>
+                                htmlFor="file-upload"
+                                tabIndex={-1}
+                            >
+                                <span>Upload a file</span>
+                                <input
+                                    className="sr-only"
+                                    id="file-upload"
+                                    name="file-upload"
+                                    type="file"
+                                    accept="image/*"
+                                    onChange={handleInputChange}
+                                    disabled={isDisabled}
+                                    ref={inputRef}
+                                />
+                            </label>
                                     <span className="pl-1">or drag and drop</span>
                                 </div>
                                 <p className="text-xs text-gray-500">PNG, JPG, GIF up to 10MB</p>
                             </div>
                         </div>
                         
-                        {imagePreview && (
+                {imagePreview && (
                             <motion.div 
                                 className="mt-6 rounded-xl overflow-hidden bg-gray-800 p-4"
                                 initial={{ opacity: 0, scale: 0.9 }}
@@ -143,30 +143,30 @@ const InputView = ({ onFileChange, onGenerate, imagePreview, isDisabled }: {
                             >
                                 <h3 className="text-lg font-semibold text-white mb-3">Preview</h3>
                                 <div className="aspect-square bg-gray-700 rounded-lg overflow-hidden">
-                                    <img
-                                        src={imagePreview}
-                                        alt="Preview"
-                                        className="w-full h-full object-cover"
-                                    />
-                                </div>
-                            </motion.div>
-                        )}
+                        <img
+                            src={imagePreview}
+                            alt="Preview"
+                            className="w-full h-full object-cover"
+                        />
                     </div>
+                            </motion.div>
+                )}
+            </div>
 
                     <motion.button
-                        onClick={onGenerate}
-                        disabled={isDisabled || !imagePreview}
+                onClick={onGenerate}
+                disabled={isDisabled || !imagePreview}
                         className="w-full flex items-center justify-center space-x-3 px-6 py-4 rounded-xl text-base font-semibold text-white bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-900 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:from-blue-600 disabled:hover:to-purple-600 shadow-lg hover:shadow-xl"
                         whileHover={{ scale: isDisabled ? 1 : 1.02 }}
                         whileTap={{ scale: isDisabled ? 1 : 0.98 }}
-                    >
+            >
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
                         </svg>
                         <span>Generate Depth Map</span>
                     </motion.button>
                 </motion.div>
-            </div>
+        </div>
         </main>
     );
 };
@@ -202,7 +202,7 @@ const OutputView = ({
                 </h2>
                 <p className="text-lg md:text-xl text-gray-400 max-w-2xl mx-auto">
                     Your depth map has been successfully generated! Compare the results and download your output.
-                </p>
+          </p>
             </motion.div>
 
             <motion.div 
@@ -225,8 +225,8 @@ const OutputView = ({
                             <span>Original Image</span>
                         </h3>
                         <div className="aspect-square bg-gray-800 rounded-xl overflow-hidden ring-1 ring-gray-700">
-                            <img alt="Original uploaded image" className="w-full h-full object-cover" src={imagePreview || ''} />
-                        </div>
+                <img alt="Original uploaded image" className="w-full h-full object-cover" src={imagePreview || ''} />
+              </div>
                     </motion.div>
 
                     <motion.div 
@@ -242,8 +242,8 @@ const OutputView = ({
                             <span>Generated Depth Map</span>
                         </h3>
                         <div className="aspect-square bg-gray-800 rounded-xl overflow-hidden ring-1 ring-gray-700">
-                            {outputUrl && <img alt="Generated depth map" className="w-full h-full object-cover" src={outputUrl} />}
-                        </div>
+                {outputUrl && <img alt="Generated depth map" className="w-full h-full object-cover" src={outputUrl} />}
+              </div>
                     </motion.div>
                 </div>
 
@@ -266,23 +266,23 @@ const OutputView = ({
                                 <div>
                                     <p className="text-gray-400">Model Used</p>
                                     <p className="text-white font-medium">Depth-Anything-V2-Small</p>
-                                </div>
-                            </div>
+            </div>
+          </div>
                             <div className="flex items-center space-x-3 p-3 bg-gray-900/50 rounded-lg">
                                 <div className="w-2 h-2 bg-green-400 rounded-full"></div>
-                                <div>
+            <div>
                                     <p className="text-gray-400">Processing Time</p>
                                     <p className="text-white font-medium">{processingTime?.toFixed(1)}s</p>
                                 </div>
-                            </div>
+            </div>
                             <div className="flex items-center space-x-3 p-3 bg-gray-900/50 rounded-lg">
                                 <div className="w-2 h-2 bg-purple-400 rounded-full"></div>
                                 <div>
                                     <p className="text-gray-400">Resolution</p>
                                     <p className="text-white font-medium">{outputResolution}</p>
-                                </div>
-                            </div>
-                        </div>
+            </div>
+          </div>
+        </div>
                     </div>
 
                     <div className="flex flex-col sm:flex-row gap-4">
@@ -324,7 +324,7 @@ const OutputView = ({
                     </motion.button>
                 </motion.div>
             </motion.div>
-        </div>
+      </div>
     </main>
 );
 
