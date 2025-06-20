@@ -449,3 +449,238 @@ textarea:focus-visible {
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
+
+/* Inpainting Page Custom Slider Styling */
+.slider {
+  appearance: none;
+  -webkit-appearance: none;
+  height: 8px;
+  border-radius: 4px;
+  outline: none;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.slider::-webkit-slider-thumb {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #3B82F6 0%, #8B5CF6 100%);
+  cursor: pointer;
+  border: 2px solid white;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+  transition: all 0.3s ease;
+}
+
+.slider::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+}
+
+.slider::-webkit-slider-thumb:active {
+  transform: scale(1.1);
+}
+
+.slider::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #3B82F6 0%, #8B5CF6 100%);
+  cursor: pointer;
+  border: 2px solid white;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+  transition: all 0.3s ease;
+}
+
+.slider::-moz-range-thumb:hover {
+  transform: scale(1.2);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+}
+
+.slider::-moz-range-track {
+  height: 8px;
+  border-radius: 4px;
+  border: none;
+  outline: none;
+}
+
+/* Canvas container styling for inpainting */
+.canvas-container {
+  position: relative;
+  overflow: hidden;
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+}
+
+.canvas-container canvas {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+/* Professional loading animation */
+@keyframes professional-spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.professional-spinner {
+  width: 24px;
+  height: 24px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  border-top-color: #ffffff;
+  animation: professional-spin 1s linear infinite;
+}
+
+/* Tab navigation styling */
+.tab-button {
+  transition: all 0.2s ease;
+  border-radius: 8px;
+  font-weight: 500;
+}
+
+.tab-button:hover {
+  background-color: rgba(59, 130, 246, 0.1);
+  color: #3B82F6;
+}
+
+.tab-button.active {
+  background-color: #3B82F6;
+  color: white;
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+}
+
+/* Floating panel styling */
+.floating-panel {
+  backdrop-filter: blur(20px);
+  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+}
+
+.dark .floating-panel {
+  background: rgba(31, 41, 55, 0.95);
+  border: 1px solid rgba(75, 85, 99, 0.3);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+}
+
+/* Enhanced button animations */
+.enhanced-button {
+  position: relative;
+  overflow: hidden;
+  transform: translateY(0);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.enhanced-button::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 50%;
+  transition: all 0.3s ease;
+  transform: translate(-50%, -50%);
+}
+
+.enhanced-button:hover::before {
+  width: 300px;
+  height: 300px;
+}
+
+.enhanced-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+}
+
+.enhanced-button:active {
+  transform: translateY(0);
+}
+
+/* Progress bar animations */
+.animated-progress {
+  background: linear-gradient(90deg, #3B82F6, #8B5CF6, #3B82F6);
+  background-size: 200% 100%;
+  animation: gradient-shift 2s ease-in-out infinite;
+}
+
+@keyframes gradient-shift {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+/* Comparison line styling */
+.comparison-line {
+  background: linear-gradient(to bottom, transparent 0%, white 20%, white 80%, transparent 100%);
+  position: relative;
+}
+
+.comparison-line::before {
+  content: '';
+  position: absolute;
+  left: -1px;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: linear-gradient(to bottom, 
+    rgba(59, 130, 246, 0.8) 0%, 
+    rgba(139, 92, 246, 0.8) 100%);
+  border-radius: 2px;
+}
+
+/* Responsive adjustments for inpainting */
+@media (max-width: 1024px) {
+  .floating-panel {
+    position: relative !important;
+    width: 100% !important;
+    max-width: none !important;
+    margin-bottom: 1rem;
+  }
+  
+  .canvas-container {
+    height: 400px !important;
+  }
+}
+
+@media (max-width: 768px) {
+  .tab-button {
+    padding: 8px 12px;
+    font-size: 12px;
+  }
+  
+  .tab-button .material-symbols-outlined {
+    font-size: 16px;
+  }
+  
+  .floating-panel {
+    border-radius: 16px;
+    margin: 0 8px;
+  }
+}
+
+/* Dark mode adjustments */
+.dark .slider {
+  background-color: #374151;
+}
+
+.dark .slider::-webkit-slider-track {
+  background-color: #374151;
+}
+
+.dark .slider::-moz-range-track {
+  background-color: #374151;
+}

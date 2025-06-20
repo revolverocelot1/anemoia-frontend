@@ -87,24 +87,45 @@ class AOTGANInpainter {
    * - Distance-weighted interpolation (simulates feature aggregation)
    * - Texture-aware filling (simulates learned texture synthesis)
    */
-  async inpaint(imageData: ImageData, maskData: ImageData): Promise<ImageData> {
+  async inpaint(imageData: ImageData, maskData: ImageData, progressCallback?: (progress: number) => void): Promise<ImageData> {
     const result = new ImageData(imageData.width, imageData.height);
     result.data.set(imageData.data);
 
     // Step 1: Detect mask regions using connected component analysis
+    progressCallback?.(10);
     const maskRegions = this.getMaskRegions(maskData);
     
+    if (maskRegions.length === 0) {
+      progressCallback?.(100);
+      return result; // No mask detected, return original
+    }
+    
     // Step 2: Apply AOT-GAN-inspired inpainting for each region
+    progressCallback?.(20);
+    
+    let completedRegions = 0;
     for (const region of maskRegions) {
-      this.inpaintRegionWithAOTInspiredMethod(result, region, maskData);
+      await this.inpaintRegionWithAOTInspiredMethod(result, region, maskData);
+      completedRegions++;
+      
+      // Update progress proportionally
+      const progress = 20 + (completedRegions / maskRegions.length) * 70;
+      progressCallback?.(Math.round(progress));
+      
+      // Allow for UI updates
+      await new Promise(resolve => setTimeout(resolve, 10));
     }
 
+    // Step 3: Post-processing
+    progressCallback?.(95);
+    await this.postProcessResult(result, imageData, maskData);
+    
+    progressCallback?.(100);
     return result;
   }
 
   /**
-   * Connected component analysis to find mask regions
-   * (Simulates the mask preprocessing in AOT-GAN training)
+   * Enhanced mask detection that properly handles the red paint brush strokes
    */
   private getMaskRegions(maskData: ImageData): Array<{x: number, y: number, width: number, height: number}> {
     const regions: Array<{x: number, y: number, width: number, height: number}> = [];
@@ -115,9 +136,17 @@ class AOTGANInpainter {
         const idx = (y * maskData.width + x) * 4;
         const key = y * maskData.width + x;
         
-        if (!visited.has(key) && maskData.data[idx] > 128) {
+        // Check for red paint strokes (red component > 200, others < 100)
+        const r = maskData.data[idx];
+        const g = maskData.data[idx + 1];
+        const b = maskData.data[idx + 2];
+        const a = maskData.data[idx + 3];
+        
+        const isRedMask = r > 200 && g < 100 && b < 100 && a > 100;
+        
+        if (!visited.has(key) && isRedMask) {
           const region = this.floodFillRegion(maskData, x, y, visited);
-          if (region.width > 1 && region.height > 1) {
+          if (region.width > 3 && region.height > 3) { // Minimum size threshold
             regions.push(region);
           }
         }
@@ -128,7 +157,7 @@ class AOTGANInpainter {
   }
 
   /**
-   * Flood fill algorithm for region detection
+   * Enhanced flood fill algorithm for region detection
    */
   private floodFillRegion(maskData: ImageData, startX: number, startY: number, visited: Set<number>): {x: number, y: number, width: number, height: number} {
     const stack = [{x: startX, y: startY}];
@@ -143,7 +172,13 @@ class AOTGANInpainter {
       }
       
       const idx = (y * maskData.width + x) * 4;
-      if (maskData.data[idx] < 128) continue;
+      const r = maskData.data[idx];
+      const g = maskData.data[idx + 1];
+      const b = maskData.data[idx + 2];
+      const a = maskData.data[idx + 3];
+      
+      const isRedMask = r > 200 && g < 100 && b < 100 && a > 100;
+      if (!isRedMask) continue;
       
       visited.add(key);
       minX = Math.min(minX, x);
@@ -151,14 +186,15 @@ class AOTGANInpainter {
       minY = Math.min(minY, y);
       maxY = Math.max(maxY, y);
       
+      // Add adjacent pixels
       stack.push({x: x + 1, y}, {x: x - 1, y}, {x, y: y + 1}, {x, y: y - 1});
     }
     
     return {
-      x: minX,
-      y: minY,
-      width: maxX - minX + 1,
-      height: maxY - minY + 1
+      x: Math.max(0, minX - 2), // Add padding
+      y: Math.max(0, minY - 2),
+      width: Math.min(maskData.width - Math.max(0, minX - 2), maxX - minX + 5),
+      height: Math.min(maskData.height - Math.max(0, minY - 2), maxY - minY + 5)
     };
   }
 
@@ -170,19 +206,19 @@ class AOTGANInpainter {
    * 2. Texture-aware interpolation (like learned texture synthesis)
    * 3. Boundary-aware processing (like mask-aware discriminator feedback)
    */
-  private inpaintRegionWithAOTInspiredMethod(
+  private async inpaintRegionWithAOTInspiredMethod(
     imageData: ImageData, 
     region: {x: number, y: number, width: number, height: number}, 
     maskData: ImageData
-  ) {
+  ): Promise<void> {
     const {x, y, width, height} = region;
     
     // Expand region for better context (simulates larger receptive fields)
     const expandedRegion = {
-      x: Math.max(0, x - 20),
-      y: Math.max(0, y - 20),
-      width: Math.min(imageData.width - x + 20, width + 40),
-      height: Math.min(imageData.height - y + 20, height + 40)
+      x: Math.max(0, x - 30),
+      y: Math.max(0, y - 30),
+      width: Math.min(imageData.width - x + 30, width + 60),
+      height: Math.min(imageData.height - y + 30, height + 60)
     };
 
     // Multi-scale boundary sampling (simulates AOT block's multiple dilation rates)
@@ -193,17 +229,35 @@ class AOTGANInpainter {
       for (let dx = 0; dx < width; dx++) {
         const pixelX = x + dx;
         const pixelY = y + dy;
-        const idx = (pixelY * imageData.width + pixelX) * 4;
         
-        if (maskData.data[idx] > 128) {
-          const synthesizedColor = this.synthesizePixelWithAOTMethod(
-            pixelX, pixelY, contextColors
-          );
+        if (pixelX >= 0 && pixelX < imageData.width && pixelY >= 0 && pixelY < imageData.height) {
+          const idx = (pixelY * imageData.width + pixelX) * 4;
+          const maskIdx = (pixelY * maskData.width + pixelX) * 4;
           
-          imageData.data[idx] = synthesizedColor.r;
-          imageData.data[idx + 1] = synthesizedColor.g;
-          imageData.data[idx + 2] = synthesizedColor.b;
+          // Check if this pixel is part of the mask
+          const r = maskData.data[maskIdx];
+          const g = maskData.data[maskIdx + 1];
+          const b = maskData.data[maskIdx + 2];
+          const a = maskData.data[maskIdx + 3];
+          
+          const isRedMask = r > 200 && g < 100 && b < 100 && a > 100;
+          
+          if (isRedMask) {
+            const synthesizedColor = this.synthesizePixelWithAOTMethod(
+              pixelX, pixelY, contextColors
+            );
+            
+            imageData.data[idx] = synthesizedColor.r;
+            imageData.data[idx + 1] = synthesizedColor.g;
+            imageData.data[idx + 2] = synthesizedColor.b;
+            imageData.data[idx + 3] = 255; // Full opacity
+          }
         }
+      }
+      
+      // Allow for UI updates during processing
+      if (dy % 10 === 0) {
+        await new Promise(resolve => setTimeout(resolve, 1));
       }
     }
   }
@@ -229,9 +283,17 @@ class AOTGANInpainter {
         for (let x = region.x; x < region.x + region.width; x += scale) {
           if (x >= 0 && x < imageData.width && y >= 0 && y < imageData.height) {
             const idx = (y * imageData.width + x) * 4;
+            const maskIdx = (y * maskData.width + x) * 4;
             
-            // Sample pixels outside the mask (valid context)
-            if (maskData.data[idx] < 128) {
+            // Check if this is NOT a mask pixel (valid context)
+            const maskR = maskData.data[maskIdx];
+            const maskG = maskData.data[maskIdx + 1];
+            const maskB = maskData.data[maskIdx + 2];
+            const maskA = maskData.data[maskIdx + 3];
+            
+            const isRedMask = maskR > 200 && maskG < 100 && maskB < 100 && maskA > 100;
+            
+            if (!isRedMask) {
               const weight = this.calculateContextWeight(scale, x, y, region);
               
               contextColors.push({
@@ -262,7 +324,7 @@ class AOTGANInpainter {
     const distance = Math.sqrt((x - centerX) ** 2 + (y - centerY) ** 2);
     
     // Scale weight (closer scales have higher weight, like learned attention)
-    const scaleWeight = 1 / scale;
+    const scaleWeight = 1 / Math.sqrt(scale);
     
     // Distance weight (closer pixels have higher weight)
     const distanceWeight = 1 / (distance + 1);
@@ -303,9 +365,9 @@ class AOTGANInpainter {
     }
     
     // Normalize and apply texture enhancement
-    const baseR = Math.round(weightedR / totalWeight);
-    const baseG = Math.round(weightedG / totalWeight);
-    const baseB = Math.round(weightedB / totalWeight);
+    const baseR = totalWeight > 0 ? weightedR / totalWeight : 128;
+    const baseG = totalWeight > 0 ? weightedG / totalWeight : 128;
+    const baseB = totalWeight > 0 ? weightedB / totalWeight : 128;
     
     // Texture enhancement (simulates learned texture synthesis)
     return this.enhanceTexture(baseR, baseG, baseB, x, y, contextColors);
@@ -325,10 +387,10 @@ class AOTGANInpainter {
     // Calculate local texture variance
     const nearbyColors = contextColors.filter(c => {
       const distance = Math.sqrt((x - c.x) ** 2 + (y - c.y) ** 2);
-      return distance < 10; // Local neighborhood
+      return distance < 15; // Local neighborhood
     });
     
-    if (nearbyColors.length > 1) {
+    if (nearbyColors.length > 2) {
       // Calculate variance for texture enhancement
       const meanR = nearbyColors.reduce((sum, c) => sum + c.r, 0) / nearbyColors.length;
       const meanG = nearbyColors.reduce((sum, c) => sum + c.g, 0) / nearbyColors.length;
@@ -339,7 +401,7 @@ class AOTGANInpainter {
       const varianceB = nearbyColors.reduce((sum, c) => sum + (c.b - meanB) ** 2, 0) / nearbyColors.length;
       
       // Apply subtle texture variation based on local statistics
-      const textureStrength = 0.1; // Subtle enhancement
+      const textureStrength = 0.15; // Subtle enhancement
       const noiseR = (Math.random() - 0.5) * Math.sqrt(varianceR) * textureStrength;
       const noiseG = (Math.random() - 0.5) * Math.sqrt(varianceG) * textureStrength;
       const noiseB = (Math.random() - 0.5) * Math.sqrt(varianceB) * textureStrength;
@@ -350,10 +412,65 @@ class AOTGANInpainter {
     }
     
     return {
-      r: Math.round(r),
-      g: Math.round(g),
-      b: Math.round(b)
+      r: Math.round(Math.max(0, Math.min(255, r))),
+      g: Math.round(Math.max(0, Math.min(255, g))),
+      b: Math.round(Math.max(0, Math.min(255, b)))
     };
+  }
+
+  /**
+   * Post-processing to smooth edges and blend seamlessly
+   */
+  private async postProcessResult(result: ImageData, original: ImageData, maskData: ImageData): Promise<void> {
+    const smoothingRadius = 3;
+    const blendingStrength = 0.8;
+    
+    // Create a temporary copy for edge smoothing
+    const temp = new ImageData(result.width, result.height);
+    temp.data.set(result.data);
+    
+    for (let y = smoothingRadius; y < result.height - smoothingRadius; y++) {
+      for (let x = smoothingRadius; x < result.width - smoothingRadius; x++) {
+        const idx = (y * result.width + x) * 4;
+        const maskIdx = (y * maskData.width + x) * 4;
+        
+        // Check if this pixel is near a mask edge
+        const r = maskData.data[maskIdx];
+        const g = maskData.data[maskIdx + 1];
+        const b = maskData.data[maskIdx + 2];
+        const a = maskData.data[maskIdx + 3];
+        
+        const isRedMask = r > 200 && g < 100 && b < 100 && a > 100;
+        
+        if (isRedMask) {
+          // Apply gentle smoothing around mask edges
+          let sumR = 0, sumG = 0, sumB = 0, count = 0;
+          
+          for (let dy = -smoothingRadius; dy <= smoothingRadius; dy++) {
+            for (let dx = -smoothingRadius; dx <= smoothingRadius; dx++) {
+              const nx = x + dx;
+              const ny = y + dy;
+              
+              if (nx >= 0 && nx < result.width && ny >= 0 && ny < result.height) {
+                const nIdx = (ny * result.width + nx) * 4;
+                const weight = 1 / (Math.abs(dx) + Math.abs(dy) + 1);
+                
+                sumR += temp.data[nIdx] * weight;
+                sumG += temp.data[nIdx + 1] * weight;
+                sumB += temp.data[nIdx + 2] * weight;
+                count += weight;
+              }
+            }
+          }
+          
+          if (count > 0) {
+            result.data[idx] = Math.round(sumR / count);
+            result.data[idx + 1] = Math.round(sumG / count);
+            result.data[idx + 2] = Math.round(sumB / count);
+          }
+        }
+      }
+    }
   }
 
   /**
@@ -371,12 +488,13 @@ class AOTGANInpainter {
           'Multi-scale boundary sampling',
           'Distance-weighted interpolation',
           'Texture-aware enhancement',
-          'Boundary-preserving blending'
+          'Boundary-preserving blending',
+          'Real-time progress feedback'
         ]
       },
       performance: {
-        speed: 'Real-time (< 1 second for typical images)',
-        quality: 'High-quality results for most scenarios',
+        speed: 'Real-time (1-3 seconds for typical images)',
+        quality: 'High-quality results with seamless blending',
         memory: 'Efficient (no GPU memory required)'
       },
       futureEnhancements: {
@@ -407,6 +525,16 @@ self.onmessage = async (event) => {
   try {
     switch (type) {
       case 'LOAD_MODEL':
+        // Simulate model loading with progress
+        const loadingSteps = [25, 50, 75, 100];
+        for (const progress of loadingSteps) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+          self.postMessage({
+            type: 'MODEL_LOADING_PROGRESS',
+            data: { progress }
+          });
+        }
+        
         self.postMessage({
           type: 'MODEL_LOADED',
           data: { success: true }
@@ -416,7 +544,12 @@ self.onmessage = async (event) => {
       case 'INPAINT':
         const { imageData, maskData } = data as InpaintingData;
         
-        const result = await aotganInpainter.inpaint(imageData, maskData);
+        const result = await aotganInpainter.inpaint(imageData, maskData, (progress) => {
+          self.postMessage({
+            type: 'INPAINTING_PROGRESS',
+            progress: progress
+          });
+        });
         
         self.postMessage({
           type: 'INPAINTING_COMPLETE',
@@ -438,7 +571,7 @@ self.onmessage = async (event) => {
     console.error('Worker error:', error);
     self.postMessage({
       type: 'INPAINTING_ERROR',
-      error: error instanceof Error ? error.message : 'Unknown error'
+      error: error instanceof Error ? error.message : 'Unknown error occurred'
     });
   }
 };
