@@ -55,50 +55,137 @@ class RealAOTGANInpainter {
     // Configure ONNX Runtime to prefer dedicated GPU over integrated graphics
     ort.env.wasm.wasmPaths = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.15.1/dist/';
     
-    // Check for WebGPU support (most advanced)
+    console.log('🔍 Detecting available graphics processors...');
+    
+    // Check for WebGPU support (most advanced) with explicit adapter selection
     if ('gpu' in navigator) {
       try {
+        // Try to get high-performance adapter first (dedicated GPU)
         const adapter = await (navigator as any).gpu.requestAdapter({
-          powerPreference: 'high-performance' // Prefer dedicated GPU
+          powerPreference: 'high-performance',
+          forceFallbackAdapter: false
         });
+        
         if (adapter) {
-          console.log('🎮 Found WebGPU adapter:', adapter.info?.vendor || 'Unknown');
-          if (adapter.info?.vendor && !adapter.info.vendor.toLowerCase().includes('intel')) {
-            this.gpuProvider = 'webgpu';
+          const info = adapter.info;
+          console.log('🎮 WebGPU Adapter Found:', {
+            vendor: info?.vendor || 'Unknown',
+            device: info?.device || 'Unknown',
+            description: info?.description || 'Unknown'
+          });
+          
+          // Prioritize NVIDIA (GTX 1650) over Intel
+          if (info?.vendor && (
+            info.vendor.toLowerCase().includes('nvidia') ||
+            info.vendor.toLowerCase().includes('geforce') ||
+            info.description?.toLowerCase().includes('gtx') ||
+            info.description?.toLowerCase().includes('rtx')
+          )) {
+            this.gpuProvider = 'webgpu-nvidia';
             this.useGPU = true;
-            console.log('✅ Using dedicated GPU via WebGPU');
+            console.log('✅ Using NVIDIA GPU via WebGPU:', info.description || info.vendor);
+            return;
+          }
+          
+          // Fallback to any non-Intel adapter
+          if (info?.vendor && !info.vendor.toLowerCase().includes('intel')) {
+            this.gpuProvider = 'webgpu-dedicated';
+            this.useGPU = true;
+            console.log('✅ Using dedicated GPU via WebGPU:', info.description || info.vendor);
             return;
           }
         }
       } catch (e) {
-        console.log('WebGPU not available, trying WebGL...');
+        console.log('WebGPU high-performance adapter not available, trying WebGL...');
       }
     }
 
-    // Check for WebGL2 support
+    // Enhanced WebGL detection with multiple methods
     const canvas = new OffscreenCanvas(1, 1);
-    const gl = canvas.getContext('webgl2');
+    const gl = canvas.getContext('webgl2', { 
+      powerPreference: 'high-performance',
+      antialias: false,
+      depth: false
+    }) || canvas.getContext('webgl', { 
+      powerPreference: 'high-performance',
+      antialias: false,
+      depth: false
+    });
+    
     if (gl) {
+      // Get detailed renderer information
       const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
+      let renderer = 'Unknown';
+      let vendor = 'Unknown';
+      
       if (debugInfo) {
-        const renderer = gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL);
-        console.log('🎮 WebGL Renderer:', renderer);
-        
-        // Prefer dedicated graphics (NVIDIA, AMD) over integrated (Intel)
-        if (renderer && !renderer.toLowerCase().includes('intel')) {
-          this.gpuProvider = 'webgl';
-          this.useGPU = true;
-          console.log('✅ Using dedicated GPU via WebGL:', renderer);
-          return;
-        }
+        renderer = gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL) || 'Unknown';
+        vendor = gl.getParameter(debugInfo.UNMASKED_VENDOR_WEBGL) || 'Unknown';
       }
-      this.gpuProvider = 'webgl-fallback';
-      this.useGPU = true;
+      
+      console.log('🎮 WebGL Renderer Details:', { vendor, renderer });
+      
+      // Aggressive NVIDIA/GTX detection
+      const isNvidia = renderer.toLowerCase().includes('nvidia') ||
+                      renderer.toLowerCase().includes('geforce') ||
+                      renderer.toLowerCase().includes('gtx') ||
+                      renderer.toLowerCase().includes('rtx') ||
+                      vendor.toLowerCase().includes('nvidia');
+      
+      const isAMD = renderer.toLowerCase().includes('amd') ||
+                    renderer.toLowerCase().includes('radeon') ||
+                    vendor.toLowerCase().includes('ati');
+      
+      const isIntel = renderer.toLowerCase().includes('intel') ||
+                      renderer.toLowerCase().includes('uhd') ||
+                      vendor.toLowerCase().includes('intel');
+      
+      if (isNvidia) {
+        this.gpuProvider = 'webgl-nvidia';
+        this.useGPU = true;
+        console.log('✅ NVIDIA GPU detected via WebGL:', renderer);
+        
+        // Force specific optimizations for NVIDIA
+        if (ort && ort.env) {
+          ort.env.webgl = {
+            powerPreference: 'high-performance',
+            contextAttributes: {
+              alpha: false,
+              antialias: false,
+              depth: false,
+              stencil: false,
+              powerPreference: 'high-performance'
+            }
+          };
+        }
+        return;
+      }
+      
+      if (isAMD) {
+        this.gpuProvider = 'webgl-amd';
+        this.useGPU = true;
+        console.log('✅ AMD GPU detected via WebGL:', renderer);
+        return;
+      }
+      
+      // Only use Intel as last resort
+      if (isIntel) {
+        this.gpuProvider = 'webgl-intel-fallback';
+        this.useGPU = false; // Treat Intel as CPU fallback for better performance
+        console.log('⚠️ Intel graphics detected, using CPU processing for better performance');
+      } else {
+        // Unknown GPU, try to use it
+        this.gpuProvider = 'webgl-unknown';
+        this.useGPU = true;
+        console.log('🔧 Unknown GPU detected, attempting hardware acceleration:', renderer);
+      }
     } else {
-      this.gpuProvider = 'cpu';
+      this.gpuProvider = 'cpu-only';
       this.useGPU = false;
+      console.log('❌ No WebGL support, using CPU-only processing');
     }
-    console.log(`🖥️ Using ${this.gpuProvider} acceleration`);
+    
+    console.log(`🖥️ Final configuration: ${this.gpuProvider} (GPU: ${this.useGPU})`);
   }
 
   private async loadModel(): Promise<void> {
