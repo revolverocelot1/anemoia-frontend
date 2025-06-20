@@ -95,7 +95,7 @@ class RealInpainter {
 
     // Step 4: Post-process for seamless blending
     progressCallback?.(95);
-    await this.seamlessBlend(result, imageData, binaryMask);
+    await this.seamlessBlend(result, binaryMask);
     
     progressCallback?.(100);
     return result;
@@ -481,7 +481,7 @@ class RealInpainter {
   /**
    * Final seamless blending for natural results
    */
-  private async seamlessBlend(result: ImageData, original: ImageData, mask: Uint8Array): Promise<void> {
+  private async seamlessBlend(result: ImageData, mask: Uint8Array): Promise<void> {
     const blendRadius = 5;
     const temp = new ImageData(new Uint8ClampedArray(result.data), result.width, result.height);
     
