@@ -16,6 +16,7 @@ import NewUpscalerPage from './pages/NewUpscalerPage';
 import ImageComparisonPage from './pages/ImageComparisonPage';
 import ImageComparisonResultsPage from './pages/ImageComparisonResultsPage';
 import InpaintingPage from './pages/InpaintingPage';
+import AIToolsPage from './pages/AIToolsPage';
 import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
 import TermsOfServicePage from './pages/TermsOfServicePage';
 
@@ -126,6 +127,14 @@ function App() {
           element={
             <AnimatedPage>
               <InpaintingPage />
+            </AnimatedPage>
+          }
+        />
+        <Route
+          path="/ai-tools"
+          element={
+            <AnimatedPage>
+              <AIToolsPage />
             </AnimatedPage>
           }
         />

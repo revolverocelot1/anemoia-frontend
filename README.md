@@ -119,6 +119,49 @@ const inpaintedImage = await inpaintImage(imageData, maskData, {
 });
 ```
 
+### AI Studio - Multiple AI Models
+- **Inpainting**: Remove unwanted objects and fill missing areas
+  - LaMa (Fast) - Optimized for speed and efficiency
+  - AOT-GAN (High Quality) - Superior results for complex scenes
+- **Face Restoration**: Enhance and restore facial details with GFPGAN
+- **Background Removal**: Precise background removal and replacement
+  - U²-Net - High-quality segmentation
+  - RemBG - Fast and efficient removal
+- **Smart Selection**: Interactive object selection with TinySAM
+  - Point-based selection
+  - Automatic segmentation
+  - Segment Anything integration
+
+### GPU Acceleration
+- **WebGPU Support**: Cutting-edge GPU acceleration for modern browsers
+- **WebGL Fallback**: Broad compatibility with older hardware
+- **Intelligent Backend Selection**: Automatically chooses the best acceleration method
+- **GPU Detection**: Identifies NVIDIA, AMD, and Intel graphics cards
+- **Performance Warnings**: Alerts when using integrated graphics
+
+### Traditional Tools
+- **Image Comparison**: AI-powered similarity analysis
+- **Pose Estimation**: Real-time human pose detection
+- **Depth Mapping**: Generate depth maps from 2D images
+- **Image Upscaling**: AI-powered image enhancement
+
+## 🖥️ GPU Requirements
+
+### Recommended (Best Performance)
+- **NVIDIA GPUs**: GTX 1650, RTX 20/30/40 series
+- **AMD GPUs**: RX 5000, RX 6000, RX 7000 series
+- **Apple Silicon**: M1, M2, M3 chips
+
+### Minimum Requirements
+- WebGL 2.0 support
+- 4GB VRAM (for high-quality models)
+- Modern browser with WebGPU support (Chrome 113+, Edge, Firefox)
+
+### Performance Tiers
+- **High Tier**: Discrete GPUs with 6GB+ VRAM
+- **Medium Tier**: Entry-level discrete GPUs, high-end integrated
+- **Low Tier**: Basic integrated graphics (performance may be limited)
+
 ---
 
 ## 🚀 Installation
