@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
+import ModelStatusIndicator from '../components/ModelStatusIndicator';
 
 interface Point {
   x: number;
@@ -15,6 +16,24 @@ interface StrokePoint extends Point {
 interface HistoryState {
   imageData: ImageData;
   maskData: ImageData;
+}
+
+interface ModelInfo {
+  initialized: boolean;
+  modelLoaded: boolean;
+  gpuInfo: any | null;
+  currentModel: string;
+  availableModels?: Array<{
+    name: string;
+    displayName: string;
+    description: string;
+  }>;
+  performanceStats: {
+    lastInferenceTime: number;
+    averageTime: number;
+    totalInferences: number;
+  };
+  hasNeuralAcceleration: boolean;
 }
 
 const InpaintingPage = () => {
@@ -33,26 +52,33 @@ const InpaintingPage = () => {
   const [showComparison, setShowComparison] = useState(0);
   const [zoom, setZoom] = useState(1);
   const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
-  const [isDragging] = useState(false);
 
   const [history, setHistory] = useState<HistoryState[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
   const [currentStroke, setCurrentStroke] = useState<StrokePoint[]>([]);
-  const [modelLoaded, setModelLoaded] = useState(false);
+  const [modelInfo, setModelInfo] = useState<ModelInfo>({ 
+    initialized: false, 
+    modelLoaded: false, 
+    gpuInfo: null, 
+    currentModel: '', 
+    performanceStats: { lastInferenceTime: 0, averageTime: 0, totalInferences: 0 },
+    hasNeuralAcceleration: false 
+  });
+  const [initProgress, setInitProgress] = useState(0);
   const [modelLoadProgress, setModelLoadProgress] = useState(0);
   const [processingProgress, setProcessingProgress] = useState(0);
 
-  // UI state
-  const [showToolPanel, setShowToolPanel] = useState(true);
-  const [activeTab, setActiveTab] = useState<'brush' | 'view' | 'history' | 'process'>('brush');
+  // Model selection
+  const [selectedModel, setSelectedModel] = useState<'mi-gan' | 'aot-gan' | 'auto'>('auto');
+  const [showModelSelector, setShowModelSelector] = useState(false);
 
   // Worker ref
   const workerRef = useRef<Worker | null>(null);
 
-  // Initialize worker with enhanced loading feedback
+  // Initialize worker
   useEffect(() => {
     const initializeWorker = async () => {
-      setModelLoadProgress(10);
+      setInitProgress(0);
       
       workerRef.current = new Worker(
         new URL('../workers/inpainting.worker.ts', import.meta.url), 
@@ -63,17 +89,23 @@ const InpaintingPage = () => {
         const { type, data, error, progress } = event.data;
         
         switch (type) {
-          case 'MODEL_LOADED':
-            setModelLoaded(true);
-            setModelLoadProgress(100);
-            console.log('AOT-GAN model loaded successfully');
+          case 'INIT_PROGRESS':
+            setInitProgress(progress || 0);
+            if (data) {
+              setModelInfo(data);
+            }
+            break;
+          case 'INIT_COMPLETE':
+            setModelInfo(data);
+            console.log('✅ Worker initialized successfully');
             break;
           case 'MODEL_LOADING_PROGRESS':
             setModelLoadProgress(data.progress || 0);
             break;
-          case 'MODEL_ERROR':
-            console.error('Failed to load AOT-GAN model:', error);
-            setModelLoadProgress(0);
+          case 'MODEL_LOADED':
+            setModelInfo(data);
+            setModelLoadProgress(100);
+            console.log('✅ Model loaded successfully');
             break;
           case 'INPAINTING_PROGRESS':
             setProcessingProgress(progress || 0);
@@ -85,20 +117,15 @@ const InpaintingPage = () => {
           case 'INPAINTING_ERROR':
             setIsProcessing(false);
             setProcessingProgress(0);
-            console.error('Inpainting error:', error);
+            console.error('❌ Inpainting error:', error);
             break;
+          default:
+            console.log('Worker message:', type, data);
         }
       };
 
-      // Simulate progressive loading for the enhanced algorithm
-      const loadingSteps = [20, 40, 60, 80, 100];
-      for (let i = 0; i < loadingSteps.length; i++) {
-        await new Promise(resolve => setTimeout(resolve, 200));
-        setModelLoadProgress(loadingSteps[i]);
-      }
-
-      // Load the model
-      workerRef.current.postMessage({ type: 'LOAD_MODEL' });
+      // Initialize the worker
+      workerRef.current.postMessage({ type: 'INIT' });
     };
 
     initializeWorker();
@@ -108,7 +135,7 @@ const InpaintingPage = () => {
     };
   }, []);
 
-  // Enhanced canvas setup with proper sizing
+  // Canvas setup
   useEffect(() => {
     if (originalImage && canvasRef.current && maskCanvasRef.current && containerRef.current) {
       setupCanvases();
@@ -126,9 +153,9 @@ const InpaintingPage = () => {
 
     if (!ctx || !maskCtx) return;
 
-    // Calculate optimal canvas size to fit container while maintaining aspect ratio
+    // Calculate optimal canvas size
     const containerRect = container.getBoundingClientRect();
-    const maxWidth = containerRect.width - 40; // Account for padding
+    const maxWidth = containerRect.width - 40;
     const maxHeight = containerRect.height - 40;
     
     const imageAspect = originalImage.width / originalImage.height;
@@ -143,7 +170,7 @@ const InpaintingPage = () => {
       canvasWidth = maxHeight * imageAspect;
     }
 
-    // Set canvas size
+    // Set canvas dimensions
     canvas.width = originalImage.width;
     canvas.height = originalImage.height;
     canvas.style.width = `${canvasWidth}px`;
@@ -158,14 +185,12 @@ const InpaintingPage = () => {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.drawImage(originalImage, 0, 0);
 
-    // Clear mask with transparent background
+    // Clear mask
     maskCtx.clearRect(0, 0, maskCanvas.width, maskCanvas.height);
 
     // Reset view
     setZoom(1);
     setPanOffset({ x: 0, y: 0 });
-
-    // Save initial state
     saveHistoryState();
   }, [originalImage]);
 
@@ -182,7 +207,6 @@ const InpaintingPage = () => {
     const newHistory = history.slice(0, historyIndex + 1);
     newHistory.push({ imageData, maskData });
     
-    // Limit history to prevent memory issues
     if (newHistory.length > 20) {
       newHistory.shift();
     } else {
@@ -242,14 +266,12 @@ const InpaintingPage = () => {
   }, []);
 
   const startPainting = useCallback((event: React.MouseEvent) => {
-    if (event.button !== 0) return; // Only left mouse button
+    if (event.button !== 0) return;
     
     const point = getCanvasPoint(event);
     setIsPainting(true);
     setCurrentStroke([point]);
     drawBrushStroke(point, point);
-    
-    // Prevent default to avoid scrolling/dragging
     event.preventDefault();
   }, [getCanvasPoint]);
 
@@ -283,7 +305,7 @@ const InpaintingPage = () => {
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
     ctx.lineWidth = brushSize;
-    ctx.strokeStyle = 'rgba(255, 0, 0, 0.7)'; // Semi-transparent red for better visibility
+    ctx.strokeStyle = 'rgba(255, 0, 0, 0.7)';
     
     ctx.beginPath();
     ctx.moveTo(from.x, from.y);
@@ -300,11 +322,6 @@ const InpaintingPage = () => {
     ctx.clearRect(0, 0, maskCanvasRef.current.width, maskCanvasRef.current.height);
     saveHistoryState();
   }, [saveHistoryState]);
-
-  const resetView = useCallback(() => {
-    setZoom(1);
-    setPanOffset({ x: 0, y: 0 });
-  }, []);
 
   const handleImageUpload = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -325,13 +342,24 @@ const InpaintingPage = () => {
     reader.readAsDataURL(file);
   }, []);
 
+  const loadModel = useCallback(async (modelName: 'mi-gan' | 'aot-gan' | 'auto') => {
+    if (!workerRef.current) return;
+
+    setModelLoadProgress(0);
+    setSelectedModel(modelName);
+    
+    workerRef.current.postMessage({
+      type: 'LOAD_MODEL',
+      data: { modelName }
+    });
+  }, []);
+
   const startInpainting = useCallback(async () => {
     if (!originalImage || !canvasRef.current || !maskCanvasRef.current || !workerRef.current) return;
 
     setIsProcessing(true);
     setProcessingProgress(0);
 
-    // Get image and mask data
     const canvas = canvasRef.current;
     const maskCanvas = maskCanvasRef.current;
     
@@ -343,17 +371,19 @@ const InpaintingPage = () => {
       return;
     }
 
-    // Send to worker
     workerRef.current.postMessage({
       type: 'INPAINT',
       data: {
         imageData: imageData,
         maskData: maskData,
-        width: canvas.width,
-        height: canvas.height
+        options: {
+          model: selectedModel,
+          quality: 'balanced',
+          preserveDetails: true
+        }
       }
     });
-  }, [originalImage]);
+  }, [originalImage, selectedModel]);
 
   const handleInpaintingComplete = useCallback((resultImageData: ImageData) => {
     if (!previewCanvasRef.current) return;
@@ -366,7 +396,6 @@ const InpaintingPage = () => {
     canvas.height = resultImageData.height;
     ctx.putImageData(resultImageData, 0, 0);
 
-    // Create processed image
     const img = new Image();
     img.onload = () => {
       setProcessedImage(img);
@@ -394,7 +423,7 @@ const InpaintingPage = () => {
     link.click();
   }, [processedImage]);
 
-  // Enhanced keyboard shortcuts
+  // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if ((event.ctrlKey || event.metaKey) && event.key === 'z' && !event.shiftKey) {
@@ -403,9 +432,6 @@ const InpaintingPage = () => {
       } else if ((event.ctrlKey || event.metaKey) && (event.key === 'y' || (event.key === 'z' && event.shiftKey))) {
         event.preventDefault();
         redo();
-      } else if (event.key === ' ' && !event.ctrlKey && !event.metaKey) {
-        event.preventDefault();
-        setShowToolPanel(prev => !prev);
       }
     };
 
@@ -413,19 +439,16 @@ const InpaintingPage = () => {
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [undo, redo]);
 
-  // Enhanced canvas interaction
-  const handleWheel = useCallback((event: React.WheelEvent) => {
-    event.preventDefault();
-    const delta = event.deltaY > 0 ? 0.9 : 1.1;
-    setZoom(prevZoom => Math.max(0.1, Math.min(5, prevZoom * delta)));
-  }, []);
-
   const canvasStyle = useMemo(() => ({
     transform: `scale(${zoom}) translate(${panOffset.x}px, ${panOffset.y}px)`,
     transformOrigin: 'center center',
-    cursor: isPainting ? 'crosshair' : isDragging ? 'grabbing' : 'grab',
-    transition: isDragging ? 'none' : 'transform 0.2s ease'
-  }), [zoom, panOffset, isPainting, isDragging]);
+    cursor: isPainting ? 'crosshair' : 'grab',
+    transition: 'transform 0.2s ease'
+  }), [zoom, panOffset, isPainting]);
+
+  const isSystemReady = modelInfo.initialized;
+  const hasValidMask = history.length > 0;
+  const canProcess = originalImage && hasValidMask && isSystemReady && !isProcessing;
 
   return (
     <div className="relative flex size-full min-h-screen flex-col bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
@@ -436,23 +459,21 @@ const InpaintingPage = () => {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="text-center py-8 px-4"
+          className="text-center py-6 px-4"
         >
           <h1 className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mb-4">
-            AOT-GAN Image Inpainting
+            AI Inpainting Studio
           </h1>
-          <p className="text-lg text-gray-600 dark:text-gray-300 max-w-2xl mx-auto mb-2">
-            Remove unwanted objects and fill missing areas with state-of-the-art AI
+          <p className="text-lg text-gray-600 dark:text-gray-300 max-w-2xl mx-auto mb-4">
+            Remove objects and fill missing areas with state-of-the-art AI models
           </p>
-          <div className="flex items-center justify-center space-x-4 text-sm text-gray-500 dark:text-gray-400">
-            <div className="flex items-center">
-              <div className={`w-2 h-2 rounded-full mr-2 ${modelLoaded ? 'bg-green-500' : 'bg-yellow-500'} animate-pulse`} />
-              {modelLoaded ? 'AOT-GAN Ready' : `Loading... ${modelLoadProgress}%`}
-            </div>
-            <div className="flex items-center">
-              <span className="material-symbols-outlined mr-1 text-blue-500">psychology</span>
-              Enhanced Algorithm
-            </div>
+          
+          {/* GPU Status */}
+          <div className="flex justify-center mb-4">
+            <ModelStatusIndicator 
+              isLoading={initProgress < 100} 
+              modelInfo={modelInfo.initialized ? modelInfo : null} 
+            />
           </div>
         </motion.div>
 
@@ -497,320 +518,206 @@ const InpaintingPage = () => {
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="flex-1 flex h-[calc(100vh-200px)]"
+              className="flex-1 flex flex-col h-[calc(100vh-180px)]"
             >
-              {/* Floating Tool Panel */}
-              <AnimatePresence>
-                {showToolPanel && (
-                  <motion.div
-                    initial={{ x: -300, opacity: 0 }}
-                    animate={{ x: 0, opacity: 1 }}
-                    exit={{ x: -300, opacity: 0 }}
-                    className="absolute left-4 top-4 bottom-4 w-80 z-10"
-                  >
-                    <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 h-full flex flex-col overflow-hidden">
-                      {/* Tool Panel Header */}
-                      <div className="p-4 border-b border-gray-200 dark:border-gray-700">
-                        <div className="flex items-center justify-between mb-4">
-                          <h3 className="font-bold text-lg">Tools</h3>
-                          <button
-                            onClick={() => setShowToolPanel(false)}
-                            className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+              {/* Controls Bar */}
+              <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-4">
+                <div className="flex items-center justify-between max-w-7xl mx-auto">
+                  
+                  {/* Left Controls */}
+                  <div className="flex items-center space-x-4">
+                    
+                    {/* Model Selector */}
+                    <div className="relative">
+                      <button
+                        onClick={() => setShowModelSelector(!showModelSelector)}
+                        className="flex items-center space-x-2 px-4 py-2 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                      >
+                        <span className="material-symbols-outlined text-lg">psychology</span>
+                        <span className="font-medium">
+                          {selectedModel === 'auto' ? 'Auto Select' : 
+                           selectedModel === 'mi-gan' ? 'MI-GAN' : 'AOT-GAN'}
+                        </span>
+                        <span className="material-symbols-outlined text-sm">expand_more</span>
+                      </button>
+                      
+                      <AnimatePresence>
+                        {showModelSelector && (
+                          <motion.div
+                            initial={{ opacity: 0, y: -10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -10 }}
+                            className="absolute top-full left-0 mt-2 w-80 bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 z-50"
                           >
-                            <span className="material-symbols-outlined">close</span>
-                          </button>
-                        </div>
-                        
-                        {/* Tab Navigation */}
-                        <div className="flex space-x-1 bg-gray-100 dark:bg-gray-700 rounded-lg p-1">
-                          {[
-                            { id: 'brush', icon: 'brush', label: 'Brush' },
-                            { id: 'view', icon: 'zoom_in', label: 'View' },
-                            { id: 'history', icon: 'history', label: 'History' },
-                            { id: 'process', icon: 'auto_fix_high', label: 'Process' }
-                          ].map(tab => (
-                            <button
-                              key={tab.id}
-                              onClick={() => setActiveTab(tab.id as any)}
-                              className={`flex-1 flex flex-col items-center py-2 px-3 rounded-md transition-all duration-200 ${
-                                activeTab === tab.id 
-                                  ? 'bg-white dark:bg-gray-600 shadow-sm text-blue-600 dark:text-blue-400' 
-                                  : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600'
-                              }`}
-                            >
-                              <span className="material-symbols-outlined text-lg">{tab.icon}</span>
-                              <span className="text-xs mt-1">{tab.label}</span>
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* Tool Panel Content */}
-                      <div className="flex-1 p-4 overflow-y-auto">
-                        <AnimatePresence mode="wait">
-                          {activeTab === 'brush' && (
-                            <motion.div
-                              key="brush"
-                              initial={{ opacity: 0, x: 20 }}
-                              animate={{ opacity: 1, x: 0 }}
-                              exit={{ opacity: 0, x: -20 }}
-                              className="space-y-6"
-                            >
-                              <div>
-                                <label className="block text-sm font-semibold mb-3">
-                                  Brush Size: {brushSize}px
-                                </label>
-                                <input
-                                  type="range"
-                                  min="5"
-                                  max="100"
-                                  value={brushSize}
-                                  onChange={(e) => setBrushSize(Number(e.target.value))}
-                                  className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer slider"
-                                />
-                                <div className="flex justify-between text-xs text-gray-500 mt-1">
-                                  <span>5px</span>
-                                  <span>100px</span>
-                                </div>
-                              </div>
+                            <div className="p-4">
+                              <h3 className="text-lg font-semibold mb-3">Select AI Model</h3>
                               
+                              {/* Auto Selection */}
                               <button
-                                onClick={clearMask}
-                                className="w-full py-3 bg-red-500 hover:bg-red-600 text-white rounded-xl transition-colors duration-200 flex items-center justify-center space-x-2 shadow-lg"
+                                onClick={() => {
+                                  loadModel('auto');
+                                  setShowModelSelector(false);
+                                }}
+                                className={`w-full text-left p-3 rounded-lg mb-2 transition-colors ${
+                                  selectedModel === 'auto' 
+                                    ? 'bg-blue-100 dark:bg-blue-900/20 border-2 border-blue-500' 
+                                    : 'bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600'
+                                }`}
                               >
-                                <span className="material-symbols-outlined">clear_all</span>
-                                <span>Clear All Marks</span>
+                                <div className="flex items-center space-x-3">
+                                  <span className="material-symbols-outlined text-blue-500">auto_awesome</span>
+                                  <div>
+                                    <div className="font-medium">Auto Select</div>
+                                    <div className="text-sm text-gray-600 dark:text-gray-300">
+                                      Automatically choose the best model for your GPU
+                                    </div>
+                                  </div>
+                                </div>
                               </button>
 
-                              <div className="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-4">
-                                <h4 className="font-semibold text-blue-900 dark:text-blue-100 mb-2">How to use:</h4>
-                                <ul className="text-sm text-blue-800 dark:text-blue-200 space-y-1">
-                                  <li>• Paint over areas to remove</li>
-                                  <li>• Use larger brush for big areas</li>
-                                  <li>• Smaller brush for details</li>
-                                  <li>• Click Process when ready</li>
-                                </ul>
-                              </div>
-                            </motion.div>
-                          )}
-
-                          {activeTab === 'view' && (
-                            <motion.div
-                              key="view"
-                              initial={{ opacity: 0, x: 20 }}
-                              animate={{ opacity: 1, x: 0 }}
-                              exit={{ opacity: 0, x: -20 }}
-                              className="space-y-6"
-                            >
-                              <div>
-                                <label className="block text-sm font-semibold mb-3">
-                                  Zoom: {Math.round(zoom * 100)}%
-                                </label>
-                                <input
-                                  type="range"
-                                  min="0.1"
-                                  max="5"
-                                  step="0.1"
-                                  value={zoom}
-                                  onChange={(e) => setZoom(Number(e.target.value))}
-                                  className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer slider"
-                                />
-                                <div className="flex justify-between text-xs text-gray-500 mt-1">
-                                  <span>10%</span>
-                                  <span>500%</span>
-                                </div>
-                              </div>
-                              
+                              {/* MI-GAN Option */}
                               <button
-                                onClick={resetView}
-                                className="w-full py-3 bg-gray-500 hover:bg-gray-600 text-white rounded-xl transition-colors duration-200 flex items-center justify-center space-x-2 shadow-lg"
+                                onClick={() => {
+                                  loadModel('mi-gan');
+                                  setShowModelSelector(false);
+                                }}
+                                className={`w-full text-left p-3 rounded-lg mb-2 transition-colors ${
+                                  selectedModel === 'mi-gan' 
+                                    ? 'bg-green-100 dark:bg-green-900/20 border-2 border-green-500' 
+                                    : 'bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600'
+                                }`}
                               >
-                                <span className="material-symbols-outlined">center_focus_strong</span>
-                                <span>Reset View</span>
+                                <div className="flex items-center space-x-3">
+                                  <span className="material-symbols-outlined text-green-500">phone_android</span>
+                                  <div>
+                                    <div className="font-medium">MI-GAN Mobile</div>
+                                    <div className="text-sm text-gray-600 dark:text-gray-300">
+                                      Optimized for mobile/integrated graphics • Fast processing
+                                    </div>
+                                  </div>
+                                </div>
                               </button>
 
-                              {processedImage && (
-                                <div>
-                                  <label className="block text-sm font-semibold mb-3">
-                                    Comparison
-                                  </label>
-                                  <input
-                                    type="range"
-                                    min="0"
-                                    max="100"
-                                    value={showComparison}
-                                    onChange={(e) => setShowComparison(Number(e.target.value))}
-                                    className="w-full h-2 bg-gradient-to-r from-red-200 to-green-200 dark:from-red-800 dark:to-green-800 rounded-lg appearance-none cursor-pointer slider"
-                                  />
-                                  <div className="flex justify-between text-xs text-gray-500 mt-1">
-                                    <span>Original</span>
-                                    <span>Result</span>
-                                  </div>
-                                </div>
-                              )}
-                            </motion.div>
-                          )}
-
-                          {activeTab === 'history' && (
-                            <motion.div
-                              key="history"
-                              initial={{ opacity: 0, x: 20 }}
-                              animate={{ opacity: 1, x: 0 }}
-                              exit={{ opacity: 0, x: -20 }}
-                              className="space-y-4"
-                            >
-                              <div className="flex space-x-3">
-                                <button
-                                  onClick={undo}
-                                  disabled={historyIndex <= 0}
-                                  className="flex-1 py-3 px-4 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-xl transition-colors duration-200 flex items-center justify-center space-x-2 shadow-lg"
-                                >
-                                  <span className="material-symbols-outlined">undo</span>
-                                  <span>Undo</span>
-                                </button>
-                                <button
-                                  onClick={redo}
-                                  disabled={historyIndex >= history.length - 1}
-                                  className="flex-1 py-3 px-4 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-xl transition-colors duration-200 flex items-center justify-center space-x-2 shadow-lg"
-                                >
-                                  <span className="material-symbols-outlined">redo</span>
-                                  <span>Redo</span>
-                                </button>
-                              </div>
-                              
-                              <div className="bg-gray-50 dark:bg-gray-700 rounded-xl p-4">
-                                <div className="text-sm text-gray-600 dark:text-gray-300">
-                                  <div className="flex justify-between mb-2">
-                                    <span>History Steps:</span>
-                                    <span>{history.length}</span>
-                                  </div>
-                                  <div className="flex justify-between">
-                                    <span>Current Step:</span>
-                                    <span>{historyIndex + 1}</span>
-                                  </div>
-                                </div>
-                              </div>
-
-                              <div className="text-xs text-gray-500 dark:text-gray-400">
-                                <p>Keyboard shortcuts:</p>
-                                <p>• Ctrl+Z: Undo</p>
-                                <p>• Ctrl+Y: Redo</p>
-                                <p>• Space: Toggle panel</p>
-                              </div>
-                            </motion.div>
-                          )}
-
-                          {activeTab === 'process' && (
-                            <motion.div
-                              key="process"
-                              initial={{ opacity: 0, x: 20 }}
-                              animate={{ opacity: 1, x: 0 }}
-                              exit={{ opacity: 0, x: -20 }}
-                              className="space-y-6"
-                            >
+                              {/* AOT-GAN Option */}
                               <button
-                                onClick={startInpainting}
-                                disabled={isProcessing || !modelLoaded}
-                                className="w-full py-4 bg-gradient-to-r from-green-500 to-blue-500 hover:from-green-600 hover:to-blue-600 disabled:from-gray-300 disabled:to-gray-400 disabled:cursor-not-allowed text-white rounded-xl transition-all duration-300 flex items-center justify-center space-x-3 shadow-lg transform hover:scale-105 disabled:transform-none"
+                                onClick={() => {
+                                  loadModel('aot-gan');
+                                  setShowModelSelector(false);
+                                }}
+                                className={`w-full text-left p-3 rounded-lg transition-colors ${
+                                  selectedModel === 'aot-gan' 
+                                    ? 'bg-purple-100 dark:bg-purple-900/20 border-2 border-purple-500' 
+                                    : 'bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600'
+                                }`}
                               >
-                                {isProcessing ? (
-                                  <>
-                                    <div className="animate-spin w-6 h-6 border-2 border-white border-t-transparent rounded-full" />
-                                    <span>Processing...</span>
-                                  </>
-                                ) : (
-                                  <>
-                                    <span className="material-symbols-outlined text-xl">auto_fix_high</span>
-                                    <span className="font-semibold">Start Inpainting</span>
-                                  </>
-                                )}
-                              </button>
-
-                              {isProcessing && (
-                                <motion.div
-                                  initial={{ opacity: 0, y: 10 }}
-                                  animate={{ opacity: 1, y: 0 }}
-                                  className="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-4"
-                                >
-                                  <div className="flex justify-between text-sm mb-2">
-                                    <span>Progress</span>
-                                    <span>{processingProgress}%</span>
+                                <div className="flex items-center space-x-3">
+                                  <span className="material-symbols-outlined text-purple-500">gaming_desktop</span>
+                                  <div>
+                                    <div className="font-medium">AOT-GAN High Quality</div>
+                                    <div className="text-sm text-gray-600 dark:text-gray-300">
+                                      Best quality for dedicated GPUs • Complex inpainting tasks
+                                    </div>
                                   </div>
-                                  <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                                    <motion.div
-                                      className="bg-gradient-to-r from-blue-500 to-green-500 h-2 rounded-full"
-                                      initial={{ width: 0 }}
-                                      animate={{ width: `${processingProgress}%` }}
-                                      transition={{ duration: 0.5 }}
-                                    />
-                                  </div>
-                                </motion.div>
-                              )}
-                              
-                              {processedImage && (
-                                <div className="space-y-3">
-                                  <motion.button
-                                    initial={{ opacity: 0, y: 10 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    onClick={downloadResult}
-                                    className="w-full py-3 bg-purple-500 hover:bg-purple-600 text-white rounded-xl transition-colors duration-200 flex items-center justify-center space-x-2 shadow-lg"
-                                  >
-                                    <span className="material-symbols-outlined">download</span>
-                                    <span>Download Result</span>
-                                  </motion.button>
-                                  
-                                  <motion.button
-                                    initial={{ opacity: 0, y: 10 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    transition={{ delay: 0.1 }}
-                                    onClick={() => {
-                                      setOriginalImage(null);
-                                      setProcessedImage(null);
-                                      setShowComparison(0);
-                                      setHistory([]);
-                                      setHistoryIndex(-1);
-                                    }}
-                                    className="w-full py-3 bg-gray-500 hover:bg-gray-600 text-white rounded-xl transition-colors duration-200 flex items-center justify-center space-x-2 shadow-lg"
-                                  >
-                                    <span className="material-symbols-outlined">add_photo_alternate</span>
-                                    <span>Try New Image</span>
-                                  </motion.button>
                                 </div>
-                              )}
-
-                              <div className="bg-green-50 dark:bg-green-900/20 rounded-xl p-4">
-                                <h4 className="font-semibold text-green-900 dark:text-green-100 mb-2">AOT-GAN Features:</h4>
-                                <ul className="text-sm text-green-800 dark:text-green-200 space-y-1">
-                                  <li>• Multi-scale context analysis</li>
-                                  <li>• Texture-aware synthesis</li>
-                                  <li>• Edge-preserving algorithms</li>
-                                  <li>• High-quality results</li>
-                                </ul>
-                              </div>
-                            </motion.div>
-                          )}
-                        </AnimatePresence>
-                      </div>
+                              </button>
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
                     </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
+
+                    {/* Brush Size */}
+                    <div className="flex items-center space-x-3">
+                      <span className="material-symbols-outlined text-gray-600 dark:text-gray-300">brush</span>
+                      <input
+                        type="range"
+                        min="5"
+                        max="100"
+                        value={brushSize}
+                        onChange={(e) => setBrushSize(Number(e.target.value))}
+                        className="w-24"
+                      />
+                      <span className="text-sm text-gray-600 dark:text-gray-300 min-w-[35px]">
+                        {brushSize}px
+                      </span>
+                    </div>
+
+                    {/* Action Buttons */}
+                    <button
+                      onClick={undo}
+                      disabled={historyIndex <= 0}
+                      className="p-2 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      title="Undo (Ctrl+Z)"
+                    >
+                      <span className="material-symbols-outlined text-lg">undo</span>
+                    </button>
+
+                    <button
+                      onClick={redo}
+                      disabled={historyIndex >= history.length - 1}
+                      className="p-2 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      title="Redo (Ctrl+Y)"
+                    >
+                      <span className="material-symbols-outlined text-lg">redo</span>
+                    </button>
+
+                    <button
+                      onClick={clearMask}
+                      className="p-2 bg-red-100 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-200 dark:hover:bg-red-900/40 transition-colors"
+                      title="Clear All Marks"
+                    >
+                      <span className="material-symbols-outlined text-lg">clear_all</span>
+                    </button>
+                  </div>
+
+                  {/* Right Controls - Main Action */}
+                  <div className="flex items-center space-x-4">
+                    
+                    {/* Process Button */}
+                    <motion.button
+                      onClick={startInpainting}
+                      disabled={!canProcess}
+                      className={`flex items-center space-x-3 px-8 py-3 rounded-xl font-semibold text-lg transition-all duration-300 transform ${
+                        canProcess
+                          ? 'bg-gradient-to-r from-green-500 to-blue-500 hover:from-green-600 hover:to-blue-600 text-white shadow-lg hover:shadow-xl hover:scale-105'
+                          : 'bg-gray-300 dark:bg-gray-600 text-gray-500 dark:text-gray-400 cursor-not-allowed'
+                      }`}
+                      whileHover={canProcess ? { scale: 1.05 } : {}}
+                      whileTap={canProcess ? { scale: 0.98 } : {}}
+                    >
+                      {isProcessing ? (
+                        <>
+                          <div className="animate-spin w-6 h-6 border-2 border-white border-t-transparent rounded-full" />
+                          <span>Processing...</span>
+                        </>
+                      ) : (
+                        <>
+                          <span className="material-symbols-outlined text-xl">auto_fix_high</span>
+                          <span>Start Inpainting</span>
+                        </>
+                      )}
+                    </motion.button>
+
+                    {processedImage && (
+                      <motion.button
+                        initial={{ opacity: 0, scale: 0.8 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        onClick={downloadResult}
+                        className="flex items-center space-x-2 px-6 py-3 bg-purple-500 hover:bg-purple-600 text-white rounded-xl transition-all duration-200 shadow-lg"
+                      >
+                        <span className="material-symbols-outlined">download</span>
+                        <span>Download</span>
+                      </motion.button>
+                    )}
+                  </div>
+                </div>
+              </div>
 
               {/* Canvas Area */}
-              <div className="flex-1 relative">
-                {!showToolPanel && (
-                  <button
-                    onClick={() => setShowToolPanel(true)}
-                    className="absolute top-4 left-4 z-10 p-3 bg-white dark:bg-gray-800 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 border border-gray-200 dark:border-gray-700"
-                  >
-                    <span className="material-symbols-outlined text-blue-600 dark:text-blue-400">tune</span>
-                  </button>
-                )}
-                
+              <div className="flex-1 relative bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-900">
                 <div 
                   ref={containerRef}
-                  className="h-full bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-900 overflow-hidden relative"
-                  onWheel={handleWheel}
+                  className="h-full overflow-hidden relative"
                 >
                   {/* Canvas Container */}
                   <div className="absolute inset-0 flex items-center justify-center p-4">
@@ -849,7 +756,7 @@ const InpaintingPage = () => {
                         />
                       )}
                       
-                      {/* Mask Canvas - Only show when painting and no processed image */}
+                      {/* Mask Canvas */}
                       <canvas
                         ref={maskCanvasRef}
                         className={`absolute top-0 left-0 rounded-xl ${processedImage ? 'opacity-0 pointer-events-none' : 'opacity-50'}`}
@@ -866,89 +773,39 @@ const InpaintingPage = () => {
                     </div>
                   </div>
 
-                  {/* Comparison Line */}
+                  {/* Comparison Slider */}
                   {processedImage && (
-                    <motion.div
-                      className="absolute top-0 bottom-0 w-1 bg-white shadow-lg z-10 rounded-full"
-                      style={{ left: `${showComparison}%` }}
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                    >
-                      <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-8 h-8 bg-white rounded-full shadow-xl flex items-center justify-center border-2 border-gray-300">
-                        <span className="material-symbols-outlined text-sm text-gray-600">drag_indicator</span>
+                    <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-white dark:bg-gray-800 rounded-xl shadow-lg p-4 min-w-[300px]">
+                      <div className="text-center mb-2">
+                        <span className="text-sm font-medium text-gray-600 dark:text-gray-300">
+                          Compare Results
+                        </span>
                       </div>
-                    </motion.div>
+                      <div className="flex items-center space-x-3">
+                        <span className="text-xs text-gray-500">Original</span>
+                        <input
+                          type="range"
+                          min="0"
+                          max="100"
+                          value={showComparison}
+                          onChange={(e) => setShowComparison(Number(e.target.value))}
+                          className="flex-1 h-2 bg-gradient-to-r from-red-200 to-green-200 dark:from-red-800 dark:to-green-800 rounded-lg appearance-none cursor-pointer"
+                        />
+                        <span className="text-xs text-gray-500">Result</span>
+                      </div>
+                    </div>
                   )}
 
-                  {/* Result Preview Section */}
-                  {processedImage && (
-                    <motion.div
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="absolute bottom-4 right-4 bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 p-6 max-w-sm"
-                    >
-                      <div className="text-center">
-                        <div className="w-16 h-16 bg-gradient-to-r from-green-500 to-blue-500 rounded-2xl mx-auto flex items-center justify-center mb-4">
-                          <span className="material-symbols-outlined text-2xl text-white">check_circle</span>
-                        </div>
-                        <h3 className="text-lg font-bold mb-2">Inpainting Complete!</h3>
-                        <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">
-                          Use the slider above to compare before and after results
-                        </p>
-                        
-                        {/* Quick Preview */}
-                        <div className="mb-4 relative">
-                          <canvas
-                            className="w-full h-20 object-cover rounded-lg border-2 border-gray-200 dark:border-gray-600"
-                            ref={(canvas) => {
-                              if (canvas && processedImage) {
-                                canvas.width = processedImage.width;
-                                canvas.height = processedImage.height;
-                                const ctx = canvas.getContext('2d');
-                                if (ctx) {
-                                  ctx.drawImage(processedImage, 0, 0);
-                                }
-                              }
-                            }}
-                          />
-                          <div className="absolute top-1 left-1 bg-green-500 text-white text-xs px-2 py-1 rounded">
-                            Result
-                          </div>
-                        </div>
-                        
-                        <div className="space-y-2">
-                          <button
-                            onClick={downloadResult}
-                            className="w-full py-2 bg-gradient-to-r from-green-500 to-blue-500 hover:from-green-600 hover:to-blue-600 text-white rounded-lg transition-all duration-200 flex items-center justify-center space-x-2 text-sm"
-                          >
-                            <span className="material-symbols-outlined text-lg">download</span>
-                            <span>Download</span>
-                          </button>
-                          
-                          <button
-                            onClick={() => {
-                              setOriginalImage(null);
-                              setProcessedImage(null);
-                              setShowComparison(0);
-                              setHistory([]);
-                              setHistoryIndex(-1);
-                            }}
-                            className="w-full py-2 bg-gray-500 hover:bg-gray-600 text-white rounded-lg transition-colors duration-200 flex items-center justify-center space-x-2 text-sm"
-                          >
-                            <span className="material-symbols-outlined text-lg">refresh</span>
-                            <span>New Image</span>
-                          </button>
-                        </div>
-                      </div>
-                    </motion.div>
+                  {/* Instructions */}
+                  {!processedImage && (
+                    <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-black/70 text-white px-6 py-3 rounded-xl backdrop-blur-sm">
+                      <p className="text-sm text-center">
+                        <span className="font-semibold">Paint</span> over areas to remove • 
+                        <span className="font-semibold"> Adjust brush size</span> as needed • 
+                        <span className="font-semibold"> Click "Start Inpainting"</span> when ready
+                      </p>
+                    </div>
                   )}
-
-                  {/* Instructions Overlay */}
-                  <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-black/70 text-white px-6 py-3 rounded-xl backdrop-blur-sm">
-                    <p className="text-sm text-center">
-                      <span className="font-semibold">Paint</span> over areas to remove • <span className="font-semibold">Scroll</span> to zoom • <span className="font-semibold">Space</span> to toggle tools
-                    </p>
-                  </div>
                 </div>
               </div>
             </motion.div>
@@ -961,7 +818,7 @@ const InpaintingPage = () => {
       {/* Hidden canvas for processing */}
       <canvas ref={previewCanvasRef} className="hidden" />
 
-      {/* Enhanced Loading overlay */}
+      {/* Loading Overlays */}
       <AnimatePresence>
         {isProcessing && (
           <motion.div
@@ -981,8 +838,12 @@ const InpaintingPage = () => {
                   <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-500 rounded-2xl mx-auto flex items-center justify-center mb-4">
                     <span className="material-symbols-outlined text-2xl text-white animate-pulse">psychology</span>
                   </div>
-                  <h3 className="text-xl font-bold mb-2">AOT-GAN Processing</h3>
-                  <p className="text-gray-600 dark:text-gray-300">Analyzing and reconstructing your image...</p>
+                  <h3 className="text-xl font-bold mb-2">
+                    {modelInfo.currentModel || 'AI Processing'}
+                  </h3>
+                  <p className="text-gray-600 dark:text-gray-300">
+                    Analyzing and reconstructing your image...
+                  </p>
                 </div>
                 
                 <div className="mb-4">
@@ -1006,6 +867,31 @@ const InpaintingPage = () => {
                 </div>
               </div>
             </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Model Loading */}
+      <AnimatePresence>
+        {modelLoadProgress > 0 && modelLoadProgress < 100 && (
+          <motion.div
+            initial={{ opacity: 0, y: 50 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 50 }}
+            className="fixed bottom-4 right-4 bg-white dark:bg-gray-800 rounded-xl shadow-lg p-4 z-40 min-w-[300px]"
+          >
+            <div className="flex items-center space-x-3">
+              <div className="animate-spin w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full" />
+              <div className="flex-1">
+                <div className="text-sm font-medium mb-1">Loading Model...</div>
+                <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                  <div 
+                    className="bg-blue-500 h-2 rounded-full transition-all duration-300"
+                    style={{ width: `${modelLoadProgress}%` }}
+                  />
+                </div>
+              </div>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>

@@ -21,6 +21,9 @@ export default defineConfig({
     assetsInlineLimit: 0,
     target: 'esnext',
   },
+  worker: {
+    format: 'es',
+  },
   optimizeDeps: {
     exclude: ['@tensorflow/tfjs-backend-wasm'],
   },
