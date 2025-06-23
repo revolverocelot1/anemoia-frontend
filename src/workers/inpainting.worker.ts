@@ -1,740 +1,642 @@
-﻿/**
- * ADVANCED GPU-ACCELERATED INPAINTING WORKER
- * Models: MI-GAN (Mobile) + AOT-GAN (High Quality)
- * Features: Real ONNX model loading, GPU acceleration, model selection
+/**
+ * PROFESSIONAL OBJECT REMOVAL SYSTEM
+ * Based on lxfater/inpaint-web and MI-GAN research
+ * Features: Real ONNX neural networks, WebGPU acceleration, multiple models
  */
 
-// ONNX Runtime types
-interface ONNXSession {
-  run(feeds: Record<string, any>): Promise<Record<string, any>>;
-  dispose(): void;
+import * as ort from 'onnxruntime-web';
+
+interface InpaintingRequest {
+  imageData: ImageData;
+  maskData: ImageData;
+  modelType: 'auto' | 'mi-gan-mobile' | 'lama-big';
+  quality: 'fast' | 'balanced' | 'high';
 }
 
-interface ONNXTensor {
-  data: Float32Array | Uint8Array;
-  dims: number[];
-  dispose(): void;
-}
-
-interface OnnxRuntime {
-  InferenceSession: {
-    create(modelPath: string, options?: any): Promise<ONNXSession>;
+interface InpaintingResponse {
+  success: boolean;
+  resultImageData?: ImageData;
+  error?: string;
+  performanceStats?: {
+    preprocessTime: number;
+    inferenceTime: number;
+    postprocessTime: number;
+    totalTime: number;
+    modelUsed: string;
+    acceleration: string;
+    gpuType: string;
   };
-  Tensor: {
-    new(type: string, data: Float32Array | Uint8Array, dims: number[]): ONNXTensor;
-  };
-  env: any;
-}
-
-// GPU types and interfaces
-enum GPUType {
-  UNKNOWN = 'unknown',
-  DEDICATED_NVIDIA = 'nvidia-dedicated',
-  DEDICATED_AMD = 'amd-dedicated', 
-  DEDICATED_OTHER = 'dedicated-other',
-  INTEGRATED_INTEL = 'intel-integrated',
-  INTEGRATED_OTHER = 'integrated-other',
-}
-
-enum AccelerationType {
-  WEBGPU = 'webgpu',
-  WEBGL2 = 'webgl2', 
-  WEBGL = 'webgl',
-  CPU = 'cpu'
+  warnings?: string[];
 }
 
 interface GPUInfo {
-  type: GPUType;
-  vendor: string;
-  device: string;
-  acceleration: AccelerationType;
+  type: 'nvidia-dedicated' | 'amd-dedicated' | 'other-dedicated' | 'intel-integrated' | 'other-integrated' | 'unknown';
   performance: 'high' | 'medium' | 'low';
-  warningMessage?: string;
+  webgpuSupported: boolean;
+  vendor?: string;
+  device?: string;
 }
 
 interface ModelConfig {
   name: string;
   displayName: string;
-  path: string;
-  inputSize: [number, number];
-  channels: number;
-  precision: 'fp32' | 'fp16';
-  requiredMemoryMB: number;
-  preferredGPU: GPUType[];
   description: string;
+  modelUrl: string;
+  inputSize: number;
+  preferredGPU: string[];
+  memoryMB: number;
 }
 
-interface InpaintingOptions {
-  model: 'mi-gan' | 'aot-gan' | 'auto';
-  quality: 'fast' | 'balanced' | 'high';
-  preserveDetails: boolean;
-}
-
-class AdvancedGPUInpainter {
-  private ort: OnnxRuntime | null = null;
-  private session: ONNXSession | null = null;
-  private isInitialized = false;
+class ObjectRemovalProcessor {
+  private session: ort.InferenceSession | null = null;
+  private currentModel: string = '';
   private gpuInfo: GPUInfo | null = null;
-  private currentModel: ModelConfig | null = null;
-  private modelLoaded = false;
-  
-  private performanceStats = {
-    lastInferenceTime: 0,
-    averageTime: 0,
-    totalInferences: 0
-  };
+  private isInitialized = false;
 
-  // Available models configuration
   private readonly models: Record<string, ModelConfig> = {
-    'mi-gan': {
-      name: 'mi-gan',
+    'mi-gan-mobile': {
+      name: 'mi-gan-mobile',
       displayName: 'MI-GAN Mobile',
-      path: '/models/mi-gan-inpainting-512.onnx',
-      inputSize: [512, 512],
-      channels: 3,
-      precision: 'fp32',
-      requiredMemoryMB: 2048,
-      preferredGPU: [GPUType.INTEGRATED_INTEL, GPUType.INTEGRATED_OTHER, GPUType.DEDICATED_OTHER],
-      description: 'Optimized for mobile devices and integrated graphics. Fast processing with good quality.'
+      description: 'Optimized for integrated graphics and mobile devices',
+      modelUrl: 'https://huggingface.co/lxfater/inpaint-web-mobile/resolve/main/migan_mobile.onnx',
+      inputSize: 512,
+      preferredGPU: ['intel-integrated', 'other-integrated', 'other-dedicated'],
+      memoryMB: 1024
     },
-    'aot-gan': {
-      name: 'aot-gan',
-      displayName: 'AOT-GAN High Quality',
-      path: '/models/aot-gan-inpainting-512.onnx',
-      inputSize: [512, 512],
-      channels: 3,
-      precision: 'fp32',
-      requiredMemoryMB: 4096,
-      preferredGPU: [GPUType.DEDICATED_NVIDIA, GPUType.DEDICATED_AMD, GPUType.DEDICATED_OTHER],
-      description: 'State-of-the-art quality for dedicated GPUs. Best results for complex inpainting tasks.'
+    'lama-big': {
+      name: 'lama-big',
+      displayName: 'LaMa High Quality',
+      description: 'Best quality for dedicated GPUs and complex object removal',
+      modelUrl: 'https://huggingface.co/smartywu/big-lama/resolve/main/big-lama.onnx',
+      inputSize: 512,
+      preferredGPU: ['nvidia-dedicated', 'amd-dedicated', 'other-dedicated'],
+      memoryMB: 2048
     }
   };
 
-  async initialize(progressCallback?: (progress: number) => void): Promise<void> {
-    console.log('🚀 Initializing Advanced GPU-Accelerated Inpainting System...');
-    progressCallback?.(10);
+  constructor() {
+    this.initializeORT();
+  }
 
+  private async initializeORT(): Promise<void> {
     try {
-      // Step 1: Load ONNX Runtime
-      await this.loadONNXRuntime();
-      progressCallback?.(30);
+      // Configure ONNX Runtime with proper paths and threading
+      ort.env.wasm.wasmPaths = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.16.3/dist/';
+      ort.env.wasm.numThreads = Math.min(navigator.hardwareConcurrency || 4, 8);
+      ort.env.logLevel = 'warning';
 
-      // Step 2: Detect GPU capabilities
-      this.gpuInfo = await this.detectAndRankGPU();
-      progressCallback?.(60);
-
-      // Step 3: Configure ONNX Runtime
-      this.configureONNXRuntime();
-      progressCallback?.(80);
-
-      // Step 4: Select optimal model
-      this.currentModel = this.selectOptimalModel();
-      
-      console.log(`📊 GPU: ${this.gpuInfo.vendor} ${this.gpuInfo.device} (${this.gpuInfo.acceleration})`);
-      console.log(`🧠 Selected Model: ${this.currentModel.displayName}`);
-      console.log(`⚡ Performance: ${this.gpuInfo.performance}`);
-
+      await this.detectGPU();
       this.isInitialized = true;
-      progressCallback?.(100);
-
     } catch (error) {
-      console.warn('⚠️ Failed to initialize GPU acceleration:', error);
-      this.isInitialized = true;
-      progressCallback?.(100);
+      console.error('Failed to initialize ONNX Runtime:', error);
     }
   }
 
-  async loadModel(modelName: 'mi-gan' | 'aot-gan' | 'auto' = 'auto', progressCallback?: (progress: number) => void): Promise<void> {
-    if (!this.isInitialized) {
-      throw new Error('System not initialized. Call initialize() first.');
-    }
-
-    try {
-      // Select model based on preference
-      if (modelName === 'auto') {
-        this.currentModel = this.selectOptimalModel();
-      } else {
-        this.currentModel = this.models[modelName];
-      }
-
-      if (!this.currentModel) {
-        throw new Error(`Model ${modelName} not found`);
-      }
-
-      console.log(`📦 Loading ${this.currentModel.displayName}...`);
-      progressCallback?.(20);
-
-      // Check if ONNX Runtime is available
-      if (!this.ort) {
-        console.log('⚠️ ONNX Runtime not available, using enhanced fallback algorithms');
-        this.modelLoaded = false;
-        progressCallback?.(100);
-        return;
-      }
-
-      // Configure execution providers based on detected GPU
-      const executionProviders = this.getExecutionProviders();
-      progressCallback?.(40);
-
-      // Create inference session
-      this.session = await this.ort.InferenceSession.create(this.currentModel.path, {
-        executionProviders,
-        graphOptimizationLevel: 'all',
-        executionMode: 'sequential',
-        enableCpuMemArena: true,
-        enableMemPattern: true,
-      });
-
-      progressCallback?.(80);
-
-      // Warm up the model
-      await this.warmUpModel();
-      
-      this.modelLoaded = true;
-      console.log(`✅ ${this.currentModel.displayName} loaded successfully`);
-      console.log(`🔧 Execution Providers: ${executionProviders.join(', ')}`);
-      
-      progressCallback?.(100);
-
-    } catch (error) {
-      console.error(`❌ Failed to load model:`, error);
-      console.log('🔄 Falling back to enhanced CPU algorithms...');
-      
-      this.session = null;
-      this.modelLoaded = false;
-      progressCallback?.(100);
-    }
-  }
-
-  private async loadONNXRuntime(): Promise<void> {
-    try {
-      // Dynamic import for ONNX Runtime Web
-      this.ort = await import('onnxruntime-web') as any;
-      console.log('✅ ONNX Runtime loaded successfully');
-    } catch (error) {
-      console.warn('⚠️ ONNX Runtime not available:', error);
-      this.ort = null;
-    }
-  }
-
-  private async detectAndRankGPU(): Promise<GPUInfo> {
-    console.log('🔍 Detecting GPU capabilities...');
-
-    let gpuInfo: GPUInfo = {
-      type: GPUType.UNKNOWN,
-      vendor: 'Unknown',
-      device: 'Unknown',
-      acceleration: AccelerationType.CPU,
-      performance: 'low'
+  private async detectGPU(): Promise<GPUInfo> {
+    let gpu: GPUInfo = {
+      type: 'unknown',
+      performance: 'low',
+      webgpuSupported: false
     };
 
-    // Try WebGPU first (best performance)
-    if ('gpu' in navigator) {
-      try {
-        const adapter = await (navigator as any).gpu.requestAdapter({
-          powerPreference: 'high-performance'
-        });
-
-        if (adapter) {
-          let vendor = 'Unknown';
-          let device = 'Unknown Device';
+    try {
+      // Check WebGPU support first
+      if ('gpu' in navigator) {
+        try {
+          const adapter = await (navigator as any).gpu.requestAdapter({
+            powerPreference: 'high-performance'
+          });
           
-          try {
-            // Try to get detailed adapter information
-            if (adapter.requestAdapterInfo) {
-              const info = await adapter.requestAdapterInfo();
-              vendor = info.vendor || vendor;
-              device = info.device || info.architecture || device;
-            } else if (adapter.info) {
-              vendor = adapter.info.vendor || vendor;
-              device = adapter.info.device || adapter.info.architecture || device;
+          if (adapter) {
+            gpu.webgpuSupported = true;
+            
+            // Try to get adapter info
+            try {
+              let info: any = null;
+              if (adapter.requestAdapterInfo) {
+                info = await adapter.requestAdapterInfo();
+              } else if (adapter.info) {
+                info = adapter.info;
+              }
+              
+              if (info) {
+                gpu.vendor = info.vendor;
+                gpu.device = info.description || info.device;
+                
+                const vendor = (info.vendor || '').toLowerCase();
+                const device = (info.description || info.device || '').toLowerCase();
+                
+                // Classify GPU type
+                if (vendor.includes('nvidia') || device.includes('nvidia')) {
+                  gpu.type = 'nvidia-dedicated';
+                  gpu.performance = 'high';
+                } else if (vendor.includes('amd') || device.includes('amd') || device.includes('radeon')) {
+                  gpu.type = 'amd-dedicated';
+                  gpu.performance = device.includes('rx') || device.includes('vega') ? 'high' : 'medium';
+                } else if (vendor.includes('intel') || device.includes('intel')) {
+                  gpu.type = device.includes('arc') ? 'other-dedicated' : 'intel-integrated';
+                  gpu.performance = device.includes('arc') ? 'medium' : 'low';
+                } else {
+                  gpu.type = 'other-dedicated';
+                  gpu.performance = 'medium';
+                }
+              }
+            } catch (e) {
+              console.warn('Could not get detailed adapter info:', e);
             }
-          } catch (e) {
-            console.log('Could not get detailed adapter info');
           }
+        } catch (e) {
+          console.warn('WebGPU adapter request failed:', e);
+        }
+      }
+
+      // Fallback to WebGL detection if WebGPU failed
+      if (!gpu.webgpuSupported || gpu.type === 'unknown') {
+        try {
+          const canvas = new OffscreenCanvas(1, 1);
+          const gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
           
-          console.log(`🎮 WebGPU Adapter: ${vendor} - ${device}`);
-
-          gpuInfo = {
-            type: this.classifyGPUType(vendor, device),
-            vendor: vendor,
-            device: device,
-            acceleration: AccelerationType.WEBGPU,
-            performance: this.determinePerformance(vendor, device)
-          };
-
-          // Prefer dedicated GPUs
-          if ([GPUType.DEDICATED_NVIDIA, GPUType.DEDICATED_AMD].includes(gpuInfo.type)) {
-            console.log('✅ High-performance dedicated GPU detected');
-            return gpuInfo;
+          if (gl) {
+            const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
+            if (debugInfo) {
+              const vendor = (gl.getParameter(debugInfo.UNMASKED_VENDOR_WEBGL) || '').toLowerCase();
+              const renderer = (gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL) || '').toLowerCase();
+              
+              gpu.vendor = vendor;
+              gpu.device = renderer;
+              
+              if (vendor.includes('nvidia') || renderer.includes('nvidia')) {
+                gpu.type = 'nvidia-dedicated';
+                gpu.performance = 'high';
+              } else if (vendor.includes('amd') || renderer.includes('amd')) {
+                gpu.type = 'amd-dedicated';
+                gpu.performance = 'medium';
+              } else if (vendor.includes('intel') || renderer.includes('intel')) {
+                gpu.type = 'intel-integrated';
+                gpu.performance = 'low';
+              }
+            }
           }
-        }
-      } catch (error) {
-        console.log('🚫 WebGPU not available:', error);
-      }
-    }
-
-    // Fallback to WebGL2
-    try {
-      const canvas = new OffscreenCanvas(1, 1);
-      const gl = canvas.getContext('webgl2');
-      
-      if (gl) {
-        let vendor = 'Unknown';
-        let renderer = 'Unknown';
-        
-        // Try to get unmasked renderer info
-        const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
-        if (debugInfo) {
-          vendor = gl.getParameter(debugInfo.UNMASKED_VENDOR_WEBGL) || 'Unknown';
-          renderer = gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL) || 'Unknown';
-        } else {
-          vendor = gl.getParameter(gl.VENDOR) || 'Unknown';
-          renderer = gl.getParameter(gl.RENDERER) || 'Unknown';
-        }
-
-        console.log(`🎮 WebGL2 Renderer: ${vendor} - ${renderer}`);
-
-        const webglGpuInfo = {
-          type: this.classifyGPUType(vendor, renderer),
-          vendor: vendor,
-          device: renderer,
-          acceleration: AccelerationType.WEBGL2,
-          performance: this.determinePerformance(vendor, renderer)
-        };
-
-        // Use WebGL2 info if we don't have anything better
-        if (gpuInfo.acceleration === AccelerationType.CPU) {
-          gpuInfo = webglGpuInfo;
+        } catch (e) {
+          console.warn('WebGL detection failed:', e);
         }
       }
+
     } catch (error) {
-      console.log('🚫 WebGL2 not available:', error);
+      console.warn('GPU detection failed:', error);
     }
 
-    // Add warning for Intel integrated graphics
-    if (gpuInfo.type === GPUType.INTEGRATED_INTEL) {
-      gpuInfo.warningMessage = 'Using Intel integrated graphics. For better performance, use a system with dedicated NVIDIA or AMD GPU.';
-      console.warn('⚠️ ' + gpuInfo.warningMessage);
-    }
-    
-    return gpuInfo;
+    this.gpuInfo = gpu;
+    return gpu;
   }
 
-  private classifyGPUType(vendor: string, device: string): GPUType {
-    const vendorLower = vendor.toLowerCase();
-    const deviceLower = device.toLowerCase();
-    
-    // NVIDIA classification
-    if (vendorLower.includes('nvidia')) {
-      return GPUType.DEDICATED_NVIDIA;
+  private selectOptimalModel(requestedModel: string): string {
+    if (requestedModel !== 'auto') {
+      return requestedModel;
     }
-    
-    // AMD classification  
-    if (vendorLower.includes('amd') || vendorLower.includes('radeon') || deviceLower.includes('radeon')) {
-      return GPUType.DEDICATED_AMD;
-    }
-    
-    // Intel classification
-    if (vendorLower.includes('intel')) {
-      // Determine if integrated or dedicated (Arc series)
-      if (deviceLower.includes('arc') || deviceLower.includes('xe-hpg')) {
-        return GPUType.DEDICATED_OTHER;
-      }
-      return GPUType.INTEGRATED_INTEL;
-    }
-    
-    // Generic classification based on common patterns
-    if (deviceLower.includes('integrated') || deviceLower.includes('uhd') || deviceLower.includes('iris')) {
-      return GPUType.INTEGRATED_OTHER;
-    }
-    
-    // If we can't classify, assume dedicated if it has recognizable GPU names
-    if (deviceLower.includes('gtx') || deviceLower.includes('rtx') || 
-        deviceLower.includes('rx ') || deviceLower.includes('vega') ||
-        deviceLower.includes('geforce') || deviceLower.includes('quadro')) {
-      return GPUType.DEDICATED_OTHER;
-    }
-    
-    return GPUType.UNKNOWN;
-  }
 
-  private determinePerformance(_vendor: string, device: string): 'high' | 'medium' | 'low' {
-    const deviceLower = device.toLowerCase();
-    
-    // High performance indicators
-    if (deviceLower.includes('rtx') || deviceLower.includes('gtx 16') || deviceLower.includes('gtx 10') ||
-        deviceLower.includes('rx 6') || deviceLower.includes('rx 7') || 
-        deviceLower.includes('vega') || deviceLower.includes('arc')) {
-      return 'high';
-    }
-    
-    // Medium performance (older dedicated or powerful integrated)
-    if (deviceLower.includes('gtx') || deviceLower.includes('rx ') || 
-        deviceLower.includes('radeon')) {
-      return 'medium';
-    }
-    
-    // Low performance (integrated graphics)
-    return 'low';
-  }
-
-  private selectOptimalModel(): ModelConfig {
     if (!this.gpuInfo) {
-      return this.models['mi-gan']; // Safe fallback
+      return 'mi-gan-mobile';
     }
 
-    // High-performance dedicated GPUs get AOT-GAN
-    if (this.gpuInfo.performance === 'high' && 
-        [GPUType.DEDICATED_NVIDIA, GPUType.DEDICATED_AMD].includes(this.gpuInfo.type)) {
-      console.log('🔥 High-performance GPU detected, selecting AOT-GAN');
-      return this.models['aot-gan'];
+    // Auto-select based on GPU performance
+    if (this.gpuInfo.performance === 'high' && this.gpuInfo.webgpuSupported) {
+      return 'lama-big';
+    } else {
+      return 'mi-gan-mobile';
     }
-
-    // Everything else gets MI-GAN (more compatible)
-    console.log('📱 Standard performance detected, selecting MI-GAN');
-    return this.models['mi-gan'];
   }
 
-  private configureONNXRuntime(): void {
-    if (!this.ort) return;
+  private async loadModel(modelName: string): Promise<ort.InferenceSession> {
+    const model = this.models[modelName];
+    if (!model) {
+      throw new Error(`Unknown model: ${modelName}`);
+    }
 
-    // Configure WebAssembly paths and threading
-    this.ort.env.wasm.wasmPaths = '/assets/';
-    this.ort.env.wasm.numThreads = Math.min(navigator.hardwareConcurrency || 4, 8);
-    this.ort.env.logLevel = 'warning';
+    // Determine execution providers
+    const executionProviders: string[] = [];
+
+    if (this.gpuInfo?.webgpuSupported) {
+      executionProviders.push('webgpu');
+    }
     
-    console.log(`🔧 ONNX Runtime configured for ${this.gpuInfo?.acceleration}`);
-  }
+    executionProviders.push('webgl');
+    executionProviders.push('wasm');
 
-  private getExecutionProviders(): string[] {
-    if (!this.gpuInfo) return ['wasm'];
-
-    switch (this.gpuInfo.acceleration) {
-      case AccelerationType.WEBGPU:
-        return ['webgpu', 'wasm'];
-      case AccelerationType.WEBGL2:
-      case AccelerationType.WEBGL:
-        return ['webgl', 'wasm'];
-      default:
-        return ['wasm'];
-    }
-  }
-
-  private async warmUpModel(): Promise<void> {
-    if (!this.session || !this.currentModel || !this.ort) return;
-
-    console.log('🔥 Warming up model...');
-    
-    try {
-      const [height, width] = this.currentModel.inputSize;
-      
-      // Create dummy input tensors
-      const dummyImage = new Float32Array(3 * height * width).fill(0.5);
-      const dummyMask = new Float32Array(1 * height * width).fill(0);
-      
-      const imageTensor = new this.ort.Tensor('float32', dummyImage, [1, 3, height, width]);
-      const maskTensor = new this.ort.Tensor('float32', dummyMask, [1, 1, height, width]);
-      
-      const start = performance.now();
-      await this.session.run({ 'image': imageTensor, 'mask': maskTensor });
-      const warmupTime = performance.now() - start;
-      
-      console.log(`⏱️ Model warm-up completed in ${warmupTime.toFixed(1)}ms`);
-      
-      // Cleanup
-      imageTensor.dispose();
-      maskTensor.dispose();
-      
-    } catch (error) {
-      console.warn('⚠️ Model warm-up failed:', error);
-    }
-  }
-
-  async inpaint(
-    imageData: ImageData,
-    maskData: ImageData,
-    options: InpaintingOptions = { model: 'auto', quality: 'balanced', preserveDetails: true },
-    progressCallback?: (progress: number) => void
-  ): Promise<ImageData> {
-    if (!this.isInitialized) {
-      throw new Error('Inpainter not initialized. Call initialize() first.');
-    }
-
-    const startTime = performance.now();
-    console.log(`🎨 Starting inpainting (${imageData.width}x${imageData.height})`);
+    const sessionOptions: ort.InferenceSession.SessionOptions = {
+      executionProviders,
+      graphOptimizationLevel: 'all',
+      enableCpuMemArena: true,
+      enableMemPattern: true,
+      executionMode: 'parallel'
+    };
 
     try {
-      let result: ImageData;
-
-      if (this.session && this.modelLoaded && this.ort) {
-        console.log(`🧠 Using ${this.currentModel?.displayName} for neural inference`);
-        result = await this.performNeuralInpainting(imageData, maskData, options, progressCallback);
-      } else {
-        console.log('🧠 Using enhanced fallback algorithms');
-        result = await this.performFallbackInpainting(imageData, maskData, progressCallback);
-      }
-
-      const inferenceTime = performance.now() - startTime;
-      this.updatePerformanceStats(inferenceTime);
-      
-      console.log(`✅ Inpainting completed in ${inferenceTime.toFixed(1)}ms`);
-      
-      return result;
-
+      console.log(`Loading model: ${model.displayName} from ${model.modelUrl}`);
+      const session = await ort.InferenceSession.create(model.modelUrl, sessionOptions);
+      console.log(`Model loaded successfully with providers:`, executionProviders);
+      return session;
     } catch (error) {
-      console.error('❌ Inpainting failed:', error);
+      console.error(`Failed to load model ${modelName}:`, error);
       throw error;
     }
   }
 
-  private async performNeuralInpainting(
-    imageData: ImageData,
-    maskData: ImageData,
-    _options: InpaintingOptions,
-    progressCallback?: (progress: number) => void
-  ): Promise<ImageData> {
-    // For now, fall back to CPU algorithms since we don't have actual model files
-    // In production, this would do full neural inference
-    console.log('🔄 Neural inference not yet fully implemented, using enhanced fallback');
-    return this.performFallbackInpainting(imageData, maskData, progressCallback);
-  }
+  private preprocessInputs(imageData: ImageData, maskData: ImageData): {
+    imageTensor: ort.Tensor;
+    maskTensor: ort.Tensor;
+    originalSize: { width: number; height: number };
+  } {
+    const { width, height } = imageData;
+    const targetSize = 512;
 
-  private async performFallbackInpainting(
-    imageData: ImageData,
-    maskData: ImageData,
-    progressCallback?: (progress: number) => void
-  ): Promise<ImageData> {
-    console.log('🧠 Using Enhanced CPU Fallback Algorithm...');
+    // Create canvases for preprocessing
+    const imageCanvas = new OffscreenCanvas(targetSize, targetSize);
+    const imageCtx = imageCanvas.getContext('2d')!;
     
-    const result = new ImageData(
-      new Uint8ClampedArray(imageData.data),
-      imageData.width,
-      imageData.height
-    );
-    
-    progressCallback?.(20);
-    
-    // Enhanced mask detection
-    const binaryMask = this.createEnhancedMask(maskData);
-    progressCallback?.(40);
-    
-    // Perform intelligent inpainting
-    await this.intelligentInpainting(result, binaryMask, progressCallback);
-    
-    progressCallback?.(100);
-    return result;
-  }
+    const maskCanvas = new OffscreenCanvas(targetSize, targetSize);
+    const maskCtx = maskCanvas.getContext('2d')!;
 
-  private createEnhancedMask(maskData: ImageData): Uint8Array {
-    const mask = new Uint8Array(maskData.width * maskData.height);
-    
-    for (let i = 0; i < maskData.data.length; i += 4) {
-      const r = maskData.data[i];
-      const g = maskData.data[i + 1];
-      const b = maskData.data[i + 2];
-      const a = maskData.data[i + 3];
+    // Resize image
+    const tempImageCanvas = new OffscreenCanvas(width, height);
+    const tempImageCtx = tempImageCanvas.getContext('2d')!;
+    tempImageCtx.putImageData(imageData, 0, 0);
+    imageCtx.drawImage(tempImageCanvas, 0, 0, targetSize, targetSize);
+
+    // Resize mask
+    const tempMaskCanvas = new OffscreenCanvas(width, height);
+    const tempMaskCtx = tempMaskCanvas.getContext('2d')!;
+    tempMaskCtx.putImageData(maskData, 0, 0);
+    maskCtx.drawImage(tempMaskCanvas, 0, 0, targetSize, targetSize);
+
+    // Get processed image data
+    const processedImageData = imageCtx.getImageData(0, 0, targetSize, targetSize);
+    const processedMaskData = maskCtx.getImageData(0, 0, targetSize, targetSize);
+
+    // Convert to tensors (NCHW format)
+    const imageArray = new Float32Array(3 * targetSize * targetSize);
+    const maskArray = new Float32Array(1 * targetSize * targetSize);
+
+    for (let i = 0; i < targetSize * targetSize; i++) {
+      const pixelIndex = i * 4;
       
-      // Enhanced red detection with better thresholds
-      const redIntensity = r - Math.max(g, b);
-      const isRedMask = redIntensity > 30 && r > 80 && a > 30;
-      mask[i / 4] = isRedMask ? 255 : 0;
-    }
-    
-    return mask;
-  }
-
-  private async intelligentInpainting(
-    imageData: ImageData,
-    mask: Uint8Array,
-    progressCallback?: (progress: number) => void
-  ): Promise<void> {
-    // Simple but effective patch-based inpainting
-    for (let y = 0; y < imageData.height; y++) {
-      for (let x = 0; x < imageData.width; x++) {
-        const idx = y * imageData.width + x;
-        
-        if (mask[idx] === 255) {
-          // Find best matching surrounding pixel
-          const bestColor = this.findBestSurroundingColor(imageData, x, y, mask);
-          
-          const pixelIdx = idx * 4;
-          imageData.data[pixelIdx] = bestColor.r;
-          imageData.data[pixelIdx + 1] = bestColor.g;
-          imageData.data[pixelIdx + 2] = bestColor.b;
-          imageData.data[pixelIdx + 3] = 255;
-        }
-      }
+      // Normalize image to [-1, 1]
+      imageArray[i] = (processedImageData.data[pixelIndex] / 255.0) * 2.0 - 1.0; // R
+      imageArray[i + targetSize * targetSize] = (processedImageData.data[pixelIndex + 1] / 255.0) * 2.0 - 1.0; // G
+      imageArray[i + 2 * targetSize * targetSize] = (processedImageData.data[pixelIndex + 2] / 255.0) * 2.0 - 1.0; // B
       
-      // Update progress
-      if (y % 10 === 0) {
-        const progress = 40 + (y / imageData.height) * 50;
-        progressCallback?.(progress);
-        await new Promise(resolve => setTimeout(resolve, 1));
-      }
+      // Binary mask (1 for areas to inpaint, 0 for keep)
+      maskArray[i] = processedMaskData.data[pixelIndex] > 128 ? 1.0 : 0.0;
     }
+
+    return {
+      imageTensor: new ort.Tensor('float32', imageArray, [1, 3, targetSize, targetSize]),
+      maskTensor: new ort.Tensor('float32', maskArray, [1, 1, targetSize, targetSize]),
+      originalSize: { width, height }
+    };
   }
 
-  private findBestSurroundingColor(
-    imageData: ImageData,
-    x: number,
-    y: number,
-    mask: Uint8Array
-  ): { r: number; g: number; b: number } {
-    let totalR = 0, totalG = 0, totalB = 0, count = 0;
+  private postprocessOutput(
+    output: ort.Tensor,
+    originalSize: { width: number; height: number }
+  ): ImageData {
+    const targetSize = 512;
+    const outputData = output.data as Float32Array;
+
+    // Create canvas for postprocessing
+    const canvas = new OffscreenCanvas(targetSize, targetSize);
+    const ctx = canvas.getContext('2d')!;
+    const imageData = ctx.createImageData(targetSize, targetSize);
+
+    // Convert tensor back to image data
+    for (let i = 0; i < targetSize * targetSize; i++) {
+      const pixelIndex = i * 4;
+      
+      // Denormalize from [-1, 1] to [0, 255]
+      imageData.data[pixelIndex] = Math.max(0, Math.min(255, (outputData[i] + 1.0) * 127.5)); // R
+      imageData.data[pixelIndex + 1] = Math.max(0, Math.min(255, (outputData[i + targetSize * targetSize] + 1.0) * 127.5)); // G
+      imageData.data[pixelIndex + 2] = Math.max(0, Math.min(255, (outputData[i + 2 * targetSize * targetSize] + 1.0) * 127.5)); // B
+      imageData.data[pixelIndex + 3] = 255; // A
+    }
+
+    // Resize back to original dimensions if needed
+    if (originalSize.width !== targetSize || originalSize.height !== targetSize) {
+      ctx.putImageData(imageData, 0, 0);
+      
+      const finalCanvas = new OffscreenCanvas(originalSize.width, originalSize.height);
+      const finalCtx = finalCanvas.getContext('2d')!;
+      finalCtx.drawImage(canvas, 0, 0, originalSize.width, originalSize.height);
+      
+      return finalCtx.getImageData(0, 0, originalSize.width, originalSize.height);
+    }
+
+    return imageData;
+  }
+
+  private advancedFallbackInpainting(imageData: ImageData, maskData: ImageData): ImageData {
+    const canvas = new OffscreenCanvas(imageData.width, imageData.height);
+    const ctx = canvas.getContext('2d')!;
+    ctx.putImageData(imageData, 0, 0);
     
-    // Check surrounding pixels in expanding radius
-    for (let radius = 1; radius <= 10; radius++) {
-      for (let dy = -radius; dy <= radius; dy++) {
-        for (let dx = -radius; dx <= radius; dx++) {
-          const nx = x + dx;
-          const ny = y + dy;
+    const result = ctx.getImageData(0, 0, imageData.width, imageData.height);
+    const data = result.data;
+    const mask = maskData.data;
+    
+    // Multi-pass intelligent inpainting
+    const patchSize = 11;
+    const searchRadius = 60;
+    const iterations = 3;
+    
+    for (let iter = 0; iter < iterations; iter++) {
+      for (let y = 0; y < imageData.height; y++) {
+        for (let x = 0; x < imageData.width; x++) {
+          const idx = (y * imageData.width + x) * 4;
           
-          if (nx >= 0 && nx < imageData.width && ny >= 0 && ny < imageData.height) {
-            const nIdx = ny * imageData.width + nx;
-            
-            // Only use pixels that are not masked
-            if (mask[nIdx] === 0) {
-              const pixelIdx = nIdx * 4;
-              totalR += imageData.data[pixelIdx];
-              totalG += imageData.data[pixelIdx + 1];
-              totalB += imageData.data[pixelIdx + 2];
-              count++;
+          if (mask[idx] > 128) { // Masked pixel needs inpainting
+            const bestMatch = this.findBestPatchMatch(imageData, x, y, patchSize, searchRadius, maskData);
+            if (bestMatch) {
+              // Weighted blending for smoother results
+              const weight = 0.6 + 0.4 * (iter / iterations);
+              data[idx] = Math.round(data[idx] * (1 - weight) + bestMatch.r * weight);
+              data[idx + 1] = Math.round(data[idx + 1] * (1 - weight) + bestMatch.g * weight);
+              data[idx + 2] = Math.round(data[idx + 2] * (1 - weight) + bestMatch.b * weight);
             }
           }
         }
       }
-      
-      // If we found enough valid pixels, use the average
-      if (count >= 4) {
-        break;
+    }
+    
+    // Final edge smoothing pass
+    this.edgeAwareSmoothing(result, maskData);
+    
+    return result;
+  }
+
+  private findBestPatchMatch(
+    imageData: ImageData,
+    x: number,
+    y: number,
+    patchSize: number,
+    searchRadius: number,
+    maskData: ImageData
+  ): { r: number; g: number; b: number } | null {
+    let bestScore = Infinity;
+    let bestColor = null;
+    
+    const halfPatch = Math.floor(patchSize / 2);
+    
+    for (let sy = Math.max(halfPatch, y - searchRadius); 
+         sy < Math.min(imageData.height - halfPatch, y + searchRadius); sy++) {
+      for (let sx = Math.max(halfPatch, x - searchRadius); 
+           sx < Math.min(imageData.width - halfPatch, x + searchRadius); sx++) {
+        
+        const maskIdx = (sy * imageData.width + sx) * 4;
+        if (maskData.data[maskIdx] > 128) continue; // Skip masked areas
+        
+        const score = this.computePatchSimilarity(imageData, x, y, sx, sy, patchSize, maskData);
+        
+        if (score < bestScore) {
+          bestScore = score;
+          const idx = (sy * imageData.width + sx) * 4;
+          bestColor = {
+            r: imageData.data[idx],
+            g: imageData.data[idx + 1],
+            b: imageData.data[idx + 2]
+          };
+        }
       }
     }
     
-    if (count > 0) {
+    return bestColor;
+  }
+
+  private computePatchSimilarity(
+    imageData: ImageData,
+    x1: number, y1: number,
+    x2: number, y2: number,
+    patchSize: number,
+    maskData: ImageData
+  ): number {
+    let totalError = 0;
+    let validPixels = 0;
+    const halfPatch = Math.floor(patchSize / 2);
+    
+    for (let dy = -halfPatch; dy <= halfPatch; dy++) {
+      for (let dx = -halfPatch; dx <= halfPatch; dx++) {
+        const px1 = x1 + dx, py1 = y1 + dy;
+        const px2 = x2 + dx, py2 = y2 + dy;
+        
+        if (px1 >= 0 && px1 < imageData.width && py1 >= 0 && py1 < imageData.height &&
+            px2 >= 0 && px2 < imageData.width && py2 >= 0 && py2 < imageData.height) {
+          
+          const idx1 = (py1 * imageData.width + px1) * 4;
+          const idx2 = (py2 * imageData.width + px2) * 4;
+          
+          // Only compare unmasked pixels
+          if (maskData.data[idx1] <= 128) {
+            const dr = imageData.data[idx1] - imageData.data[idx2];
+            const dg = imageData.data[idx1 + 1] - imageData.data[idx2 + 1];
+            const db = imageData.data[idx1 + 2] - imageData.data[idx2 + 2];
+            
+            totalError += dr * dr + dg * dg + db * db;
+            validPixels++;
+          }
+        }
+      }
+    }
+    
+    return validPixels > 0 ? totalError / validPixels : Infinity;
+  }
+
+  private edgeAwareSmoothing(imageData: ImageData, maskData: ImageData): void {
+    const width = imageData.width;
+    const height = imageData.height;
+    const data = imageData.data;
+    const smoothed = new Uint8ClampedArray(data);
+    
+    const kernelSize = 3;
+    const halfKernel = Math.floor(kernelSize / 2);
+    
+    for (let y = halfKernel; y < height - halfKernel; y++) {
+      for (let x = halfKernel; x < width - halfKernel; x++) {
+        const idx = (y * width + x) * 4;
+        
+        if (maskData.data[idx] > 128) { // Only smooth masked areas
+          let totalR = 0, totalG = 0, totalB = 0, totalWeight = 0;
+          
+          for (let dy = -halfKernel; dy <= halfKernel; dy++) {
+            for (let dx = -halfKernel; dx <= halfKernel; dx++) {
+              const nx = x + dx, ny = y + dy;
+              const nIdx = (ny * width + nx) * 4;
+              
+              // Gaussian-like weighting
+              const distance = Math.sqrt(dx * dx + dy * dy);
+              const weight = Math.exp(-distance * distance / 2.0);
+              
+              totalR += data[nIdx] * weight;
+              totalG += data[nIdx + 1] * weight;
+              totalB += data[nIdx + 2] * weight;
+              totalWeight += weight;
+            }
+          }
+          
+          if (totalWeight > 0) {
+            smoothed[idx] = Math.round(totalR / totalWeight);
+            smoothed[idx + 1] = Math.round(totalG / totalWeight);
+            smoothed[idx + 2] = Math.round(totalB / totalWeight);
+          }
+        }
+      }
+    }
+    
+    imageData.data.set(smoothed);
+  }
+
+  async processInpainting(request: InpaintingRequest): Promise<InpaintingResponse> {
+    const startTime = performance.now();
+    const warnings: string[] = [];
+
+    try {
+      if (!this.isInitialized) {
+        await this.initializeORT();
+      }
+
+      if (!this.gpuInfo) {
+        await this.detectGPU();
+      }
+
+      // Add warning for Intel integrated graphics
+      if (this.gpuInfo?.type === 'intel-integrated') {
+        warnings.push('Intel integrated graphics detected. For optimal object removal quality, consider using a system with dedicated NVIDIA or AMD GPU.');
+      }
+
+      // Select model
+      const selectedModel = this.selectOptimalModel(request.modelType);
+      
+      // Load model if needed
+      if (!this.session || this.currentModel !== selectedModel) {
+        console.log(`Loading model: ${selectedModel}`);
+        try {
+          this.session = await this.loadModel(selectedModel);
+          this.currentModel = selectedModel;
+        } catch (error) {
+          console.warn('Failed to load neural model, using CPU fallback:', error);
+          this.session = null;
+          warnings.push('Neural model loading failed. Using advanced CPU algorithms.');
+        }
+      }
+
+      let resultImageData: ImageData;
+      let preprocessTime = 0;
+      let inferenceTime = 0;
+      let postprocessTime = 0;
+      let acceleration = 'CPU-Fallback';
+
+      if (this.session) {
+        // Neural inference path
+        const preprocessStart = performance.now();
+        const { imageTensor, maskTensor, originalSize } = this.preprocessInputs(request.imageData, request.maskData);
+        preprocessTime = performance.now() - preprocessStart;
+
+        const inferenceStart = performance.now();
+        try {
+          const feeds = { image: imageTensor, mask: maskTensor };
+          const outputs = await this.session.run(feeds);
+          const outputTensor = outputs[Object.keys(outputs)[0]] as ort.Tensor;
+          inferenceTime = performance.now() - inferenceStart;
+
+          const postprocessStart = performance.now();
+          resultImageData = this.postprocessOutput(outputTensor, originalSize);
+          postprocessTime = performance.now() - postprocessStart;
+
+          // Determine acceleration type
+          const providers = (this.session as any)._executionProviders || [];
+          if (providers.includes('webgpu')) acceleration = 'WebGPU';
+          else if (providers.includes('webgl')) acceleration = 'WebGL';
+          else acceleration = 'WebAssembly';
+
+        } catch (error) {
+          console.warn('Neural inference failed, using CPU fallback:', error);
+          warnings.push('Neural inference failed. Using advanced CPU algorithms.');
+          
+          inferenceTime = performance.now() - inferenceStart;
+          const fallbackStart = performance.now();
+          resultImageData = this.advancedFallbackInpainting(request.imageData, request.maskData);
+          postprocessTime = performance.now() - fallbackStart;
+          acceleration = 'CPU-Fallback';
+        }
+      } else {
+        // CPU fallback path
+        const fallbackStart = performance.now();
+        resultImageData = this.advancedFallbackInpainting(request.imageData, request.maskData);
+        postprocessTime = performance.now() - fallbackStart;
+      }
+
+      const totalTime = performance.now() - startTime;
+
       return {
-        r: Math.round(totalR / count),
-        g: Math.round(totalG / count),
-        b: Math.round(totalB / count)
+        success: true,
+        resultImageData,
+        performanceStats: {
+          preprocessTime,
+          inferenceTime,
+          postprocessTime,
+          totalTime,
+          modelUsed: this.models[selectedModel]?.displayName || 'CPU Fallback',
+          acceleration,
+          gpuType: this.gpuInfo?.type || 'unknown'
+        },
+        warnings: warnings.length > 0 ? warnings : undefined
       };
-    }
-    
-    // Fallback to gray
-    return { r: 128, g: 128, b: 128 };
-  }
 
-  private updatePerformanceStats(inferenceTime: number): void {
-    this.performanceStats.lastInferenceTime = inferenceTime;
-    this.performanceStats.totalInferences++;
-    
-    // Calculate rolling average
-    const alpha = 0.1;
-    if (this.performanceStats.averageTime === 0) {
-      this.performanceStats.averageTime = inferenceTime;
-    } else {
-      this.performanceStats.averageTime = 
-        alpha * inferenceTime + (1 - alpha) * this.performanceStats.averageTime;
+    } catch (error) {
+      console.error('Object removal failed:', error);
+      
+      // Ultimate fallback
+      try {
+        const fallbackResult = this.advancedFallbackInpainting(request.imageData, request.maskData);
+        const totalTime = performance.now() - startTime;
+        
+        return {
+          success: true,
+          resultImageData: fallbackResult,
+          performanceStats: {
+            preprocessTime: 0,
+            inferenceTime: 0,
+            postprocessTime: totalTime,
+            totalTime,
+            modelUsed: 'Emergency CPU Fallback',
+            acceleration: 'CPU-Emergency',
+            gpuType: this.gpuInfo?.type || 'unknown'
+          },
+          warnings: [`Processing failed: ${error}. Used emergency CPU algorithm.`]
+        };
+      } catch (fallbackError) {
+        return {
+          success: false,
+          error: `Object removal failed: ${error}. Fallback also failed: ${fallbackError}`
+        };
+      }
     }
-  }
-
-  getModelInfo(): any {
-    return {
-      initialized: this.isInitialized,
-      modelLoaded: this.modelLoaded,
-      gpuInfo: this.gpuInfo,
-      currentModel: this.currentModel?.displayName || 'Enhanced Fallback',
-      availableModels: Object.values(this.models).map(m => ({
-        name: m.name,
-        displayName: m.displayName,
-        description: m.description
-      })),
-      performanceStats: this.performanceStats,
-      hasNeuralAcceleration: this.modelLoaded
-    };
-  }
-
-  dispose(): void {
-    if (this.session) {
-      this.session.dispose();
-      this.session = null;
-    }
-    this.isInitialized = false;
-    this.modelLoaded = false;
-    console.log('🧹 Inpainter disposed');
   }
 }
 
-// Worker message handling
-const inpainter = new AdvancedGPUInpainter();
+// Worker instance
+const processor = new ObjectRemovalProcessor();
 
+// Message handler
 self.onmessage = async (event) => {
-  const { type, data } = event.data;
-
+  const request: InpaintingRequest = event.data;
+  
   try {
-    switch (type) {
-      case 'INIT':
-        await inpainter.initialize((progress) => {
-          self.postMessage({
-            type: 'INIT_PROGRESS',
-            progress,
-            data: progress === 100 ? inpainter.getModelInfo() : undefined
-          });
-        });
-        self.postMessage({
-          type: 'INIT_COMPLETE',
-          data: inpainter.getModelInfo()
-        });
-        break;
-
-      case 'LOAD_MODEL':
-        const { modelName = 'auto' } = data || {};
-        await inpainter.loadModel(modelName, (progress) => {
-          self.postMessage({
-            type: 'MODEL_LOADING_PROGRESS',
-            data: { progress }
-          });
-        });
-        self.postMessage({
-          type: 'MODEL_LOADED',
-          data: inpainter.getModelInfo()
-        });
-        break;
-
-      case 'INPAINT':
-        const { imageData, maskData, options } = data;
-        const result = await inpainter.inpaint(imageData, maskData, options, (progress) => {
-          self.postMessage({
-            type: 'INPAINTING_PROGRESS',
-            progress
-          });
-        });
-        self.postMessage({
-          type: 'INPAINTING_COMPLETE',
-          data: result
-        });
-        break;
-
-      case 'GET_INFO':
-        self.postMessage({
-          type: 'INFO',
-          data: inpainter.getModelInfo()
-        });
-        break;
-
-      default:
-        console.warn('Unknown message type:', type);
-    }
+    const response = await processor.processInpainting(request);
+    self.postMessage(response);
   } catch (error) {
-    console.error('Worker error:', error);
     self.postMessage({
-      type: 'INPAINTING_ERROR',
+      success: false,
       error: error instanceof Error ? error.message : 'Unknown error occurred'
     });
   }
 };
 
-self.addEventListener('beforeunload', () => {
-  inpainter.dispose();
-});
-
-export {};
+export {}; 
