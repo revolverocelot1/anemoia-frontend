@@ -1,5 +1,4 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { motion } from 'framer-motion';
 import Header from '../components/Header';
 import { FiEdit, FiSmile, FiScissors, FiCrosshair, FiDownload, FiTrash2, FiUploadCloud } from 'react-icons/fi';
 
