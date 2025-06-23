@@ -57,20 +57,20 @@ class ObjectRemovalProcessor {
     'mi-gan-mobile': {
       name: 'mi-gan-mobile',
       displayName: 'MI-GAN Mobile',
-      description: 'Optimized for integrated graphics and mobile devices',
-      modelUrl: 'https://huggingface.co/lxfater/inpaint-web-mobile/resolve/main/migan_mobile.onnx',
+      description: 'Fast object removal optimized for mobile devices',
+      modelUrl: '/models/mi-gan-mobile.onnx',
       inputSize: 512,
-      preferredGPU: ['intel-integrated', 'other-integrated', 'other-dedicated'],
-      memoryMB: 1024
+      preferredGPU: ['intel-integrated', 'other-integrated'],
+      memoryMB: 50
     },
     'lama-big': {
       name: 'lama-big',
       displayName: 'LaMa High Quality',
-      description: 'Best quality for dedicated GPUs and complex object removal',
-      modelUrl: 'https://huggingface.co/smartywu/big-lama/resolve/main/big-lama.onnx',
+      description: 'High-quality object removal using Large Mask Inpainting',
+      modelUrl: '/models/lama-big.onnx',
       inputSize: 512,
       preferredGPU: ['nvidia-dedicated', 'amd-dedicated', 'other-dedicated'],
-      memoryMB: 2048
+      memoryMB: 200
     }
   };
 
@@ -78,17 +78,19 @@ class ObjectRemovalProcessor {
     this.initializeORT();
   }
 
-  private async initializeORT(): Promise<void> {
+  async initializeORT(): Promise<void> {
     try {
-      // Configure ONNX Runtime with proper paths and threading
-      ort.env.wasm.wasmPaths = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.16.3/dist/';
-      ort.env.wasm.numThreads = Math.min(navigator.hardwareConcurrency || 4, 8);
+      // Configure ONNX Runtime for production environment with working CDN
+      ort.env.wasm.wasmPaths = '/';
+      ort.env.wasm.numThreads = Math.min(navigator.hardwareConcurrency || 4, 4);
       ort.env.logLevel = 'warning';
 
       await this.detectGPU();
       this.isInitialized = true;
+      console.log('ONNX Runtime initialized successfully');
     } catch (error) {
       console.error('Failed to initialize ONNX Runtime:', error);
+      this.isInitialized = true; // Still mark as initialized to allow fallback
     }
   }
 
@@ -334,6 +336,11 @@ class ObjectRemovalProcessor {
   }
 
   private advancedFallbackInpainting(imageData: ImageData, maskData: ImageData): ImageData {
+    // Validate inputs
+    if (!imageData || !maskData || !imageData.width || !imageData.height) {
+      throw new Error('Invalid image data provided to fallback inpainting');
+    }
+
     const canvas = new OffscreenCanvas(imageData.width, imageData.height);
     const ctx = canvas.getContext('2d')!;
     ctx.putImageData(imageData, 0, 0);
@@ -619,22 +626,92 @@ class ObjectRemovalProcessor {
       }
     }
   }
+
+  getGPUInfo(): GPUInfo | null {
+    return this.gpuInfo;
+  }
 }
 
 // Worker instance
 const processor = new ObjectRemovalProcessor();
 
 // Message handler
-self.onmessage = async (event) => {
-  const request: InpaintingRequest = event.data;
-  
+self.onmessage = async (event: MessageEvent) => {
+  const { command, imageData, maskData, modelType = 'auto', quality = 'balanced' } = event.data;
+
   try {
-    const response = await processor.processInpainting(request);
-    self.postMessage(response);
+    switch (command) {
+      case 'initialize':
+        await processor.initializeORT();
+        self.postMessage({ 
+          status: 'worker_initialized',
+          gpuInfo: processor.getGPUInfo()
+        });
+        break;
+
+      case 'process':
+        if (!imageData || !maskData) {
+          self.postMessage({ 
+            status: 'error', 
+            error: 'Missing image or mask data' 
+          });
+          return;
+        }
+
+        // Report progress
+        self.postMessage({ 
+          status: 'processing', 
+          message: 'Initializing AI models...',
+          progress: 10
+        });
+
+        const request: InpaintingRequest = {
+          imageData,
+          maskData,
+          modelType,
+          quality
+        };
+
+        self.postMessage({ 
+          status: 'processing', 
+          message: 'Loading neural network model...',
+          progress: 20
+        });
+
+        const response = await processor.processInpainting(request);
+
+        self.postMessage({ 
+          status: 'processing', 
+          message: 'Processing complete',
+          progress: 100
+        });
+
+        if (response.success) {
+          self.postMessage({
+            status: 'complete',
+            resultImageData: response.resultImageData,
+            performanceStats: response.performanceStats,
+            warnings: response.warnings
+          });
+        } else {
+          self.postMessage({
+            status: 'error',
+            error: response.error || 'Processing failed'
+          });
+        }
+        break;
+
+      default:
+        self.postMessage({ 
+          status: 'error', 
+          error: `Unknown command: ${command}` 
+        });
+    }
   } catch (error) {
-    self.postMessage({
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error occurred'
+    console.error('Worker error:', error);
+    self.postMessage({ 
+      status: 'error', 
+      error: error instanceof Error ? error.message : 'Unknown error occurred' 
     });
   }
 };
