@@ -9,7 +9,7 @@ import * as ort from 'onnxruntime-web';
 interface InpaintingRequest {
   imageData: ImageData;
   maskData: ImageData;
-  modelType: 'auto' | 'mi-gan-mobile' | 'lama-big';
+  modelType: 'auto' | 'mi-gan-mobile' | 'aot-gan';
   quality: 'fast' | 'balanced' | 'high';
 }
 
@@ -62,6 +62,15 @@ class ObjectRemovalProcessor {
       inputSize: 512,
       preferredGPU: ['intel-integrated', 'other-integrated'],
       memoryMB: 50
+    },
+    'aot-gan': {
+      name: 'aot-gan',
+      displayName: 'AOT-GAN High Quality',
+      description: 'High-quality object removal using aggregated contextual transformations',
+      modelUrl: '/models/aot-gan.onnx',
+      inputSize: 512,
+      preferredGPU: ['nvidia-dedicated', 'amd-dedicated', 'other-dedicated'],
+      memoryMB: 200
     },
     'lama-big': {
       name: 'lama-big',
@@ -203,7 +212,9 @@ class ObjectRemovalProcessor {
 
     // Auto-select based on GPU performance
     if (this.gpuInfo.performance === 'high' && this.gpuInfo.webgpuSupported) {
-      return 'lama-big';
+      return 'aot-gan';
+    } else if (this.gpuInfo.performance === 'medium') {
+      return 'mi-gan-mobile';
     } else {
       return 'mi-gan-mobile';
     }

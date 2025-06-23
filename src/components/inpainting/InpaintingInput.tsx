@@ -111,9 +111,11 @@ const InpaintingInput: React.FC<InpaintingInputProps> = ({ onImageUploaded, isPr
   const [brushMode, setBrushMode] = useState<'paint' | 'erase'>('paint');
   const [brushSize, setBrushSize] = useState(25);
   const [isDrawing, setIsDrawing] = useState(false);
+  const [hasDrawn, setHasDrawn] = useState(false);
   
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const maskCanvasRef = useRef<HTMLCanvasElement>(null);
+  const [currentImage, setCurrentImage] = useState<HTMLImageElement | null>(null);
 
   const models = [
     {
@@ -138,47 +140,67 @@ const InpaintingInput: React.FC<InpaintingInputProps> = ({ onImageUploaded, isPr
       gpuType: 'Integrated GPU'
     },
     {
-      title: 'LaMa High Quality',
-      description: 'Best quality object removal using Fourier convolutions. Requires dedicated GPU.',
-      modelType: 'LaMa',
-      size: '8.5MB',
+      title: 'AOT-GAN High Quality',
+      description: 'Best quality object removal using aggregated contextual transformations. Requires dedicated GPU.',
+      modelType: 'AOT-GAN',
+      size: '15.2MB',
       speed: 'Slow' as const,
       quality: 'Best' as const,
-      type: 'lama-big',
+      type: 'aot-gan',
       gpuType: 'Dedicated GPU'
     }
   ];
 
-  const setupCanvases = (imageSrc: string) => {
+  const setupCanvases = useCallback((imageSrc: string) => {
     const img = new Image();
     img.onload = () => {
       if (canvasRef.current && maskCanvasRef.current) {
         const canvas = canvasRef.current;
         const maskCanvas = maskCanvasRef.current;
         
-        // Set canvas size
-        const maxSize = 512;
-        const scale = Math.min(maxSize / img.width, maxSize / img.height);
-        canvas.width = img.width * scale;
-        canvas.height = img.height * scale;
-        maskCanvas.width = canvas.width;
-        maskCanvas.height = canvas.height;
+        // Calculate display size while maintaining aspect ratio
+        const maxDisplaySize = 400;
+        const imageAspect = img.width / img.height;
         
-        // Draw image
+        let displayWidth, displayHeight;
+        if (imageAspect > 1) {
+          displayWidth = Math.min(maxDisplaySize, img.width);
+          displayHeight = displayWidth / imageAspect;
+        } else {
+          displayHeight = Math.min(maxDisplaySize, img.height);
+          displayWidth = displayHeight * imageAspect;
+        }
+        
+        // Set canvas display size
+        canvas.style.width = `${displayWidth}px`;
+        canvas.style.height = `${displayHeight}px`;
+        maskCanvas.style.width = `${displayWidth}px`;
+        maskCanvas.style.height = `${displayHeight}px`;
+        
+        // Set canvas internal resolution (higher for quality)
+        canvas.width = img.width;
+        canvas.height = img.height;
+        maskCanvas.width = img.width;
+        maskCanvas.height = img.height;
+        
+        // Draw image on main canvas
         const ctx = canvas.getContext('2d');
-        const maskCtx = maskCanvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0);
+        }
         
-        if (ctx && maskCtx) {
-          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-          
-          // Clear mask
+        // Clear mask canvas
+        const maskCtx = maskCanvas.getContext('2d');
+        if (maskCtx) {
           maskCtx.fillStyle = 'black';
           maskCtx.fillRect(0, 0, maskCanvas.width, maskCanvas.height);
         }
+        
+        setCurrentImage(img);
       }
     };
     img.src = imageSrc;
-  };
+  }, []);
 
   const onDrop = useCallback((acceptedFiles: File[], rejectedFiles: any[]) => {
     setError(null);
@@ -201,18 +223,17 @@ const InpaintingInput: React.FC<InpaintingInputProps> = ({ onImageUploaded, isPr
       reader.onload = () => {
         setPreviewUrl(reader.result as string);
         setupCanvases(reader.result as string);
+        setHasDrawn(false);
       };
       reader.readAsDataURL(file);
     }
-  }, []);
+  }, [setupCanvases]);
 
-  const dropzone = useDropzone({
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     accept: { 'image/*': ['.png', '.jpg', '.jpeg', '.webp', '.bmp'] },
     multiple: false,
   });
-
-  const { getRootProps, getInputProps, isDragActive } = dropzone;
 
   const {
     ref,
@@ -230,36 +251,45 @@ const InpaintingInput: React.FC<InpaintingInputProps> = ({ onImageUploaded, isPr
     setSelectedModelType(type);
   };
 
-  const handleStartInpainting = () => {
-    if (selectedFile && maskCanvasRef.current) {
-      const maskCtx = maskCanvasRef.current.getContext('2d');
-      if (maskCtx) {
-        const maskData = maskCtx.getImageData(0, 0, maskCanvasRef.current.width, maskCanvasRef.current.height);
-        onImageUploaded(selectedFile, maskData, selectedModelType);
-      }
-    } else {
-      setError('Please select an image and paint the areas to remove.');
-    }
+  const getCanvasCoordinates = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (!maskCanvasRef.current || !currentImage) return null;
+    
+    const canvas = maskCanvasRef.current;
+    const rect = canvas.getBoundingClientRect();
+    
+    // Get mouse position relative to canvas display
+    const x = (e.clientX - rect.left) / rect.width;
+    const y = (e.clientY - rect.top) / rect.height;
+    
+    // Convert to actual canvas coordinates
+    return {
+      x: x * canvas.width,
+      y: y * canvas.height
+    };
   };
 
   const startDrawing = (e: React.MouseEvent<HTMLCanvasElement>) => {
     setIsDrawing(true);
+    setHasDrawn(true);
     draw(e);
   };
 
   const draw = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!isDrawing || !maskCanvasRef.current) return;
+    if (!isDrawing || !maskCanvasRef.current || !currentImage) return;
     
-    const rect = maskCanvasRef.current.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    const coords = getCanvasCoordinates(e);
+    if (!coords) return;
     
     const ctx = maskCanvasRef.current.getContext('2d');
     if (ctx) {
+      // Scale brush size to canvas resolution
+      const scaleFactor = maskCanvasRef.current.width / (maskCanvasRef.current.getBoundingClientRect().width || 1);
+      const actualBrushSize = brushSize * scaleFactor;
+      
       ctx.globalCompositeOperation = brushMode === 'paint' ? 'source-over' : 'destination-out';
-      ctx.fillStyle = 'rgba(255, 0, 0, 0.7)';
+      ctx.fillStyle = 'rgba(255, 255, 255, 1)';
       ctx.beginPath();
-      ctx.arc(x, y, brushSize / 2, 0, Math.PI * 2);
+      ctx.arc(coords.x, coords.y, actualBrushSize / 2, 0, Math.PI * 2);
       ctx.fill();
     }
   };
@@ -274,7 +304,29 @@ const InpaintingInput: React.FC<InpaintingInputProps> = ({ onImageUploaded, isPr
       if (ctx) {
         ctx.fillStyle = 'black';
         ctx.fillRect(0, 0, maskCanvasRef.current.width, maskCanvasRef.current.height);
+        setHasDrawn(false);
       }
+    }
+  };
+
+  const handleStartInpainting = () => {
+    if (!selectedFile || !maskCanvasRef.current || !canvasRef.current) {
+      setError('Please select an image and paint the areas to remove.');
+      return;
+    }
+
+    if (!hasDrawn) {
+      setError('Please paint some areas to remove first.');
+      return;
+    }
+
+    const maskCtx = maskCanvasRef.current.getContext('2d');
+    const imageCtx = canvasRef.current.getContext('2d');
+    
+    if (maskCtx && imageCtx) {
+      const maskData = maskCtx.getImageData(0, 0, maskCanvasRef.current.width, maskCanvasRef.current.height);
+      
+      onImageUploaded(selectedFile, maskData, selectedModelType);
     }
   };
   
@@ -341,36 +393,51 @@ const InpaintingInput: React.FC<InpaintingInputProps> = ({ onImageUploaded, isPr
           </motion.div>
         ) : (
           <motion.div variants={itemVariants} className="mb-8">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 p-6 bg-gray-800/30 rounded-2xl border border-gray-700">
-              {/* Original Image */}
-              <div className="text-center">
-                <h4 className="text-lg font-semibold mb-4 text-white">Original Image</h4>
-                <div className="relative inline-block">
-                  <canvas 
-                    ref={canvasRef}
-                    className="max-w-full max-h-64 rounded-xl shadow-lg border border-gray-600"
-                  />
-                </div>
-              </div>
+            <div className="bg-gray-800/30 rounded-2xl border border-gray-700 p-6">
+              <h3 className="text-xl font-bold text-center text-white mb-6">Edit Your Image</h3>
               
-              {/* Mask Editor */}
-              <div className="text-center">
-                <h4 className="text-lg font-semibold mb-4 text-white">Paint Objects to Remove</h4>
-                <div className="relative inline-block">
-                  <canvas 
-                    ref={maskCanvasRef}
-                    className="max-w-full max-h-64 rounded-xl shadow-lg border border-gray-600 cursor-crosshair"
-                    onMouseDown={startDrawing}
-                    onMouseMove={draw}
-                    onMouseUp={stopDrawing}
-                    onMouseLeave={stopDrawing}
-                    style={{ touchAction: 'none' }}
-                  />
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                {/* Original Image */}
+                <div className="text-center">
+                  <h4 className="text-lg font-semibold mb-4 text-white">Original Image</h4>
+                  <div className="relative inline-block">
+                    <canvas 
+                      ref={canvasRef}
+                      className="max-w-full rounded-xl shadow-lg border border-gray-600"
+                    />
+                  </div>
+                </div>
+                
+                {/* Mask Editor */}
+                <div className="text-center">
+                  <h4 className="text-lg font-semibold mb-4 text-white">Paint Objects to Remove</h4>
+                  <div className="relative inline-block">
+                    <canvas 
+                      ref={canvasRef}
+                      className="absolute inset-0 rounded-xl opacity-70"
+                      style={{ pointerEvents: 'none' }}
+                    />
+                    <canvas 
+                      ref={maskCanvasRef}
+                      className="relative max-w-full rounded-xl shadow-lg border border-gray-600 cursor-crosshair"
+                      style={{
+                        backgroundColor: 'transparent',
+                        mixBlendMode: 'multiply'
+                      }}
+                      onMouseDown={startDrawing}
+                      onMouseMove={draw}
+                      onMouseUp={stopDrawing}
+                      onMouseLeave={stopDrawing}
+                    />
+                  </div>
+                  <p className="text-xs text-gray-400 mt-2">
+                    {hasDrawn ? 'White areas will be removed' : 'Paint over objects to remove them'}
+                  </p>
                 </div>
               </div>
               
               {/* Brush Controls */}
-              <div className="lg:col-span-2">
+              <div className="border-t border-gray-600 pt-6">
                 <div className="flex flex-wrap items-center justify-center gap-4 mb-4">
                   <div className="flex items-center space-x-2">
                     <button
@@ -430,6 +497,7 @@ const InpaintingInput: React.FC<InpaintingInputProps> = ({ onImageUploaded, isPr
                       e.stopPropagation();
                       setPreviewUrl(null);
                       setSelectedFile(null);
+                      setHasDrawn(false);
                     }}
                     className="px-4 py-2 bg-gray-700 text-gray-300 border border-gray-600 rounded-lg hover:bg-gray-600 transition-colors"
                     whileHover={{ scale: 1.05 }}
@@ -487,10 +555,10 @@ const InpaintingInput: React.FC<InpaintingInputProps> = ({ onImageUploaded, isPr
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-400">
             <div>
               <p className="mb-2"><strong className="text-green-400">MI-GAN:</strong> Fast processing for integrated GPUs</p>
-              <p className="mb-2"><strong className="text-blue-400">WebGPU:</strong> Enable in Chrome for GPU acceleration</p>
+              <p className="mb-2"><strong className="text-blue-400">AOT-GAN:</strong> Best quality for dedicated GPUs</p>
             </div>
             <div>
-              <p className="mb-2"><strong className="text-purple-400">LaMa:</strong> Best quality for dedicated GPUs</p>
+              <p className="mb-2"><strong className="text-purple-400">WebGPU:</strong> Enable in Chrome for GPU acceleration</p>
               <p className="mb-2"><strong className="text-orange-400">Auto Select:</strong> Chooses optimal model automatically</p>
             </div>
           </div>
