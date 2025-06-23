@@ -310,12 +310,12 @@ export class ModelManager {
     return session;
   }
 
-  private async loadWASMModel(path: string, progressCallback?: (progress: number) => void): Promise<any> {
+  private async loadWASMModel(_path: string, _progressCallback?: (progress: number) => void): Promise<any> {
     // Implementation for WASM models
     throw new Error('WASM model loading not yet implemented');
   }
 
-  private async warmupModel(model: tf.GraphModel): Promise<void> {
+  private async warmupModel(_model: tf.GraphModel): Promise<void> {
     // Create dummy input to warm up the model
     // const dummyInput = tf.zeros([1, 224, 224, 3]);
     // const prediction = await model.predict(dummyInput) as tf.Tensor;

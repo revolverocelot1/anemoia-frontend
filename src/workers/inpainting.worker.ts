@@ -5,6 +5,7 @@
 
 import { ModelManager, MODEL_CONFIGS } from '../utils/modelManager';
 import { GPUDetector } from '../utils/gpuDetection';
+import { getErrorMessage } from '../utils/errorHandler';
 
 interface InpaintingMessage {
   type: 'INIT' | 'INPAINT' | 'SWITCH_MODEL' | 'GET_STATUS';
@@ -57,7 +58,7 @@ class GPUInpaintingWorker {
       console.error('Failed to initialize inpainting worker:', error);
       self.postMessage({
         type: 'INIT_ERROR',
-        error: error instanceof Error ? error.message : 'Unknown initialization error'
+        error: getErrorMessage(error)
       });
     }
   }
@@ -87,7 +88,7 @@ class GPUInpaintingWorker {
       console.error(`Failed to switch to ${modelType}:`, error);
       self.postMessage({
         type: 'MODEL_SWITCH_ERROR',
-        error: error.message,
+        error: getErrorMessage(error),
         modelType
       });
     }
@@ -105,7 +106,7 @@ class GPUInpaintingWorker {
       });
 
       // Load model if not already loaded
-      const model = await this.modelManager.loadModel(this.currentModel, (progress) => {
+      await this.modelManager.loadModel(this.currentModel, (progress) => {
         self.postMessage({
           type: 'MODEL_LOADING_PROGRESS',
           progress,
@@ -141,7 +142,7 @@ class GPUInpaintingWorker {
       console.error('Inpainting failed:', error);
       self.postMessage({
         type: 'INPAINTING_ERROR',
-        error: error.message
+        error: getErrorMessage(error)
       });
     }
   }
@@ -425,7 +426,7 @@ const worker = new GPUInpaintingWorker();
 
 // Message handler
 self.onmessage = async (event: MessageEvent<InpaintingMessage>) => {
-  const { type, data, modelType, imageData, maskData } = event.data;
+  const { type, modelType, imageData, maskData } = event.data;
 
   try {
     switch (type) {
@@ -460,7 +461,7 @@ self.onmessage = async (event: MessageEvent<InpaintingMessage>) => {
     console.error('Worker error:', error);
     self.postMessage({
       type: 'ERROR',
-      error: error.message
+      error: getErrorMessage(error)
     });
   }
 }; 

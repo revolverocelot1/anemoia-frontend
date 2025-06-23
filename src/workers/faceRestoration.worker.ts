@@ -5,6 +5,7 @@
 
 import { ModelManager, MODEL_CONFIGS } from '../utils/modelManager';
 import { GPUDetector } from '../utils/gpuDetection';
+import { getErrorMessage } from '../utils/errorHandler';
 
 interface FaceRestorationMessage {
   type: 'INIT' | 'RESTORE_FACE' | 'GET_STATUS';
@@ -51,7 +52,7 @@ class GPUFaceRestorationWorker {
       console.error('Failed to initialize face restoration worker:', error);
       self.postMessage({
         type: 'INIT_ERROR',
-        error: error.message
+        error: getErrorMessage(error)
       });
     }
   }
@@ -72,7 +73,7 @@ class GPUFaceRestorationWorker {
       });
 
       // Load model
-      const model = await this.modelManager.loadModel(modelType, (progress) => {
+      await this.modelManager.loadModel(modelType, (progress) => {
         self.postMessage({
           type: 'MODEL_LOADING_PROGRESS',
           progress,
@@ -110,7 +111,7 @@ class GPUFaceRestorationWorker {
           totalFaces: faces.length
         });
 
-        const restoredFace = await this.restoreSingleFace(face, model, fidelity);
+        const restoredFace = await this.restoreSingleFace(face, fidelity);
         restoredFaces.push({
           ...face,
           restoredData: restoredFace
@@ -130,7 +131,7 @@ class GPUFaceRestorationWorker {
       console.error('Face restoration failed:', error);
       self.postMessage({
         type: 'RESTORATION_ERROR',
-        error: error.message
+        error: getErrorMessage(error)
       });
     }
   }
@@ -262,10 +263,9 @@ class GPUFaceRestorationWorker {
     return overlapArea / Math.min(face1Area, face2Area);
   }
 
-  private async restoreSingleFace(face: any, model: any, fidelity: number): Promise<ImageData> {
+  private async restoreSingleFace(face: any, fidelity: number): Promise<ImageData> {
     // Extract face region
     const faceCanvas = new OffscreenCanvas(face.width, face.height);
-    const faceCtx = faceCanvas.getContext('2d')!;
     
     // Note: We'd need the original image data here
     // This is simplified for the demo
@@ -417,7 +417,7 @@ const worker = new GPUFaceRestorationWorker();
 
 // Message handler
 self.onmessage = async (event: MessageEvent<FaceRestorationMessage>) => {
-  const { type, data, imageData, options } = event.data;
+  const { type, imageData, options } = event.data;
 
   try {
     switch (type) {
@@ -446,7 +446,7 @@ self.onmessage = async (event: MessageEvent<FaceRestorationMessage>) => {
     console.error('Face restoration worker error:', error);
     self.postMessage({
       type: 'ERROR',
-      error: error.message
+      error: getErrorMessage(error)
     });
   }
 }; 

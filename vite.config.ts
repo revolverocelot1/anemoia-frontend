@@ -18,10 +18,17 @@ export default defineConfig({
   },
   publicDir: 'public',
   build: {
-    assetsInlineLimit: 0,
     target: 'esnext',
+    rollupOptions: {
+      output: {
+        format: 'es',
+      },
+    },
   },
   optimizeDeps: {
     exclude: ['@tensorflow/tfjs-backend-wasm'],
+  },
+  worker: {
+    format: 'es',
   },
 })

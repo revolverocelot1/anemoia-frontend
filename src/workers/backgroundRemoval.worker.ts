@@ -5,6 +5,7 @@
 
 import { ModelManager, MODEL_CONFIGS } from '../utils/modelManager';
 import { GPUDetector } from '../utils/gpuDetection';
+import { getErrorMessage } from '../utils/errorHandler';
 
 interface BackgroundRemovalMessage {
   type: 'INIT' | 'REMOVE_BACKGROUND' | 'SWITCH_MODEL' | 'GET_STATUS';
@@ -61,7 +62,7 @@ class GPUBackgroundRemovalWorker {
       console.error('Failed to initialize background removal worker:', error);
       self.postMessage({
         type: 'INIT_ERROR',
-        error: error.message
+        error: getErrorMessage(error)
       });
     }
   }
@@ -91,7 +92,7 @@ class GPUBackgroundRemovalWorker {
       console.error(`Failed to switch to ${modelType}:`, error);
       self.postMessage({
         type: 'MODEL_SWITCH_ERROR',
-        error: error.message,
+        error: getErrorMessage(error),
         modelType
       });
     }
@@ -113,7 +114,7 @@ class GPUBackgroundRemovalWorker {
       });
 
       // Load model if not already loaded
-      const model = await this.modelManager.loadModel(this.currentModel, (progress) => {
+      await this.modelManager.loadModel(this.currentModel, (progress) => {
         self.postMessage({
           type: 'MODEL_LOADING_PROGRESS',
           progress,
@@ -163,7 +164,7 @@ class GPUBackgroundRemovalWorker {
       console.error('Background removal failed:', error);
       self.postMessage({
         type: 'REMOVAL_ERROR',
-        error: error.message
+        error: getErrorMessage(error)
       });
     }
   }
@@ -414,8 +415,6 @@ class GPUBackgroundRemovalWorker {
                          imageData: Uint8ClampedArray, width: number, height: number, 
                          x: number, y: number): number {
     // Analyze local neighborhood to refine alpha
-    let foregroundSim = 0;
-    let backgroundSim = 0;
     let count = 0;
 
     const radius = 3;
@@ -450,8 +449,6 @@ class GPUBackgroundRemovalWorker {
     mask: ImageData, 
     outputType: string
   ): Promise<ImageData> {
-    const canvas = new OffscreenCanvas(originalImage.width, originalImage.height);
-    const ctx = canvas.getContext('2d')!;
 
     switch (outputType) {
       case 'mask':
@@ -517,7 +514,7 @@ const worker = new GPUBackgroundRemovalWorker();
 
 // Message handler
 self.onmessage = async (event: MessageEvent<BackgroundRemovalMessage>) => {
-  const { type, data, modelType, imageData, options } = event.data;
+  const { type, modelType, imageData, options } = event.data;
 
   try {
     switch (type) {
@@ -552,7 +549,7 @@ self.onmessage = async (event: MessageEvent<BackgroundRemovalMessage>) => {
     console.error('Background removal worker error:', error);
     self.postMessage({
       type: 'ERROR',
-      error: error.message
+      error: getErrorMessage(error)
     });
   }
 }; 
