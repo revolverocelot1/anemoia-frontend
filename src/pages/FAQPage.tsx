@@ -137,7 +137,7 @@ const Accordion = ({ items, categoryColor }: { items: FAQItem[], categoryColor: 
             >
               <div className="px-6 pb-4">
                 <p className="text-gray-300 leading-relaxed">{item.a}</p>
-              </div>
+      </div>
             </motion.div>
           </motion.div>
         );
@@ -250,8 +250,8 @@ const FAQPage = () => {
                   >
                     {category}
                   </button>
-                ))}
-              </div>
+    ))}
+  </div>
             </motion.div>
 
             {/* FAQ Content */}
