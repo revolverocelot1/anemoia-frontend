@@ -74,7 +74,17 @@ const Header = () => {
                 }`
               }
             >
-              AI Studio
+              AI Editor
+            </NavLink>
+            <NavLink 
+              to="/compare" 
+              className={({ isActive }) => 
+                `text-sm font-medium transition-colors duration-300 hover:text-blue-400 ${
+                  isActive ? 'text-blue-400 border-b-2 border-blue-400 pb-1' : 'text-gray-300'
+                }`
+              }
+            >
+              Compare
             </NavLink>
             <NavLink 
               to="/faq" 
@@ -85,7 +95,7 @@ const Header = () => {
               }
             >
               FAQ
-        </NavLink>
+            </NavLink>
           </nav>
 
           {/* Auth Section */}
@@ -180,7 +190,17 @@ const Header = () => {
                 }`
               }
             >
-              AI Studio
+              AI Editor
+            </NavLink>
+            <NavLink 
+              to="/compare" 
+              className={({ isActive }) => 
+                `text-sm font-medium px-3 py-2 rounded-lg transition-colors duration-300 ${
+                  isActive ? 'text-blue-400 bg-blue-400/10' : 'text-gray-300 hover:text-white hover:bg-gray-800'
+                }`
+              }
+            >
+              Compare
             </NavLink>
             <NavLink 
               to="/faq" 

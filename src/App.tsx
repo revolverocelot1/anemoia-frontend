@@ -2,20 +2,14 @@ import { Routes, Route, useLocation } from 'react-router-dom';
 import { AnimatePresence } from 'framer-motion';
 import AnimatedPage from './components/AnimatedPage';
 import HomePage from './pages/HomePage';
-import DepthMapPage from './pages/DepthMapPage';
 import LoginPage from './pages/LoginPage';
 import AuthCallbackPage from './pages/AuthCallbackPage';
 import SettingsPage from './pages/SettingsPage';
 import FAQPage from './pages/FAQPage';
-import PosePage from './pages/PosePage';
 import PoseResultsPage from './pages/PoseResultsPage';
 import AccountPage from './pages/AccountPage';
-import NewUpscalerPage from './pages/NewUpscalerPage';
-// We will create these pages next
-// import PosePage from './pages/PosePage';
 import ImageComparisonPage from './pages/ImageComparisonPage';
 import ImageComparisonResultsPage from './pages/ImageComparisonResultsPage';
-import InpaintingPage from './pages/InpaintingPage';
 import AIToolsPage from './pages/AIToolsPage';
 import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
 import TermsOfServicePage from './pages/TermsOfServicePage';
@@ -31,14 +25,6 @@ function App() {
           element={
             <AnimatedPage>
               <HomePage />
-            </AnimatedPage>
-          }
-        />
-        <Route
-          path="/depth-map"
-          element={
-            <AnimatedPage>
-              <DepthMapPage />
             </AnimatedPage>
           }
         />
@@ -83,14 +69,6 @@ function App() {
           }
         />
         <Route
-          path="/pose-estimation"
-          element={
-            <AnimatedPage>
-              <PosePage />
-            </AnimatedPage>
-          }
-        />
-        <Route
           path="/pose-estimation/results"
           element={
             <AnimatedPage>
@@ -99,10 +77,10 @@ function App() {
           }
         />
         <Route
-          path="/upscaler"
+          path="/ai-tools"
           element={
             <AnimatedPage>
-              <NewUpscalerPage />
+              <AIToolsPage />
             </AnimatedPage>
           }
         />
@@ -123,22 +101,6 @@ function App() {
           }
         />
         <Route
-          path="/inpainting"
-          element={
-            <AnimatedPage>
-              <InpaintingPage />
-            </AnimatedPage>
-          }
-        />
-        <Route
-          path="/ai-tools"
-          element={
-            <AnimatedPage>
-              <AIToolsPage />
-            </AnimatedPage>
-          }
-        />
-        <Route
           path="/privacy"
           element={
             <AnimatedPage>
@@ -154,7 +116,6 @@ function App() {
             </AnimatedPage>
           }
         />
-        {/* <Route path="/pose-estimation" element={<PosePage />} /> */}
       </Routes>
     </AnimatePresence>
   );
