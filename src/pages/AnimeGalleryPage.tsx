@@ -1,474 +1,344 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 
+// --- Interfaces & Types ---
 interface AnimeImage {
   id: string;
   name: string;
   category: string;
   url: string;
-  filename: string;
 }
 
 interface Category {
   name: string;
   count: number;
-  color: string;
-  icon: string;
 }
 
+// --- Constants ---
+const REPO_API_URL = 'https://api.github.com/repos/cat-milk/Anime-Girls-Holding-Programming-Books/git/trees/master?recursive=1';
+const IMAGE_BASE_URL = 'https://raw.githubusercontent.com/cat-milk/Anime-Girls-Holding-Programming-Books/master/';
+const IGNORED_DIRS = ['.github', 'Mixed', 'Memes', 'Other', 'Uncategorized', 'Personification'];
+
+// --- Helper Components ---
+const GlitchText: React.FC<{ children: React.ReactNode; className?: string }> = ({ children, className }) => (
+  <div className={`relative inline-block ${className}`}>
+    <span className="absolute inset-0 text-red-500 animate-glitch-1">{children}</span>
+    <span className="absolute inset-0 text-blue-500 animate-glitch-2">{children}</span>
+    <span className="relative">{children}</span>
+  </div>
+);
+
+const ScanningLine: React.FC = () => (
+  <motion.div
+    className="absolute top-0 left-0 w-full h-1 bg-cyan-400/80 shadow-[0_0_10px_theme(colors.cyan.400)]"
+    initial={{ y: '-100%' }}
+    animate={{ y: '100vh' }}
+    transition={{ duration: 4, repeat: Infinity, ease: 'linear' }}
+  />
+);
+
+const TextDecoder: React.FC<{ text: string; delay?: number }> = ({ text, delay = 0 }) => {
+  const [decodedText, setDecodedText] = useState('');
+
+  useEffect(() => {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789%$#@';
+    let interval: NodeJS.Timeout;
+    let timeout: NodeJS.Timeout;
+
+    timeout = setTimeout(() => {
+      let iteration = 0;
+      interval = setInterval(() => {
+        setDecodedText(
+          text
+            .split('')
+            .map((_char, index) => {
+              if (index < iteration) {
+                return text[index];
+              }
+              return chars[Math.floor(Math.random() * chars.length)];
+            })
+            .join('')
+        );
+
+        if (iteration >= text.length) {
+          clearInterval(interval);
+        }
+
+        iteration += 1 / 3;
+      }, 30);
+    }, delay);
+
+    return () => {
+      clearInterval(interval);
+      clearTimeout(timeout);
+    };
+  }, [text, delay]);
+
+  return <>{decodedText}</>;
+};
+
+// --- Main Page Component ---
 const AnimeGalleryPage: React.FC = () => {
+  const [allImages, setAllImages] = useState<AnimeImage[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadingStatus, setLoadingStatus] = useState('INITIATING_CONNECTION');
   const [selectedImage, setSelectedImage] = useState<AnimeImage | null>(null);
-  const [sortBy, setSortBy] = useState<'name' | 'category'>('name');
 
-  // Sample data - In real implementation, this would come from GitHub API
-  const categories: Category[] = [
-    { name: 'C', count: 45, color: 'from-blue-500 to-cyan-500', icon: 'code' },
-    { name: 'C++', count: 38, color: 'from-purple-500 to-pink-500', icon: 'developer_mode' },
-    { name: 'Python', count: 52, color: 'from-green-500 to-emerald-500', icon: 'psychology' },
-    { name: 'JavaScript', count: 34, color: 'from-yellow-500 to-orange-500', icon: 'javascript' },
-    { name: 'Rust', count: 29, color: 'from-red-500 to-orange-500', icon: 'security' },
-    { name: 'Java', count: 31, color: 'from-orange-500 to-red-500', icon: 'coffee' },
-    { name: 'Go', count: 22, color: 'from-cyan-500 to-blue-500', icon: 'speed' },
-    { name: 'Haskell', count: 26, color: 'from-purple-500 to-indigo-500', icon: 'functions' },
-    { name: 'SICP', count: 18, color: 'from-indigo-500 to-purple-500', icon: 'school' },
-    { name: 'Algorithms', count: 15, color: 'from-teal-500 to-green-500', icon: 'account_tree' },
-    { name: 'Math', count: 12, color: 'from-pink-500 to-rose-500', icon: 'calculate' },
-    { name: 'Mixed', count: 20, color: 'from-gray-500 to-slate-500', icon: 'auto_awesome' }
-  ];
+  useEffect(() => {
+    const fetchImages = async () => {
+      try {
+        setLoadingStatus('CONNECTING_TO_GH_API...');
+        const response = await fetch(REPO_API_URL);
+        if (!response.ok) throw new Error(`GitHub API Error: ${response.status}`);
+        
+        setLoadingStatus('PARSING_TREE_STRUCTURE...');
+        const data = await response.json();
+        
+        setLoadingStatus('FILTERING_IMAGE_PATHS...');
+        const imagePaths = data.tree
+          .map((node: { path: string; type: string }) => node.path)
+          .filter(
+            (path: string) =>
+              (path.endsWith('.png') || path.endsWith('.jpg') || path.endsWith('.jpeg')) &&
+              !IGNORED_DIRS.some(dir => path.startsWith(dir + '/'))
+          );
 
-  const sampleImages: AnimeImage[] = [
-    {
-      id: '1',
-      name: 'Makise Kurisu Holding C Programming Language',
-      category: 'C',
-      url: 'https://raw.githubusercontent.com/cat-milk/Anime-Girls-Holding-Programming-Books/master/C/Makise%20Kurisu%20Holding%20C%20Programming%20Language.png',
-      filename: 'Makise_Kurisu_Holding_C_Programming_Language.png'
-    },
-    {
-      id: '2', 
-      name: 'Lain SICP',
-      category: 'SICP',
-      url: 'https://raw.githubusercontent.com/cat-milk/Anime-Girls-Holding-Programming-Books/master/SICP/Iwakura%20Lain%20SICP.png',
-      filename: 'Iwakura_Lain_SICP.png'
-    },
-    {
-      id: '3',
-      name: 'Kanna Kamui Finds Rust Programming',
-      category: 'Rust', 
-      url: 'https://raw.githubusercontent.com/cat-milk/Anime-Girls-Holding-Programming-Books/master/Rust/Kanna%20Kamui%20Finds%20RUST%20programming.png',
-      filename: 'Kanna_Kamui_Finds_RUST_programming.png'
-    },
-    {
-      id: '4',
-      name: 'Mai Sakurajima Holding Eloquent Javascript',
-      category: 'JavaScript',
-      url: 'https://raw.githubusercontent.com/cat-milk/Anime-Girls-Holding-Programming-Books/master/Javascript/Mai%20Sakurajima%20Holding%20Eloquent%20Javascript.png',
-      filename: 'Mai_Sakurajima_Holding_Eloquent_Javascript.png'
-    },
-    {
-      id: '5',
-      name: 'Kagome With Python',
-      category: 'Python',
-      url: 'https://raw.githubusercontent.com/cat-milk/Anime-Girls-Holding-Programming-Books/master/Python/kagome%20with%20python.png',
-      filename: 'kagome_with_python.png'
-    },
-    {
-      id: '6',
-      name: 'Sakura Nene CPP',
-      category: 'C++',
-      url: 'https://raw.githubusercontent.com/cat-milk/Anime-Girls-Holding-Programming-Books/master/C%2B%2B/Sakura%20Nene%20CPP.png',
-      filename: 'Sakura_Nene_CPP.png'
-    }
-  ];
+        const imageMap: { [key: string]: AnimeImage[] } = {};
+        const categoryMap: { [key: string]: number } = {};
+
+        setLoadingStatus('BUILDING_IMAGE_DATABASE...');
+        imagePaths.forEach((path: string, index: number) => {
+          const parts = path.split('/');
+          if (parts.length > 1) {
+            const category = parts[0];
+            const name = parts[1].split('.')[0].replace(/_/g, ' ');
+            
+            const image: AnimeImage = {
+              id: `${category}-${index}`,
+              category,
+              name,
+              url: `${IMAGE_BASE_URL}${path}`,
+            };
+
+            if (!imageMap[category]) imageMap[category] = [];
+            imageMap[category].push(image);
+
+            categoryMap[category] = (categoryMap[category] || 0) + 1;
+          }
+        });
+        
+        const allImageData = Object.values(imageMap).flat();
+        const categoryData = Object.entries(categoryMap)
+          .map(([name, count]) => ({ name, count }))
+          .sort((a, b) => b.count - a.count);
+
+        setAllImages(allImageData);
+        setCategories(categoryData);
+        setLoadingStatus('DATABASE_LOADED');
+        setTimeout(() => setIsLoading(false), 1000);
+
+      } catch (error) {
+        console.error("Failed to fetch image data:", error);
+        setLoadingStatus('ERROR: CONNECTION_FAILED');
+      }
+    };
+
+    fetchImages();
+  }, []);
 
   const filteredImages = useMemo(() => {
-    let filtered = sampleImages;
-    
-    if (selectedCategory) {
-      filtered = filtered.filter(img => img.category === selectedCategory);
-    }
-    
-    if (searchTerm) {
-      filtered = filtered.filter(img => 
-        img.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        img.category.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-    }
-    
-    return filtered.sort((a, b) => {
-      if (sortBy === 'name') return a.name.localeCompare(b.name);
-      return a.category.localeCompare(b.category);
-    });
-  }, [selectedCategory, searchTerm, sortBy]);
+    return allImages
+      .filter(image => {
+        const categoryMatch = selectedCategory ? image.category === selectedCategory : true;
+        const searchMatch = searchTerm
+          ? image.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            image.category.toLowerCase().includes(searchTerm.toLowerCase())
+          : true;
+        return categoryMatch && searchMatch;
+      })
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [allImages, selectedCategory, searchTerm]);
 
-  const handleCategorySelect = (category: string) => {
-    setIsLoading(true);
-    setSelectedCategory(category === selectedCategory ? null : category);
-    setTimeout(() => setIsLoading(false), 500);
-  };
-
-
+  if (isLoading) {
+    return (
+      <div className="fixed inset-0 bg-black text-cyan-400 font-mono flex flex-col items-center justify-center overflow-hidden">
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-gray-900/50 via-black to-black opacity-50" />
+        <GlitchText className="text-4xl font-black mb-4 tracking-widest">A.G.H.P.B. ARCHIVE</GlitchText>
+        <div className="w-1/2 h-1 bg-cyan-400/20 mb-4" />
+        <div className="text-lg">
+          <TextDecoder text={loadingStatus} />
+        </div>
+        <div className="w-1/3 mt-4 h-2 bg-black border border-cyan-400 p-0.5">
+          <motion.div
+            className="h-full bg-cyan-400"
+            initial={{ width: '0%' }}
+            animate={{ width: '100%' }}
+            transition={{ duration: 15, ease: 'linear' }}
+          />
+        </div>
+        <div className="absolute bottom-4 text-xs text-gray-500">SYSTEM BOOT SEQUENCE INITIATED...</div>
+      </div>
+    );
+  }
 
   return (
-    <div className="relative flex size-full min-h-screen flex-col dark group/design-root overflow-x-hidden bg-gradient-to-br from-gray-900 via-purple-900 to-blue-900">
-      {/* Animated Background Grid */}
-      <div className="absolute inset-0 opacity-20">
-        <div className="absolute inset-0" style={{
-          backgroundImage: `radial-gradient(circle at 1px 1px, rgba(0, 255, 255, 0.3) 1px, transparent 0)`,
-          backgroundSize: '50px 50px'
-        }} />
-      </div>
+    <div className="relative flex size-full min-h-screen flex-col bg-black text-cyan-400 font-mono overflow-hidden">
+      <ScanningLine />
+      
+      {/* Background Grid */}
+      <div className="absolute inset-0 opacity-20" style={{
+        backgroundImage: `
+          linear-gradient(rgba(0, 150, 255, 0.3) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(0, 150, 255, 0.3) 1px, transparent 1px)
+        `,
+        backgroundSize: '30px 30px',
+      }}/>
+      
+      {/* Vignette */}
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-transparent via-black to-black" />
 
-      {/* Scanning Lines Effect */}
-      <motion.div
-        className="absolute inset-0 pointer-events-none opacity-10"
-        animate={{
-          backgroundPosition: ['0px 0px', '0px 100vh']
-        }}
-        transition={{
-          duration: 8,
-          repeat: Infinity,
-          ease: "linear"
-        }}
-        style={{
-          backgroundImage: 'linear-gradient(90deg, transparent 98%, rgba(0, 255, 255, 0.8) 100%)',
-          backgroundSize: '100% 3px'
-        }}
-      />
-
-      <div className="layout-container flex h-full grow flex-col relative z-10">
-        <Header />
-        
-        <main className="flex-1 px-6 md:px-10 lg:px-20 xl:px-40 py-8">
-          
-          {/* Hero Section */}
-          <motion.div
-            initial={{ opacity: 0, y: -50 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="text-center mb-12"
-          >
-            <motion.div
-              initial={{ scale: 0, rotate: -180 }}
-              animate={{ scale: 1, rotate: 0 }}
-              transition={{ delay: 0.2, type: 'spring', stiffness: 200 }}
-              className="mx-auto mb-6 w-20 h-20 rounded-full bg-gradient-to-r from-cyan-400 to-purple-400 flex items-center justify-center shadow-2xl border-2 border-cyan-300"
-            >
-              <span className="material-symbols-outlined text-black text-4xl font-bold">collections</span>
-            </motion.div>
-            
-            <motion.h1
-              className="text-5xl md:text-7xl lg:text-8xl font-black mb-4 tracking-tighter bg-gradient-to-r from-cyan-400 via-purple-400 to-pink-400 bg-clip-text text-transparent"
-              style={{ textShadow: '0 0 30px rgba(0, 255, 255, 0.5)' }}
-            >
-              ANIME GALLERY
-            </motion.h1>
-            
+      <div className="relative z-10 flex flex-col h-screen">
+        <header className="flex-shrink-0 p-4 border-b border-cyan-400/30 flex justify-between items-center backdrop-blur-sm">
+          <h1 className="text-xl font-bold tracking-widest">
+            <TextDecoder text="HOLOGRAPHIC ARCHIVE: AGHPB" />
+          </h1>
+          <div className="flex items-center space-x-2 text-green-400">
             <motion.div 
-              className="text-xl md:text-2xl text-cyan-300 font-mono mb-8"
-              animate={{ 
-                textShadow: [
-                  '0 0 5px rgba(0, 255, 255, 0.8)',
-                  '0 0 20px rgba(0, 255, 255, 0.8)',
-                  '0 0 5px rgba(0, 255, 255, 0.8)'
-                ]
-              }}
-              transition={{ duration: 2, repeat: Infinity }}
-            >
-              &gt; Programming Books Collection Database_
-            </motion.div>
-            
-            <motion.p
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.8 }}
-              className="text-lg text-gray-300 max-w-4xl mx-auto leading-relaxed"
-            >
-              Access the legendary archive of anime characters holding programming books. 
-              Each image categorized, searchable, and ready for deployment in your next project.
-            </motion.p>
-          </motion.div>
+              className="w-3 h-3 bg-green-400 rounded-full"
+              animate={{ opacity: [0.5, 1, 0.5] }}
+              transition={{ duration: 1, repeat: Infinity }}
+            />
+            <span>SYSTEM_ONLINE</span>
+          </div>
+        </header>
 
-          {/* Search & Controls */}
-          <motion.div
-            initial={{ opacity: 0, y: 50 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.4 }}
-            className="mb-8 bg-black/30 rounded-xl p-6 border border-cyan-500/30 backdrop-blur-md"
-          >
-            <div className="flex flex-col lg:flex-row gap-4 items-center justify-between">
-              <div className="flex-1 relative">
-                <motion.input
-                  whileFocus={{ scale: 1.02 }}
-                  type="text"
-                  placeholder="Search database..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full bg-black/50 border border-cyan-500/50 rounded-lg px-4 py-3 text-cyan-100 placeholder-cyan-400/70 focus:border-cyan-400 focus:outline-none font-mono"
-                  style={{ boxShadow: 'inset 0 0 10px rgba(0, 255, 255, 0.1)' }}
-                />
-                <span className="absolute right-3 top-3 material-symbols-outlined text-cyan-400">search</span>
-              </div>
-              
-              <div className="flex gap-3">
-                <motion.select
-                  whileHover={{ scale: 1.05 }}
-                  value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value as 'name' | 'category')}
-                  className="bg-black/50 border border-purple-500/50 rounded-lg px-4 py-3 text-purple-100 focus:border-purple-400 focus:outline-none font-mono"
+        <div className="flex-1 grid grid-cols-12 gap-4 p-4 overflow-hidden">
+          {/* Left Panel: Categories & Search */}
+          <aside className="col-span-3 flex flex-col space-y-4 overflow-y-auto pr-2">
+            <div className="border border-cyan-400/30 p-2">
+              <h2 className="text-lg mb-2">
+                <TextDecoder text="<SEARCH>" />
+              </h2>
+              <input
+                type="text"
+                placeholder="Filter by keyword..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full bg-black/50 border border-cyan-400/50 px-2 py-1 placeholder-cyan-400/50 focus:border-cyan-400 focus:outline-none"
+              />
+            </div>
+
+            <div className="border border-cyan-400/30 p-2 flex-1 flex flex-col">
+              <h2 className="text-lg mb-2">
+                <TextDecoder text="<CATEGORIES>" />
+              </h2>
+              <div className="flex-1 overflow-y-auto space-y-1">
+                <button 
+                  onClick={() => setSelectedCategory(null)}
+                  className={`w-full text-left p-1 transition-colors ${!selectedCategory ? 'bg-cyan-400 text-black' : 'hover:bg-cyan-400/20'}`}
                 >
-                  <option value="name">Sort by Name</option>
-                  <option value="category">Sort by Category</option>
-                </motion.select>
-                
-                <motion.button
-                  whileHover={{ scale: 1.1, rotate: 5 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}
-                  className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white p-3 rounded-lg border border-purple-400 shadow-lg"
-                >
-                  <span className="material-symbols-outlined">
-                    {viewMode === 'grid' ? 'list' : 'grid_view'}
-                  </span>
-                </motion.button>
+                  // ALL ({allImages.length})
+                </button>
+                {categories.map(cat => (
+                  <button 
+                    key={cat.name}
+                    onClick={() => setSelectedCategory(cat.name)}
+                    className={`w-full text-left p-1 transition-colors ${selectedCategory === cat.name ? 'bg-cyan-400 text-black' : 'hover:bg-cyan-400/20'}`}
+                  >
+                    {cat.name} ({cat.count})
+                  </button>
+                ))}
               </div>
             </div>
-          </motion.div>
+          </aside>
 
-          {/* Categories */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.6 }}
-            className="mb-8"
-          >
-            <h2 className="text-2xl font-bold text-cyan-300 mb-6 font-mono flex items-center">
-              <span className="material-symbols-outlined mr-2">folder</span>
-              PROGRAMMING_CATEGORIES
-            </h2>
-            
-            <motion.div 
-              className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ staggerChildren: 0.1 }}
-            >
-              {categories.map((category) => (
-                <motion.button
-                  key={category.name}
-                  initial={{ y: 50, opacity: 0 }}
-                  animate={{ y: 0, opacity: 1 }}
-                  transition={{ delay: 0.1, type: "spring", stiffness: 100 }}
-                  onClick={() => handleCategorySelect(category.name)}
-                  className={`relative group overflow-hidden rounded-xl p-4 border-2 transition-all duration-300 ${
-                    selectedCategory === category.name
-                      ? 'border-cyan-400 bg-cyan-400/20'
-                      : 'border-gray-600 hover:border-gray-400 bg-black/20'
-                  }`}
-                  whileHover={{ 
-                    scale: 1.05,
-                    boxShadow: '0 0 25px rgba(0, 255, 255, 0.4)'
-                  }}
-                  whileTap={{ scale: 0.95 }}
-                >
-                  <div className={`absolute inset-0 bg-gradient-to-br ${category.color} opacity-10 group-hover:opacity-20 transition-opacity`} />
-                  
-                  <div className="relative z-10">
-                    <div className={`w-8 h-8 mx-auto mb-2 rounded-lg bg-gradient-to-r ${category.color} flex items-center justify-center`}>
-                      <span className="material-symbols-outlined text-white text-sm">{category.icon}</span>
-                    </div>
-                    <div className="text-sm font-bold text-gray-100 mb-1">{category.name}</div>
-                    <div className="text-xs text-cyan-400 font-mono">{category.count} files</div>
-                  </div>
-                  
-                  {selectedCategory === category.name && (
-                    <motion.div
-                      layoutId="selected-category"
-                      className="absolute inset-0 border-2 border-cyan-400 rounded-xl"
-                      style={{ boxShadow: '0 0 20px rgba(0, 255, 255, 0.6)' }}
-                    />
-                  )}
-                </motion.button>
-              ))}
-            </motion.div>
-          </motion.div>
-
-          {/* Loading State */}
-          <AnimatePresence>
-            {isLoading && (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="flex items-center justify-center py-12"
-              >
-                <div className="flex items-center space-x-4 text-cyan-400">
-                  <motion.div
-                    animate={{ rotate: 360 }}
-                    transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                    className="w-8 h-8 border-2 border-cyan-400 border-t-transparent rounded-full"
-                  />
-                  <span className="font-mono text-lg">ACCESSING DATABASE...</span>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          {/* Image Gallery */}
-          {!isLoading && (
-            <motion.div
-              className={viewMode === 'grid' 
-                ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6'
-                : 'space-y-4'
-              }
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ staggerChildren: 0.1 }}
-            >
-              {filteredImages.map((image) => (
+          {/* Center Panel: Image View & Grid */}
+          <main className="col-span-6 flex flex-col border border-cyan-400/30 p-2">
+            <AnimatePresence mode="wait">
+              {selectedImage ? (
                 <motion.div
-                  key={image.id}
-                  initial={{ y: 50, opacity: 0 }}
-                  animate={{ y: 0, opacity: 1 }}
-                  transition={{ delay: 0.1, type: "spring", stiffness: 100 }}
-                  className="group relative cursor-pointer"
-                  whileHover={{ scale: 1.02 }}
-                  onClick={() => setSelectedImage(image)}
+                  key={selectedImage.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20 }}
+                  className="w-full h-full flex items-center justify-center bg-black/50"
                 >
-                  <div className="relative overflow-hidden rounded-xl bg-black/40 border border-gray-600 hover:border-cyan-400 transition-all duration-300">
-                    <div className="aspect-square relative">
-                      <img
-                        src={image.url}
-                        alt={image.name}
-                        className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
-                        loading="lazy"
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                    </div>
-                    
-                    <div className="p-4">
-                      <div className="flex items-center gap-2 mb-2">
-                        <span className={`px-2 py-1 text-xs rounded-full font-mono ${
-                          categories.find(c => c.name === image.category)?.color 
-                            ? `bg-gradient-to-r ${categories.find(c => c.name === image.category)?.color} text-white`
-                            : 'bg-gray-600 text-gray-200'
-                        }`}>
-                          {image.category}
-                        </span>
-                      </div>
-                      <h3 className="text-sm font-semibold text-gray-100 line-clamp-2 group-hover:text-cyan-300 transition-colors">
-                        {image.name}
-                      </h3>
-                    </div>
-
-                    {/* Hover Effects */}
-                    <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none">
-                      <div className="absolute top-2 right-2">
-                        <motion.div
-                          whileHover={{ scale: 1.2 }}
-                          className="w-8 h-8 bg-cyan-400 rounded-full flex items-center justify-center"
-                        >
-                          <span className="material-symbols-outlined text-black text-sm">zoom_in</span>
-                        </motion.div>
-                      </div>
-                    </div>
-                  </div>
+                  <img 
+                    src={selectedImage.url} 
+                    alt={selectedImage.name} 
+                    className="max-w-full max-h-full object-contain"
+                  />
                 </motion.div>
-              ))}
-            </motion.div>
-          )}
+              ) : (
+                <div className="w-full h-full flex flex-col items-center justify-center text-center text-gray-500">
+                  <span className="text-4xl">NO TARGET SELECTED</span>
+                  <p>Select an image from the grid to view details</p>
+                </div>
+              )}
+            </AnimatePresence>
+          </main>
+          
+          {/* Right Panel: Data Readout & Image Grid */}
+          <aside className="col-span-3 flex flex-col space-y-4">
+            <div className="border border-cyan-400/30 p-2 h-1/3">
+              <h2 className="text-lg mb-2">
+                <TextDecoder text="<DATA_READOUT>" />
+              </h2>
+              <AnimatePresence mode="wait">
+                {selectedImage ? (
+                  <motion.div
+                    key={selectedImage.id}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="space-y-1 text-sm"
+                  >
+                    <p>ID: {selectedImage.id}</p>
+                    <p>NAME: {selectedImage.name}</p>
+                    <p>CATEGORY: {selectedImage.category}</p>
+                    <a href={selectedImage.url} target="_blank" rel="noreferrer" className="text-red-500 hover:underline block truncate">
+                      URL: {selectedImage.url}
+                    </a>
+                  </motion.div>
+                ) : (
+                  <p className="text-gray-500">Awaiting data...</p>
+                )}
+              </AnimatePresence>
+            </div>
+            
+            <div className="border border-cyan-400/30 p-2 flex-1 flex flex-col">
+              <h2 className="text-lg mb-2">
+                <TextDecoder text="<IMAGE_GRID>" />
+              </h2>
+              <div className="flex-1 grid grid-cols-3 gap-2 overflow-y-auto">
+                {filteredImages.map(image => (
+                  <motion.div
+                    key={image.id}
+                    className={`relative aspect-square border-2 transition-colors cursor-pointer ${
+                      selectedImage?.id === image.id ? 'border-red-500' : 'border-cyan-400/30 hover:border-cyan-400'
+                    }`}
+                    onClick={() => setSelectedImage(image)}
+                    whileHover={{ scale: 1.05 }}
+                    layoutId={image.id}
+                  >
+                    <img src={image.url} alt={image.name} className="w-full h-full object-cover" loading="lazy" />
+                  </motion.div>
+                ))}
+              </div>
+            </div>
+          </aside>
+        </div>
 
-          {/* No Results */}
-          {!isLoading && filteredImages.length === 0 && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="text-center py-12"
-            >
-              <span className="material-symbols-outlined text-6xl text-gray-500 mb-4 block">search_off</span>
-              <h3 className="text-xl font-bold text-gray-400 mb-2">No results found</h3>
-              <p className="text-gray-500">Try adjusting your search or category filter</p>
-            </motion.div>
-          )}
-
-        </main>
-        
-        <Footer />
+        <footer className="flex-shrink-0 p-2 border-t border-cyan-400/30 flex justify-between items-center text-xs">
+          <div>{filteredImages.length} IMAGES LOADED</div>
+          <div>SELECTED CATEGORY: {selectedCategory || 'ALL'}</div>
+        </footer>
       </div>
-
-      {/* Image Modal */}
-      <AnimatePresence>
-        {selectedImage && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-4"
-            onClick={() => setSelectedImage(null)}
-          >
-            <motion.div
-              initial={{ scale: 0.8, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.8, opacity: 0 }}
-              className="max-w-4xl w-full max-h-[90vh] bg-black/80 rounded-xl border border-cyan-400 overflow-hidden"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="p-6 border-b border-cyan-400/30">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h2 className="text-xl font-bold text-cyan-300 mb-2">{selectedImage.name}</h2>
-                    <span className="text-sm text-gray-400 font-mono">{selectedImage.filename}</span>
-                  </div>
-                  <motion.button
-                    whileHover={{ scale: 1.1 }}
-                    whileTap={{ scale: 0.9 }}
-                    onClick={() => setSelectedImage(null)}
-                    className="w-10 h-10 bg-red-600 hover:bg-red-500 rounded-full flex items-center justify-center"
-                  >
-                    <span className="material-symbols-outlined text-white">close</span>
-                  </motion.button>
-                </div>
-              </div>
-              
-              <div className="p-6">
-                <img
-                  src={selectedImage.url}
-                  alt={selectedImage.name}
-                  className="w-full h-auto max-h-[60vh] object-contain mx-auto rounded-lg"
-                />
-                
-                <div className="mt-6 flex gap-4">
-                  <motion.a
-                    href={selectedImage.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex-1 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white py-3 px-6 rounded-lg font-semibold text-center transition-all"
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                  >
-                    <span className="material-symbols-outlined mr-2">download</span>
-                    Download
-                  </motion.a>
-                  <motion.button
-                    onClick={() => navigator.clipboard.writeText(selectedImage.url)}
-                    className="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white py-3 px-6 rounded-lg font-semibold transition-all"
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                  >
-                    <span className="material-symbols-outlined mr-2">content_copy</span>
-                    Copy URL
-                  </motion.button>
-                </div>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </div>
   );
 };
