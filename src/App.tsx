@@ -12,6 +12,7 @@ import PoseResultsPage from './pages/PoseResultsPage';
 import AccountPage from './pages/AccountPage';
 import NewUpscalerPage from './pages/NewUpscalerPage';
 import DoomPage from './pages/DoomPage';
+import AnimeGalleryPage from './pages/AnimeGalleryPage';
 // We will create these pages next
 // import PosePage from './pages/PosePage';
 import ImageComparisonPage from './pages/ImageComparisonPage';
@@ -111,6 +112,14 @@ function App() {
           element={
             <AnimatedPage>
               <DoomPage />
+            </AnimatedPage>
+          }
+        />
+        <Route
+          path="/anime-gallery"
+          element={
+            <AnimatedPage>
+              <AnimeGalleryPage />
             </AnimatedPage>
           }
         />
