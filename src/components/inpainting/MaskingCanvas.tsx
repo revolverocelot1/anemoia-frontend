@@ -8,43 +8,63 @@ interface MaskingCanvasProps {
 
 const MaskingCanvas = forwardRef((props: MaskingCanvasProps, ref) => {
   const { imageUrl, brushSize, onMaskChange } = props;
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const imageCanvasRef = useRef<HTMLCanvasElement>(null);
+  const maskCanvasRef = useRef<HTMLCanvasElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [history, setHistory] = useState<ImageData[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
+  const [imageLoaded, setImageLoaded] = useState(false);
 
-  const getCanvasContext = () => {
-    const canvas = canvasRef.current;
-    return canvas ? canvas.getContext('2d') : null;
-  };
-  
-  // Initial image load
+  // Load image on both canvases
   useEffect(() => {
-    const context = getCanvasContext();
-    const canvas = canvasRef.current;
-    if (!context || !canvas) return;
+    const imageCanvas = imageCanvasRef.current;
+    const maskCanvas = maskCanvasRef.current;
+    if (!imageCanvas || !maskCanvas) return;
+
+    const imageCtx = imageCanvas.getContext('2d');
+    const maskCtx = maskCanvas.getContext('2d');
+    if (!imageCtx || !maskCtx) return;
 
     const image = new Image();
     image.crossOrigin = "anonymous";
     image.src = imageUrl;
     image.onload = () => {
-      canvas.width = image.width;
-      canvas.height = image.height;
-      context.drawImage(image, 0, 0, image.width, image.height);
-      const initialData = context.getImageData(0, 0, canvas.width, canvas.height);
-      setHistory([initialData]);
+      // Set canvas dimensions
+      imageCanvas.width = image.width;
+      imageCanvas.height = image.height;
+      maskCanvas.width = image.width;
+      maskCanvas.height = image.height;
+
+      // Draw image on image canvas
+      imageCtx.drawImage(image, 0, 0);
+
+      // Initialize mask canvas to black (no mask)
+      maskCtx.fillStyle = 'black';
+      maskCtx.fillRect(0, 0, maskCanvas.width, maskCanvas.height);
+
+      // Save initial mask state
+      const initialMask = maskCtx.getImageData(0, 0, maskCanvas.width, maskCanvas.height);
+      setHistory([initialMask]);
       setHistoryIndex(0);
+      setImageLoaded(true);
+
+      // Notify parent of initial (empty) mask
+      onMaskChange(initialMask);
     };
-  }, [imageUrl]);
+  }, [imageUrl, onMaskChange]);
 
   const saveToHistory = () => {
-    const context = getCanvasContext();
-    const canvas = canvasRef.current;
-    if (!context || !canvas) return;
+    const maskCanvas = maskCanvasRef.current;
+    const maskCtx = maskCanvas?.getContext('2d');
+    if (!maskCtx || !maskCanvas) return;
+
     const newHistory = history.slice(0, historyIndex + 1);
-    const currentData = context.getImageData(0, 0, canvas.width, canvas.height);
-    setHistory([...newHistory, currentData]);
+    const currentMask = maskCtx.getImageData(0, 0, maskCanvas.width, maskCanvas.height);
+    setHistory([...newHistory, currentMask]);
     setHistoryIndex(newHistory.length);
+    
+    // Notify parent of mask change
+    onMaskChange(currentMask);
   };
 
   useImperativeHandle(ref, () => ({
@@ -52,97 +72,117 @@ const MaskingCanvas = forwardRef((props: MaskingCanvasProps, ref) => {
       if (historyIndex > 0) {
         const newIndex = historyIndex - 1;
         setHistoryIndex(newIndex);
-        const context = getCanvasContext();
-        if (context) context.putImageData(history[newIndex], 0, 0);
+        const maskCtx = maskCanvasRef.current?.getContext('2d');
+        if (maskCtx) {
+          maskCtx.putImageData(history[newIndex], 0, 0);
+          onMaskChange(history[newIndex]);
+        }
       }
     },
     redo: () => {
       if (historyIndex < history.length - 1) {
         const newIndex = historyIndex + 1;
         setHistoryIndex(newIndex);
-        const context = getCanvasContext();
-        if (context) context.putImageData(history[newIndex], 0, 0);
+        const maskCtx = maskCanvasRef.current?.getContext('2d');
+        if (maskCtx) {
+          maskCtx.putImageData(history[newIndex], 0, 0);
+          onMaskChange(history[newIndex]);
+        }
       }
     },
     reset: () => {
-        if (history.length > 0) {
-            setHistoryIndex(0);
-            const context = getCanvasContext();
-            if (context) context.putImageData(history[0], 0, 0);
+      if (history.length > 0) {
+        setHistoryIndex(0);
+        const maskCtx = maskCanvasRef.current?.getContext('2d');
+        if (maskCtx) {
+          maskCtx.putImageData(history[0], 0, 0);
+          onMaskChange(history[0]);
         }
+      }
     }
   }));
 
   const getCoordinates = (event: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
-    const canvas = canvasRef.current;
+    const canvas = maskCanvasRef.current;
     if (!canvas) return null;
 
     const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+
     if ('touches' in event) {
       return {
-        x: event.touches[0].clientX - rect.left,
-        y: event.touches[0].clientY - rect.top
+        x: (event.touches[0].clientX - rect.left) * scaleX,
+        y: (event.touches[0].clientY - rect.top) * scaleY
       };
     }
     return {
-      x: event.clientX - rect.left,
-      y: event.clientY - rect.top
+      x: (event.clientX - rect.left) * scaleX,
+      y: (event.clientY - rect.top) * scaleY
     };
   };
 
   const startDrawing = (event: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    if (!imageLoaded) return;
+    event.preventDefault();
+    
     const coords = getCoordinates(event);
     if (!coords) return;
+    
     setIsDrawing(true);
-    const context = canvasRef.current?.getContext('2d');
-    if (!context) return;
-    context.beginPath();
-    context.moveTo(coords.x, coords.y);
+    const maskCtx = maskCanvasRef.current?.getContext('2d');
+    if (!maskCtx) return;
+
+    maskCtx.globalCompositeOperation = 'source-over';
+    maskCtx.fillStyle = 'white';
+    maskCtx.beginPath();
+    maskCtx.arc(coords.x, coords.y, brushSize / 2, 0, Math.PI * 2);
+    maskCtx.fill();
   };
 
   const draw = (event: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
-    if (!isDrawing) return;
+    if (!isDrawing || !imageLoaded) return;
+    event.preventDefault();
+    
     const coords = getCoordinates(event);
     if (!coords) return;
-    const context = canvasRef.current?.getContext('2d');
-    if (!context) return;
     
-    context.globalCompositeOperation = 'destination-out';
-    context.lineTo(coords.x, coords.y);
-    context.lineWidth = brushSize;
-    context.lineCap = 'round';
-    context.lineJoin = 'round';
-    context.stroke();
+    const maskCtx = maskCanvasRef.current?.getContext('2d');
+    if (!maskCtx) return;
+
+    maskCtx.globalCompositeOperation = 'source-over';
+    maskCtx.fillStyle = 'white';
+    maskCtx.beginPath();
+    maskCtx.arc(coords.x, coords.y, brushSize / 2, 0, Math.PI * 2);
+    maskCtx.fill();
   };
 
   const stopDrawing = () => {
-    const canvas = canvasRef.current;
-    const context = canvas?.getContext('2d');
-    if (!context || !canvas) return;
-
-    context.closePath();
+    if (!isDrawing) return;
     setIsDrawing(false);
-    
-    // Create the mask data
-    const originalImageData = context.getImageData(0, 0, canvas.width, canvas.height);
-    const mask = new ImageData(canvas.width, canvas.height);
-    for (let i = 0; i < originalImageData.data.length; i += 4) {
-        // If alpha is 0, it's erased. Mark it white in the mask.
-        if (originalImageData.data[i + 3] === 0) {
-            mask.data[i] = 255;
-            mask.data[i + 1] = 255;
-            mask.data[i + 2] = 255;
-            mask.data[i + 3] = 255;
-        }
-    }
     saveToHistory();
-    onMaskChange(mask);
   };
 
+  if (!imageLoaded) {
+    return (
+      <div className="w-full h-full flex items-center justify-center bg-gray-900/50 rounded-lg">
+        <div className="text-gray-400">Loading image...</div>
+      </div>
+    );
+  }
+
   return (
-    <div className="w-full h-full flex items-center justify-center bg-gray-900/50 rounded-lg overflow-hidden">
+    <div className="w-full h-full flex items-center justify-center bg-gray-900/50 rounded-lg overflow-hidden relative">
+      {/* Background image canvas */}
       <canvas
-        ref={canvasRef}
+        ref={imageCanvasRef}
+        className="absolute max-w-full max-h-full object-contain"
+        style={{ opacity: 0.7 }}
+      />
+      
+      {/* Mask overlay canvas */}
+      <canvas
+        ref={maskCanvasRef}
         onMouseDown={startDrawing}
         onMouseMove={draw}
         onMouseUp={stopDrawing}
@@ -150,10 +190,24 @@ const MaskingCanvas = forwardRef((props: MaskingCanvasProps, ref) => {
         onTouchStart={startDrawing}
         onTouchMove={draw}
         onTouchEnd={stopDrawing}
-        className="max-w-full max-h-full object-contain cursor-crosshair"
+        className="absolute max-w-full max-h-full object-contain cursor-crosshair"
+        style={{ 
+          mixBlendMode: 'multiply',
+          filter: 'invert(1)',
+          opacity: 0.8
+        }}
       />
+      
+      {/* Instruction overlay */}
+      {historyIndex === 0 && (
+        <div className="absolute top-4 left-4 bg-black/70 text-white px-3 py-2 rounded-lg text-sm pointer-events-none">
+          Paint over objects to remove them
+        </div>
+      )}
     </div>
   );
 });
+
+MaskingCanvas.displayName = 'MaskingCanvas';
 
 export default MaskingCanvas; 
