@@ -105,8 +105,8 @@ const HomePage = () => {
                 className="relative"
               >
                 <ToolCard
-                  title="AI Inpainting"
-                  description="Remove unwanted objects or fill missing areas using AOT-GAN."
+                  title="Magic Eraser (Inpainting)"
+                  description="Remove objects or creatively fill parts of an image."
                   icon="auto_fix_high"
                   accent="1"
                   path="/inpainting"

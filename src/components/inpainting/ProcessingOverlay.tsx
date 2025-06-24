@@ -8,11 +8,11 @@ interface ProcessingOverlayProps {
     type: string;
     performance: string;
     acceleration: string;
-  };
+  } | null;
   modelInfo?: {
     name: string;
     loadingProgress: number;
-  };
+  } | null;
 }
 
 const ProcessingOverlay: React.FC<ProcessingOverlayProps> = ({
