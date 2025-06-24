@@ -28,7 +28,6 @@ interface GPUInfo {
   webgpuSupported: boolean;
   vendor?: string;
   device?: string;
-  webgpuAdapter?: any;
 }
 
 interface ModelConfig {
@@ -93,11 +92,17 @@ class ObjectRemovalProcessor {
       this.isInitialized = true;
       console.log('ONNX Runtime initialized successfully with WebGPU support:', this.gpuInfo?.webgpuSupported);
       
-      // Send initialization complete message
+      // Send initialization complete message with safe GPU info (no non-serializable objects)
       postMessage({
         status: 'initialized',
         message: 'Inpainting processor ready with GPU acceleration',
-        gpuInfo: this.gpuInfo
+        gpuInfo: {
+          type: this.gpuInfo?.type || 'unknown',
+          performance: this.gpuInfo?.performance || 'low',
+          webgpuSupported: this.gpuInfo?.webgpuSupported || false,
+          vendor: this.gpuInfo?.vendor,
+          device: this.gpuInfo?.device
+        }
       });
       
     } catch (error) {
@@ -162,7 +167,6 @@ class ObjectRemovalProcessor {
           
           if (adapter) {
             gpu.webgpuSupported = true;
-            gpu.webgpuAdapter = adapter;
             
             // Try to get adapter info (Chrome 113+)
             try {
