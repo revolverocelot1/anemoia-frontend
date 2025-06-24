@@ -191,6 +191,21 @@ const HomePage = () => {
         </main>
         <Footer />
       </div>
+      
+      {/* Coffee Link */}
+      <motion.a
+        href="https://coff.ee/ocelot"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="fixed bottom-6 right-6 w-12 h-12 bg-amber-600 hover:bg-amber-500 rounded-full flex items-center justify-center shadow-lg transition-colors z-30"
+        initial={{ opacity: 0, scale: 0 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ delay: 2, type: "spring", stiffness: 200 }}
+        whileHover={{ scale: 1.1 }}
+        whileTap={{ scale: 0.9 }}
+      >
+        ☕
+      </motion.a>
     </div>
   );
 };
