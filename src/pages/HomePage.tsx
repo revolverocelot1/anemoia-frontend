@@ -1,7 +1,9 @@
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import ToolCard from '../components/ToolCard';
+import Sidebar from '../components/Sidebar';
 import { motion, type Variants, type Transition } from 'framer-motion';
+import { useState } from 'react';
 
 const containerVariants: Variants = {
   hidden: { opacity: 1 },
@@ -30,8 +32,17 @@ const itemVariants: Variants = {
 };
 
 const HomePage = () => {
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  const toggleSidebar = () => {
+    setSidebarOpen(!sidebarOpen);
+  };
+
   return (
     <div className="relative flex size-full min-h-screen flex-col dark group/design-root overflow-x-hidden">
+      {/* Sidebar */}
+      <Sidebar isOpen={sidebarOpen} onToggle={toggleSidebar} />
+      
       <div className="layout-container flex h-full grow flex-col">
         <Header />
         <main className="px-6 md:px-10 lg:px-20 xl:px-40 flex flex-1 justify-center py-8 overflow-y-auto">
@@ -115,18 +126,25 @@ const HomePage = () => {
                 </motion.div>
               </motion.div>
               
-              {/* Placeholder for future tools - can be removed or replaced */}
+              {/* Miscellaneous Tools Card */}
               <motion.div
                 variants={itemVariants}
-                className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-2xl p-8 flex flex-col items-center justify-center text-center min-h-[200px] bg-gray-50 dark:bg-gray-800/50"
+                className="border-2 border-dashed border-blue-300 dark:border-blue-600 rounded-2xl p-8 flex flex-col items-center justify-center text-center min-h-[200px] bg-blue-50 dark:bg-blue-800/20 hover:bg-blue-100 dark:hover:bg-blue-800/30 cursor-pointer transition-colors"
+                onClick={toggleSidebar}
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
               >
-                <div className="w-16 h-16 bg-gradient-to-r from-gray-400 to-gray-500 rounded-2xl flex items-center justify-center mb-4">
-                  <span className="material-symbols-outlined text-2xl text-white">add</span>
+                <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-600 rounded-2xl flex items-center justify-center mb-4">
+                  <span className="material-symbols-outlined text-2xl text-white">build</span>
                 </div>
-                <h3 className="text-xl font-bold mb-2 text-gray-600 dark:text-gray-300">More Tools Coming</h3>
-                <p className="text-gray-500 dark:text-gray-400 text-sm">
-                  We're working on bringing you more AI-powered photo editing tools
+                <h3 className="text-xl font-bold mb-2 text-blue-900 dark:text-blue-100">Miscellaneous Tools</h3>
+                <p className="text-blue-700 dark:text-blue-300 text-sm mb-4">
+                  Access additional utilities, games, and fun tools
                 </p>
+                <div className="flex items-center space-x-2 text-blue-600 dark:text-blue-400">
+                  <span className="material-symbols-outlined text-sm">arrow_forward</span>
+                  <span className="text-xs font-medium">Click to explore</span>
+                </div>
               </motion.div>
             </motion.div>
             

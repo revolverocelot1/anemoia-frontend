@@ -11,6 +11,7 @@ import PosePage from './pages/PosePage';
 import PoseResultsPage from './pages/PoseResultsPage';
 import AccountPage from './pages/AccountPage';
 import NewUpscalerPage from './pages/NewUpscalerPage';
+import DoomPage from './pages/DoomPage';
 // We will create these pages next
 // import PosePage from './pages/PosePage';
 import ImageComparisonPage from './pages/ImageComparisonPage';
@@ -102,6 +103,14 @@ function App() {
           element={
             <AnimatedPage>
               <NewUpscalerPage />
+            </AnimatedPage>
+          }
+        />
+        <Route
+          path="/doom"
+          element={
+            <AnimatedPage>
+              <DoomPage />
             </AnimatedPage>
           }
         />
