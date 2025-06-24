@@ -29,7 +29,7 @@ const Header = () => {
 
   return (
     <motion.header 
-      className="sticky top-0 z-50 bg-[#121212]/95 backdrop-blur-xl border-b border-gray-800"
+      className="sticky top-0 z-30 bg-[#121212]/95 backdrop-blur-xl border-b border-gray-800"
       initial={{ y: -100, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
       transition={{ duration: 0.6, ease: 'easeOut' }}
