@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useDropzone } from 'react-dropzone';
 import Header from '../components/Header';
@@ -20,6 +20,63 @@ interface SceneStats {
   renderTime: number;
 }
 
+// Simple Matrix and Vector Math Utilities
+const mat4 = {
+  perspective: (fov: number, aspect: number, near: number, far: number) => {
+    const f = 1.0 / Math.tan(fov / 2);
+    const rangeInv = 1.0 / (near - far);
+    return [
+      f / aspect, 0, 0, 0,
+      0, f, 0, 0,
+      0, 0, (near + far) * rangeInv, -1,
+      0, 0, near * far * rangeInv * 2, 0
+    ];
+  },
+  lookAt: (cameraPosition: number[], target: number[], up: number[]) => {
+    const zAxis = [
+      cameraPosition[0] - target[0],
+      cameraPosition[1] - target[1],
+      cameraPosition[2] - target[2]
+    ];
+    let len = zAxis[0] * zAxis[0] + zAxis[1] * zAxis[1] + zAxis[2] * zAxis[2];
+    if (len > 0) {
+      len = 1 / Math.sqrt(len);
+      zAxis[0] *= len;
+      zAxis[1] *= len;
+      zAxis[2] *= len;
+    }
+
+    const xAxis = [
+      up[1] * zAxis[2] - up[2] * zAxis[1],
+      up[2] * zAxis[0] - up[0] * zAxis[2],
+      up[0] * zAxis[1] - up[1] * zAxis[0]
+    ];
+    len = xAxis[0] * xAxis[0] + xAxis[1] * xAxis[1] + xAxis[2] * xAxis[2];
+    if (len > 0) {
+      len = 1 / Math.sqrt(len);
+      xAxis[0] *= len;
+      xAxis[1] *= len;
+      xAxis[2] *= len;
+    }
+
+    const yAxis = [
+      zAxis[1] * xAxis[2] - zAxis[2] * xAxis[1],
+      zAxis[2] * xAxis[0] - zAxis[0] * xAxis[2],
+      zAxis[0] * xAxis[1] - zAxis[1] * xAxis[0]
+    ];
+    
+    return [
+      xAxis[0], yAxis[0], zAxis[0], 0,
+      xAxis[1], yAxis[1], zAxis[1], 0,
+      xAxis[2], yAxis[2], zAxis[2], 0,
+      -(xAxis[0] * cameraPosition[0] + xAxis[1] * cameraPosition[1] + xAxis[2] * cameraPosition[2]),
+      -(yAxis[0] * cameraPosition[0] + yAxis[1] * cameraPosition[1] + yAxis[2] * cameraPosition[2]),
+      -(zAxis[0] * cameraPosition[0] + zAxis[1] * cameraPosition[1] + zAxis[2] * cameraPosition[2]),
+      1
+    ];
+  }
+};
+
 const TriangleSplattingPage: React.FC = () => {
   const [sceneLoaded, setSceneLoaded] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -29,6 +86,13 @@ const TriangleSplattingPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   
+  const [camera, setCamera] = useState({
+    phi: Math.PI / 2,
+    theta: Math.PI / 2,
+    distance: 5,
+    target: [0, 0, 0]
+  });
+
   const [controls, setControls] = useState<ViewerControls>({
     fov: 75,
     rotationSpeed: 1,
@@ -38,6 +102,17 @@ const TriangleSplattingPage: React.FC = () => {
   });
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const glRef = useRef<WebGLRenderingContext | null>(null);
+  const animationFrameIdRef = useRef<number>(0);
+  const sceneDataRef = useRef<{ vertices: Float32Array; colors: Uint8Array } | null>(null);
+  const cameraRef = useRef(camera);
+  const isDraggingRef = useRef(false);
+  const lastMousePosRef = useRef({ x: 0, y: 0 });
+  const isPanningRef = useRef(false);
+
+  useEffect(() => {
+    cameraRef.current = camera;
+  }, [camera]);
 
   // Animated background grid effect
   const GridBackground = () => (
@@ -135,37 +210,35 @@ const TriangleSplattingPage: React.FC = () => {
       // Read file
       const arrayBuffer = await file.arrayBuffer();
       
-      // Parse based on file extension
-      let triangles: any[] = [];
-      let vertices: any[] = [];
+      let vertices: Float32Array = new Float32Array();
+      let colors: Uint8Array = new Uint8Array();
       
       if (file.name.endsWith('.ply')) {
-        // Parse PLY file (simplified)
-        const text = new TextDecoder().decode(arrayBuffer);
-        triangles = parsePLYFile(text);
+        const data = parsePLY(arrayBuffer);
+        vertices = data.vertices;
+        colors = data.colors;
       } else if (file.name.endsWith('.off')) {
-        // Parse OFF file
-        const text = new TextDecoder().decode(arrayBuffer);
-        triangles = parseOFFFile(text);
+        throw new Error('.off file format not yet supported. Please use .ply.');
       } else if (file.name.endsWith('.splat')) {
-        // Parse SPLAT file (binary format)
-        triangles = parseSPLATFile(arrayBuffer);
+        throw new Error('.splat file format not yet supported. Please use .ply.');
       }
 
-      // Generate mock stats
+      sceneDataRef.current = { vertices, colors };
+
+      // Generate scene stats
       setSceneStats({
-        triangles: triangles.length,
-        vertices: vertices.length || triangles.length * 3,
+        triangles: 0, // Placeholder, as we are rendering points
+        vertices: vertices.length / 3,
         fileSize: file.size,
         format: file.name.split('.').pop()?.toUpperCase() || 'UNKNOWN',
-        renderTime: Math.random() * 10 + 5
+        renderTime: 0 // Will be updated in render loop
       });
 
       clearInterval(progressInterval);
       setLoadProgress(100);
 
       // Initialize 3D viewer
-      await initializeViewer(triangles);
+      initializeViewer();
       
       setTimeout(() => {
         setSceneLoaded(true);
@@ -179,85 +252,238 @@ const TriangleSplattingPage: React.FC = () => {
     }
   };
 
-  const parsePLYFile = (text: string) => {
-    // Basic PLY parsing - would be more complex in real implementation  
-    text.split('\n'); // Parse file content (simplified for demo)
-    // Return mock triangles
-    return Array.from({ length: Math.floor(Math.random() * 1000) + 500 }, (_, i) => ({
-      id: i,
-      vertices: [
-        [Math.random() * 2 - 1, Math.random() * 2 - 1, Math.random() * 2 - 1],
-        [Math.random() * 2 - 1, Math.random() * 2 - 1, Math.random() * 2 - 1],
-        [Math.random() * 2 - 1, Math.random() * 2 - 1, Math.random() * 2 - 1]
-      ],
-      color: [Math.random() * 255, Math.random() * 255, Math.random() * 255]
-    }));
+  const parsePLY = (arrayBuffer: ArrayBuffer) => {
+    const text = new TextDecoder().decode(arrayBuffer);
+    const lines = text.split('\n');
+    
+    let headerEnd = 0;
+    let vertexCount = 0;
+    let propertyTypes: string[] = [];
+  
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (line.startsWith('element vertex')) {
+        vertexCount = parseInt(line.split(' ')[2]);
+      }
+      if (line.startsWith('property')) {
+        propertyTypes.push(line.split(' ')[2]);
+      }
+      if (line === 'end_header') {
+        headerEnd = i + 1;
+        break;
+      }
+    }
+    
+    const vertices = new Float32Array(vertexCount * 3);
+    const colors = new Uint8Array(vertexCount * 3);
+    
+    const x_idx = propertyTypes.indexOf('x');
+    const y_idx = propertyTypes.indexOf('y');
+    const z_idx = propertyTypes.indexOf('z');
+    const r_idx = propertyTypes.indexOf('red');
+    const g_idx = propertyTypes.indexOf('green');
+    const b_idx = propertyTypes.indexOf('blue');
+
+    if (x_idx === -1 || y_idx === -1 || z_idx === -1 || r_idx === -1 || g_idx === -1 || b_idx === -1) {
+      throw new Error('PLY file must contain x, y, z, red, green, and blue properties.');
+    }
+
+    for (let i = 0; i < vertexCount; i++) {
+      const line = lines[headerEnd + i].trim().split(' ');
+      
+      vertices[i * 3 + 0] = parseFloat(line[x_idx]);
+      vertices[i * 3 + 1] = parseFloat(line[y_idx]);
+      vertices[i * 3 + 2] = parseFloat(line[z_idx]);
+      
+      colors[i * 3 + 0] = parseInt(line[r_idx]);
+      colors[i * 3 + 1] = parseInt(line[g_idx]);
+      colors[i * 3 + 2] = parseInt(line[b_idx]);
+    }
+    
+    return { vertices, colors };
   };
 
-  const parseOFFFile = (text: string) => {
-    // Basic OFF parsing
-    text.split('\n'); // Parse file content (simplified for demo)
-    // Return mock triangles
-    return Array.from({ length: Math.floor(Math.random() * 800) + 300 }, (_, i) => ({
-      id: i,
-      vertices: [
-        [Math.random() * 2 - 1, Math.random() * 2 - 1, Math.random() * 2 - 1],
-        [Math.random() * 2 - 1, Math.random() * 2 - 1, Math.random() * 2 - 1],
-        [Math.random() * 2 - 1, Math.random() * 2 - 1, Math.random() * 2 - 1]
-      ],
-      color: [Math.random() * 255, Math.random() * 255, Math.random() * 255]
-    }));
-  };
-
-  const parseSPLATFile = (_buffer: ArrayBuffer) => {
-    // Basic SPLAT parsing (binary format)
-    // This would parse the actual triangle splatting format
-    return Array.from({ length: Math.floor(Math.random() * 1200) + 800 }, (_, i) => ({
-      id: i,
-      vertices: [
-        [Math.random() * 2 - 1, Math.random() * 2 - 1, Math.random() * 2 - 1],
-        [Math.random() * 2 - 1, Math.random() * 2 - 1, Math.random() * 2 - 1],
-        [Math.random() * 2 - 1, Math.random() * 2 - 1, Math.random() * 2 - 1]
-      ],
-      color: [Math.random() * 255, Math.random() * 255, Math.random() * 255],
-      opacity: Math.random(),
-      smoothness: Math.random()
-    }));
-  };
-
-  const initializeViewer = async (triangles: any[]) => {
+  const initializeViewer = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    // Initialize WebGL context
-    const gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
+    const gl = canvas.getContext('webgl2', { powerPreference: 'high-performance' }) || canvas.getContext('webgl', { powerPreference: 'high-performance' });
     if (!gl) {
-      throw new Error('WebGL not supported');
+      setError('WebGL is not supported on your browser.');
+      return;
     }
+    glRef.current = gl;
 
-    // Set canvas size
-    canvas.width = canvas.clientWidth;
-    canvas.height = canvas.clientHeight;
-    gl.viewport(0, 0, canvas.width, canvas.height);
+    const vertexShaderSource = `
+      attribute vec4 a_position;
+      attribute vec3 a_color;
+      uniform mat4 u_projection;
+      uniform mat4 u_view;
+      varying vec3 v_color;
+      void main() {
+        gl_Position = u_projection * u_view * a_position;
+        gl_PointSize = 2.0;
+        v_color = a_color;
+      }
+    `;
 
-    // Mock 3D rendering setup
-    gl.clearColor(0.05, 0.05, 0.1, 1.0);
-    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-    gl.enable(gl.DEPTH_TEST);
+    const fragmentShaderSource = `
+      precision mediump float;
+      varying vec3 v_color;
+      void main() {
+        gl_FragColor = vec4(v_color, 1.0);
+      }
+    `;
 
-    // Mock triangle rendering
-    renderTriangles(gl, triangles);
-  };
+    const createShader = (type: number, source: string) => {
+      const shader = gl.createShader(type);
+      if (!shader) throw new Error('Could not create shader');
+      gl.shaderSource(shader, source);
+      gl.compileShader(shader);
+      if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+        throw new Error(gl.getShaderInfoLog(shader) || 'Error compiling shader');
+      }
+      return shader;
+    };
 
-  const renderTriangles = (gl: WebGLRenderingContext, _triangles: any[]) => {
-    const startTime = performance.now();
-    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-    const renderTime = performance.now() - startTime;
+    const vertexShader = createShader(gl.VERTEX_SHADER, vertexShaderSource);
+    const fragmentShader = createShader(gl.FRAGMENT_SHADER, fragmentShaderSource);
+
+    const program = gl.createProgram();
+    if (!program) throw new Error('Could not create program');
+    gl.attachShader(program, vertexShader);
+    gl.attachShader(program, fragmentShader);
+    gl.linkProgram(program);
+    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+      throw new Error(gl.getProgramInfoLog(program) || 'Error linking program');
+    }
+    gl.useProgram(program);
+
+    const positionAttributeLocation = gl.getAttribLocation(program, "a_position");
+    const colorAttributeLocation = gl.getAttribLocation(program, "a_color");
+    const projectionUniformLocation = gl.getUniformLocation(program, "u_projection");
+    const viewUniformLocation = gl.getUniformLocation(program, "u_view");
+
+    const { vertices, colors } = sceneDataRef.current!;
+    const positionBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
+
+    const colorBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, colors, gl.STATIC_DRAW);
+
+    const handleMouseDown = (e: React.MouseEvent) => {
+      isDraggingRef.current = true;
+      if (e.button === 2 || e.ctrlKey || e.metaKey) {
+        isPanningRef.current = true;
+      }
+      lastMousePosRef.current = { x: e.clientX, y: e.clientY };
+    };
+
+    const handleMouseUp = () => {
+      isDraggingRef.current = false;
+      isPanningRef.current = false;
+    };
+
+    const handleMouseMove = (e: React.MouseEvent) => {
+      if (!isDraggingRef.current) return;
+      const dx = e.clientX - lastMousePosRef.current.x;
+      const dy = e.clientY - lastMousePosRef.current.y;
+      lastMousePosRef.current = { x: e.clientX, y: e.clientY };
+
+      if (isPanningRef.current) {
+        setCamera(prev => {
+          const cam = cameraRef.current;
+          const panSpeed = 0.01;
+          const right = [Math.cos(cam.theta), 0, -Math.sin(cam.theta)];
+          const up = [0, 1, 0];
+          const panX = right.map(v => v * -dx * panSpeed);
+          const panY = up.map(v => v * dy * panSpeed);
+          const newTarget = cam.target.map((v, i) => v + panX[i] + panY[i]);
+          return { ...prev, target: newTarget };
+        });
+      } else {
+        setCamera(prev => ({
+          ...prev,
+          theta: prev.theta - dx * 0.01,
+          phi: Math.max(0.1, Math.min(Math.PI - 0.1, prev.phi - dy * 0.01))
+        }));
+      }
+    };
+
+    const handleWheel = (e: React.WheelEvent) => {
+      e.preventDefault();
+      setCamera(prev => ({
+        ...prev,
+        distance: Math.max(1, prev.distance + e.deltaY * 0.01)
+      }));
+    };
     
-    if (sceneStats) {
-      setSceneStats((prev: SceneStats | null) => prev ? { ...prev, renderTime } : null);
+    canvas.addEventListener('mousedown', handleMouseDown as any);
+    canvas.addEventListener('mouseup', handleMouseUp as any);
+    canvas.addEventListener('mousemove', handleMouseMove as any);
+    canvas.addEventListener('wheel', handleWheel as any);
+    canvas.addEventListener('contextmenu', e => e.preventDefault());
+
+    const renderScene = () => {
+      const gl = glRef.current;
+      if (!gl) return;
+      
+      const canvas = gl.canvas as HTMLCanvasElement;
+
+      // Resize canvas if needed
+      if (canvas.width !== canvas.clientWidth || canvas.height !== canvas.clientHeight) {
+        canvas.width = canvas.clientWidth;
+        canvas.height = canvas.clientHeight;
+        gl.viewport(0, 0, canvas.width, canvas.height);
+      }
+
+      gl.clearColor(0.05, 0.05, 0.1, 1.0);
+      gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+      gl.enable(gl.DEPTH_TEST);
+      gl.useProgram(program);
+
+      // Camera
+      const cam = cameraRef.current;
+      const cameraPosition = [
+        cam.target[0] + cam.distance * Math.sin(cam.phi) * Math.cos(cam.theta),
+        cam.target[1] + cam.distance * Math.cos(cam.phi),
+        cam.target[2] + cam.distance * Math.sin(cam.phi) * Math.sin(cam.theta)
+      ];
+      const viewMatrix = mat4.lookAt(cameraPosition, cam.target, [0, 1, 0]);
+      const projectionMatrix = mat4.perspective(controls.fov * Math.PI / 180, canvas.clientWidth / canvas.clientHeight, 0.1, 200);
+
+      gl.uniformMatrix4fv(projectionUniformLocation, false, projectionMatrix);
+      gl.uniformMatrix4fv(viewUniformLocation, false, viewMatrix);
+
+      gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+      gl.enableVertexAttribArray(positionAttributeLocation);
+      gl.vertexAttribPointer(positionAttributeLocation, 3, gl.FLOAT, false, 0, 0);
+
+      gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
+      gl.enableVertexAttribArray(colorAttributeLocation);
+      gl.vertexAttribPointer(colorAttributeLocation, 3, gl.UNSIGNED_BYTE, true, 0, 0);
+
+      gl.drawArrays(gl.POINTS, 0, vertices.length / 3);
+
+      animationFrameIdRef.current = requestAnimationFrame(renderScene);
     }
+    
+    if (animationFrameIdRef.current) {
+      cancelAnimationFrame(animationFrameIdRef.current);
+    }
+    animationFrameIdRef.current = requestAnimationFrame(renderScene);
   };
+
+  useEffect(() => {
+    return () => {
+      // Cleanup on unmount
+      if(animationFrameIdRef.current) {
+        cancelAnimationFrame(animationFrameIdRef.current);
+      }
+    }
+  }, []);
 
   const toggleFullscreen = () => {
     setIsFullscreen(!isFullscreen);

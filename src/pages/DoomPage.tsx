@@ -1,108 +1,18 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useRef } from 'react';
 import { motion } from 'framer-motion';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 
 const DoomPage: React.FC = () => {
-  const [isFullscreen, setIsFullscreen] = useState(false);
   const gameContainerRef = useRef<HTMLDivElement>(null);
 
-  const handleFullscreen = async () => {
-    if (!gameContainerRef.current) return;
-
-    try {
-      // Use the browser's native Fullscreen API
-      if (gameContainerRef.current.requestFullscreen) {
-        await gameContainerRef.current.requestFullscreen();
-      } else if ((gameContainerRef.current as any).webkitRequestFullscreen) {
-        await (gameContainerRef.current as any).webkitRequestFullscreen();
-      } else if ((gameContainerRef.current as any).msRequestFullscreen) {
-        await (gameContainerRef.current as any).msRequestFullscreen();
-      }
-    } catch (error) {
-      console.warn('Fullscreen request failed:', error);
+  const handleFullscreen = () => {
+    if (gameContainerRef.current) {
+      gameContainerRef.current.requestFullscreen().catch(err => {
+        console.error(`Error attempting to enable full-screen mode: ${err.message} (${err.name})`);
+      });
     }
   };
-
-  const exitFullscreen = async () => {
-    try {
-      if (document.exitFullscreen) {
-        await document.exitFullscreen();
-      } else if ((document as any).webkitExitFullscreen) {
-        await (document as any).webkitExitFullscreen();
-      } else if ((document as any).msExitFullscreen) {
-        await (document as any).msExitFullscreen();
-      }
-    } catch (error) {
-      console.warn('Exit fullscreen failed:', error);
-    }
-  };
-
-  useEffect(() => {
-    const handleFullscreenChange = () => {
-      const isCurrentlyFullscreen = !!(
-        document.fullscreenElement ||
-        (document as any).webkitFullscreenElement ||
-        (document as any).msFullscreenElement
-      );
-      setIsFullscreen(isCurrentlyFullscreen);
-    };
-
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isFullscreen) {
-        exitFullscreen();
-      }
-    };
-
-    // Listen for fullscreen changes
-    document.addEventListener('fullscreenchange', handleFullscreenChange);
-    document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
-    document.addEventListener('msfullscreenchange', handleFullscreenChange);
-    
-    // Listen for escape key
-    document.addEventListener('keydown', handleEscape);
-
-    return () => {
-      document.removeEventListener('fullscreenchange', handleFullscreenChange);
-      document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
-      document.removeEventListener('msfullscreenchange', handleFullscreenChange);
-      document.removeEventListener('keydown', handleEscape);
-    };
-  }, [isFullscreen]);
-
-  if (isFullscreen) {
-    return (
-      <div className="w-full h-full bg-black flex flex-col">
-        {/* Minimal fullscreen header */}
-        <div className="bg-gray-900 text-white p-2 flex items-center justify-between flex-shrink-0">
-          <div className="flex items-center space-x-3">
-            <div className="w-6 h-6 bg-red-600 rounded flex items-center justify-center">
-              <span className="material-symbols-outlined text-white text-sm">videogame_asset</span>
-            </div>
-            <span className="text-sm font-medium">DOOM Classic</span>
-            <span className="text-xs text-gray-400">Press ESC or click X to exit fullscreen</span>
-          </div>
-          <button
-            onClick={exitFullscreen}
-            className="p-1 bg-gray-800 hover:bg-gray-700 rounded transition-colors"
-          >
-            <span className="material-symbols-outlined text-sm">close</span>
-          </button>
-        </div>
-
-        {/* Game takes remaining space */}
-        <div className="flex-1 w-full h-full">
-          <iframe
-            src="https://ustymukhman.github.io/webDOOM/public/"
-            className="w-full h-full border-none"
-            title="DOOM Classic"
-            allow="gamepad; midi; encrypted-media; fullscreen"
-            sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
-          />
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="relative flex size-full min-h-screen flex-col dark group/design-root overflow-x-hidden">

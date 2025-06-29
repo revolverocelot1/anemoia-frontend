@@ -97,7 +97,6 @@ body {
 }
 """
     
-    os.makedirs("user.css", exist_ok=True)
     with open("user.css", "w") as f:
         f.write(css_content)
 
@@ -275,7 +274,7 @@ def main():
             "--disable-console-progressbars",
             "--enable-console-prompts",
             f"--ui-settings-file", "/home/xlab-app-center/stable-diffusion-webui-forge/config.json",
-            f"--ui-config-file", "/home/xlab-app-center/ui-config.json"
+            f"--ui-config-file", "/home/xlab-app-center/stable-diffusion-webui-forge/ui-config.json"
         ]
         
         # Set environment variables for better performance
