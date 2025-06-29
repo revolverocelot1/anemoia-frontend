@@ -136,29 +136,25 @@ def download_models():
     for dir_path in model_dirs:
         os.makedirs(dir_path, exist_ok=True)
     
-    # Essential models with faster downloads
+    # Essential models with faster downloads - URLs replaced with reliable OpenXLab mirrors
     models = [
-        # Main SD models (using OpenXLab mirrors when available)
+        # Main SD model
         {
             "url": "https://download.openxlab.org.cn/models/ninjawick/realistic-vision-5.1/weight/realisticVisionV51_v51VAE.safetensors",
             "path": "models/Stable-diffusion/realisticVisionV51_v51VAE.safetensors"
         },
+        # Essential ControlNet models from OpenXLab mirrors
         {
-            "url": "https://huggingface.co/SG161222/Realistic_Vision_V5.1_noVAE/resolve/main/Realistic_Vision_V5.1_fp16-no-ema.safetensors",
-            "path": "models/Stable-diffusion/Realistic_Vision_V5.1_fp16-no-ema.safetensors"
-        },
-        # Essential ControlNet models
-        {
-            "url": "https://huggingface.co/ckpt/ControlNet-v1-1/resolve/main/control_v11f1p_sd15_depth_fp16.safetensors",
-            "path": "extensions/sd-webui-controlnet/models/control_v11f1p_sd15_depth_fp16.safetensors"
+            "url": "https://download.openxlab.org.cn/models/prajjwal1/ControlNet-v1-1/weight/control_v11f1p_sd15_depth.pth",
+            "path": "extensions/sd-webui-controlnet/models/control_v11f1p_sd15_depth.pth"
         },
         {
-            "url": "https://huggingface.co/ckpt/ControlNet-v1-1/resolve/main/control_v11p_sd15_openpose_fp16.safetensors", 
-            "path": "extensions/sd-webui-controlnet/models/control_v11p_sd15_openpose_fp16.safetensors"
+            "url": "https://download.openxlab.org.cn/models/prajjwal1/ControlNet-v1-1/weight/control_v11p_sd15_openpose.pth",
+            "path": "extensions/sd-webui-controlnet/models/control_v11p_sd15_openpose.pth"
         },
         {
-            "url": "https://huggingface.co/ckpt/ControlNet-v1-1/resolve/main/control_v11f1e_sd15_tile_fp16.safetensors",
-            "path": "extensions/sd-webui-controlnet/models/control_v11f1e_sd15_tile_fp16.safetensors"
+            "url": "https://download.openxlab.org.cn/models/prajjwal1/ControlNet-v1-1/weight/control_v11f1e_sd15_tile.pth",
+            "path": "extensions/sd-webui-controlnet/models/control_v11f1e_sd15_tile.pth"
         }
     ]
     
@@ -220,8 +216,10 @@ def create_custom_header():
     return gr.HTML("")
 '''
     
+    # FIX: Create the directories before trying to write the file
+    os.makedirs("extensions/custom-header/scripts", exist_ok=True)
+    
     # Create a custom extension for the header
-    os.makedirs("extensions/custom-header", exist_ok=True)
     with open("extensions/custom-header/scripts/custom_header.py", "w") as f:
         f.write(f"""
 import gradio as gr
