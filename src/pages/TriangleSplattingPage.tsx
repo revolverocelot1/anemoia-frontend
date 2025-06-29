@@ -264,7 +264,6 @@ const TriangleSplattingPage: React.FC = () => {
     const lines = header.split('\n');
 
     let vertexCount = 0;
-    let faceCount = 0;
     let properties: { type: string; name: string; size: number }[] = [];
     let format: 'ascii' | 'binary_little_endian' | 'binary_big_endian' = 'ascii';
     let isVertexElement = false;
