@@ -26,12 +26,11 @@ const MaskingCanvas = forwardRef((props: MaskingCanvasProps, ref) => {
     if (!imageCtx || !maskCtx) return;
 
     const image = new Image();
-    // Setting crossOrigin on data URLs causes the image to fail to load in some browsers
     if (!imageUrl.startsWith('data:')) {
       image.crossOrigin = 'anonymous';
     }
-    image.src = imageUrl;
-    image.onload = () => {
+
+    const handleLoaded = () => {
       // Set canvas dimensions
       imageCanvas.width = image.width;
       imageCanvas.height = image.height;
@@ -54,6 +53,19 @@ const MaskingCanvas = forwardRef((props: MaskingCanvasProps, ref) => {
       // Notify parent of initial (empty) mask
       onMaskChange(initialMask);
     };
+
+    image.onerror = () => {
+      console.error('Failed to load image for masking canvas');
+      setImageLoaded(false);
+    };
+
+    // If the image was cached, onload may not fire. Handle that.
+    if (image.complete && image.naturalWidth > 0) {
+      handleLoaded();
+    } else {
+      image.onload = handleLoaded;
+      image.src = imageUrl;
+    }
   }, [imageUrl, onMaskChange]);
 
   const saveToHistory = () => {
