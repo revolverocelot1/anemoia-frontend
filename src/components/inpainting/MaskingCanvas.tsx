@@ -31,13 +31,39 @@ const MaskingCanvas = forwardRef((props: MaskingCanvasProps, ref) => {
     }
 
     const handleLoaded = () => {
+      // Set canvas dimensions to match the container while maintaining aspect ratio
+      const containerRect = imageCanvas.parentElement?.getBoundingClientRect();
+      if (!containerRect) return;
+
+      const imageAspect = image.width / image.height;
+      const containerAspect = containerRect.width / containerRect.height;
+
+      let canvasWidth, canvasHeight;
+
+      if (imageAspect > containerAspect) {
+        // Image is wider than container
+        canvasWidth = Math.min(containerRect.width, image.width);
+        canvasHeight = canvasWidth / imageAspect;
+      } else {
+        // Image is taller than container
+        canvasHeight = Math.min(containerRect.height, image.height);
+        canvasWidth = canvasHeight * imageAspect;
+      }
+
       // Set canvas dimensions
       imageCanvas.width = image.width;
       imageCanvas.height = image.height;
       maskCanvas.width = image.width;
       maskCanvas.height = image.height;
 
-      // Draw image on image canvas
+      // Set canvas display size
+      imageCanvas.style.width = `${canvasWidth}px`;
+      imageCanvas.style.height = `${canvasHeight}px`;
+      maskCanvas.style.width = `${canvasWidth}px`;
+      maskCanvas.style.height = `${canvasHeight}px`;
+
+      // Clear and draw image on image canvas
+      imageCtx.clearRect(0, 0, imageCanvas.width, imageCanvas.height);
       imageCtx.drawImage(image, 0, 0);
 
       // Initialize mask canvas to black (no mask)
@@ -191,8 +217,14 @@ const MaskingCanvas = forwardRef((props: MaskingCanvasProps, ref) => {
       {/* Background image canvas */}
       <canvas
         ref={imageCanvasRef}
-        className="absolute max-w-full max-h-full object-contain"
-        style={{ opacity: 0.7 }}
+        className="absolute"
+        style={{ 
+          opacity: 1,
+          imageRendering: 'crisp-edges',
+          left: '50%',
+          top: '50%',
+          transform: 'translate(-50%, -50%)'
+        }}
       />
       
       {/* Mask overlay canvas */}
@@ -205,17 +237,20 @@ const MaskingCanvas = forwardRef((props: MaskingCanvasProps, ref) => {
         onTouchStart={startDrawing}
         onTouchMove={draw}
         onTouchEnd={stopDrawing}
-        className="absolute max-w-full max-h-full object-contain cursor-crosshair"
+        className="absolute cursor-crosshair"
         style={{ 
           mixBlendMode: 'multiply',
           filter: 'invert(1)',
-          opacity: 0.8
+          opacity: 0.6,
+          left: '50%',
+          top: '50%',
+          transform: 'translate(-50%, -50%)'
         }}
       />
       
       {/* Instruction overlay */}
       {historyIndex === 0 && (
-        <div className="absolute top-4 left-4 bg-black/70 text-white px-3 py-2 rounded-lg text-sm pointer-events-none">
+        <div className="absolute top-4 left-4 bg-black/70 text-white px-3 py-2 rounded-lg text-sm pointer-events-none z-10">
           Paint over objects to remove them
         </div>
       )}

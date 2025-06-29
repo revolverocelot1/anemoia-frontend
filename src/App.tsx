@@ -13,6 +13,7 @@ import AccountPage from './pages/AccountPage';
 import NewUpscalerPage from './pages/NewUpscalerPage';
 import DoomPage from './pages/DoomPage';
 import AnimeGalleryPage from './pages/AnimeGalleryPage';
+import TriangleSplattingPage from './pages/TriangleSplattingPage';
 // We will create these pages next
 // import PosePage from './pages/PosePage';
 import ImageComparisonPage from './pages/ImageComparisonPage';
@@ -120,6 +121,14 @@ function App() {
           element={
             <AnimatedPage>
               <AnimeGalleryPage />
+            </AnimatedPage>
+          }
+        />
+        <Route
+          path="/triangle-splatting"
+          element={
+            <AnimatedPage>
+              <TriangleSplattingPage />
             </AnimatedPage>
           }
         />

@@ -32,6 +32,17 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onToggle }) => {
       badge: 'WebASM'
     },
     {
+      id: 'triangle-splatting',
+      name: 'Triangle Splatting Viewer',
+      description: 'Next-gen 3D scene viewer with triangle-based rendering',
+      icon: 'view_in_ar',
+      onClick: () => {
+        navigate('/triangle-splatting');
+        onToggle();
+      },
+      badge: '3D'
+    },
+    {
       id: 'anime-gallery',
       name: 'Anime Gallery',
       description: 'Programming books held by anime girls collection',
@@ -154,6 +165,8 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onToggle }) => {
                     className={`relative p-4 rounded-xl border-2 transition-all duration-200 cursor-pointer group ${
                       tool.id === 'doom' 
                         ? 'bg-gradient-to-r from-red-50 to-orange-50 dark:from-red-900/20 dark:to-orange-900/20 border-red-200 dark:border-red-800 hover:border-red-400 dark:hover:border-red-600'
+                        : tool.id === 'triangle-splatting'
+                        ? 'bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-900/20 dark:to-purple-900/20 border-indigo-200 dark:border-indigo-800 hover:border-indigo-400 dark:hover:border-indigo-600'
                         : tool.id === 'anime-gallery'
                         ? 'bg-gradient-to-r from-cyan-50 to-purple-50 dark:from-cyan-900/20 dark:to-purple-900/20 border-cyan-200 dark:border-cyan-800 hover:border-cyan-400 dark:hover:border-cyan-600'
                         : tool.id === 'color-picker'
@@ -171,6 +184,8 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onToggle }) => {
                         <span className={`px-2 py-1 text-xs font-medium rounded-full ${
                           tool.id === 'doom' 
                             ? 'bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-300'
+                            : tool.id === 'triangle-splatting'
+                            ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300'
                             : tool.id === 'anime-gallery'
                             ? 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/50 dark:text-cyan-300'
                             : 'bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300'
@@ -184,6 +199,8 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onToggle }) => {
                       <div className={`w-12 h-12 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform ${
                         tool.id === 'doom' 
                           ? 'bg-red-600 group-hover:bg-red-700'
+                          : tool.id === 'triangle-splatting'
+                          ? 'bg-indigo-600 group-hover:bg-indigo-700'
                           : tool.id === 'anime-gallery'
                           ? 'bg-cyan-600 group-hover:bg-cyan-700'
                           : tool.id === 'color-picker'
@@ -208,9 +225,9 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onToggle }) => {
                     <div className="mt-3 flex items-center justify-between">
                       <div className="flex items-center space-x-2 text-xs text-gray-500 dark:text-gray-500">
                         <span className="material-symbols-outlined text-sm">
-                          {tool.id === 'doom' ? 'launch' : 'build'}
+                          {tool.id === 'doom' || tool.id === 'triangle-splatting' || tool.id === 'anime-gallery' ? 'launch' : 'build'}
                         </span>
-                        <span>{tool.id === 'doom' || tool.id === 'anime-gallery' ? 'Ready to explore' : 'Coming soon'}</span>
+                        <span>{tool.id === 'doom' || tool.id === 'triangle-splatting' || tool.id === 'anime-gallery' ? 'Ready to explore' : 'Coming soon'}</span>
                       </div>
                       
                       <motion.div
