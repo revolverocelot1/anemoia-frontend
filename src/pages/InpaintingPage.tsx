@@ -19,7 +19,7 @@ const RedoIcon = () => <span className="material-symbols-outlined">redo</span>;
 const ResetIcon = () => <span className="material-symbols-outlined">restart_alt</span>;
 
 // Define the model type
-type ModelType = 'auto' | 'mi-gan-mobile' | 'aot-gan';
+type ModelType = 'auto' | 'mi-gan-mobile' | 'aot-gan' | 'lama-gpu';
 type ProcessingStage = 'upload' | 'mask' | 'processing' | 'result';
 
 interface ModelSelectorProps {
@@ -34,7 +34,8 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({ selectedModel, onSelect }
       {[
         { id: 'auto', name: 'Auto Select', desc: 'Best model for your device' },
         { id: 'mi-gan-mobile', name: 'MI-GAN Mobile', desc: 'Fast processing' },
-        { id: 'aot-gan', name: 'AOT-GAN', desc: 'High quality' }
+        { id: 'aot-gan', name: 'AOT-GAN', desc: 'High quality' },
+        { id: 'lama-gpu', name: 'LaMa GPU', desc: 'GPU Turbo (512px)' }
       ].map(model => (
         <button
           key={model.id}
@@ -154,7 +155,7 @@ const InpaintingPage: React.FC = () => {
   // Initialize worker
   useEffect(() => {
     workerRef.current = new Worker(new URL('../workers/inpainting.worker.ts', import.meta.url), { type: 'module' });
-    
+
     workerRef.current.onmessage = (event: MessageEvent) => {
       const { status, message, error: workerError, resultImageData, performanceStats, progress: workerProgress } = event.data;
 
@@ -185,13 +186,13 @@ const InpaintingPage: React.FC = () => {
               ctx.putImageData(imageData, 0, 0);
               canvas.toBlob((blob) => {
                 if (blob) {
-                  const url = URL.createObjectURL(blob);
-                  setResultImageUrl(url);
-                  setStats(performanceStats);
+              const url = URL.createObjectURL(blob);
+              setResultImageUrl(url);
+              setStats(performanceStats);
                   setIsProcessing(false);
                   setStage('result');
                 }
-              });
+            });
             }
           }
           break;
@@ -278,8 +279,8 @@ const InpaintingPage: React.FC = () => {
     setStatusMessage('Preparing image...');
 
     // Convert image to ImageData
-    const img = new Image();
-    img.onload = () => {
+      const img = new Image();
+      img.onload = () => {
       const canvas = document.createElement('canvas');
       canvas.width = img.width;
       canvas.height = img.height;
@@ -448,59 +449,59 @@ const InpaintingPage: React.FC = () => {
   };
 
   return (
-    <div className="relative flex min-h-screen flex-col bg-gray-950 text-white">
-      <Header />
-      
+      <div className="relative flex min-h-screen flex-col bg-gray-950 text-white">
+        <Header />
+        
       <main className="flex-1 py-8 px-4">
         <AnimatePresence mode="wait">
-          <motion.div
+            <motion.div
             key={stage}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            transition={{ duration: 0.5 }}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.5 }}
             className="w-full min-h-[70vh] flex items-center justify-center"
           >
             {renderContent()}
-          </motion.div>
+            </motion.div>
         </AnimatePresence>
       </main>
 
       {/* Processing Overlay */}
-      <AnimatePresence>
+        <AnimatePresence>
         {stage === 'processing' && (
-          <ProcessingOverlay 
-            statusMessage={statusMessage} 
-            progress={progress} 
-          />
-        )}
-      </AnimatePresence>
+            <ProcessingOverlay 
+              statusMessage={statusMessage} 
+              progress={progress}
+            />
+          )}
+        </AnimatePresence>
 
       {/* Error Message */}
-      {error && (
-        <motion.div 
-          className="fixed bottom-8 left-1/2 transform -translate-x-1/2 bg-red-500/10 border border-red-500/20 text-red-400 text-center px-6 py-4 rounded-xl backdrop-blur-sm z-50 max-w-md"
-          initial={{ opacity: 0, y: 100 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: 100 }}
-        >
-          <div className="flex items-center space-x-2">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <span>{error}</span>
+        {error && (
+          <motion.div 
+            className="fixed bottom-8 left-1/2 transform -translate-x-1/2 bg-red-500/10 border border-red-500/20 text-red-400 text-center px-6 py-4 rounded-xl backdrop-blur-sm z-50 max-w-md"
+            initial={{ opacity: 0, y: 100 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 100 }}
+          >
+            <div className="flex items-center space-x-2">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span>{error}</span>
             <button 
               onClick={() => setError(null)}
               className="ml-2 text-red-300 hover:text-red-200"
             >
               ×
             </button>
-          </div>
-        </motion.div>
-      )}
+            </div>
+          </motion.div>
+        )}
 
-      <Footer />
-    </div>
+        <Footer />
+      </div>
   );
 };
 

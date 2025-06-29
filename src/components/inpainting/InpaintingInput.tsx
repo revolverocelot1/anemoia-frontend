@@ -148,6 +148,17 @@ const InpaintingInput: React.FC<InpaintingInputProps> = ({ onImageUploaded, isPr
       quality: 'Best' as const,
       type: 'aot-gan',
       gpuType: 'Dedicated GPU'
+    },
+    {
+      title: 'LaMa GPU Turbo',
+      description: 'Fast GPU-accelerated inpainting powered by LaMa. Fixed 512×512 resolution.',
+      modelType: 'LaMa',
+      size: '90MB',
+      speed: 'Medium' as const,
+      quality: 'Better' as const,
+      type: 'lama-gpu',
+      gpuType: 'Any GPU',
+      recommended: false
     }
   ];
 

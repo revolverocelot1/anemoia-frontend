@@ -26,7 +26,10 @@ const MaskingCanvas = forwardRef((props: MaskingCanvasProps, ref) => {
     if (!imageCtx || !maskCtx) return;
 
     const image = new Image();
-    image.crossOrigin = "anonymous";
+    // Setting crossOrigin on data URLs causes the image to fail to load in some browsers
+    if (!imageUrl.startsWith('data:')) {
+      image.crossOrigin = 'anonymous';
+    }
     image.src = imageUrl;
     image.onload = () => {
       // Set canvas dimensions
