@@ -14,6 +14,7 @@ import NewUpscalerPage from './pages/NewUpscalerPage';
 import DoomPage from './pages/DoomPage';
 import AnimeGalleryPage from './pages/AnimeGalleryPage';
 import TriangleSplattingPage from './pages/TriangleSplattingPage';
+import GaussianSplattingPage from './pages/GaussianSplattingPage';
 // We will create these pages next
 // import PosePage from './pages/PosePage';
 import ImageComparisonPage from './pages/ImageComparisonPage';
@@ -129,6 +130,14 @@ function App() {
           element={
             <AnimatedPage>
               <TriangleSplattingPage />
+            </AnimatedPage>
+          }
+        />
+        <Route
+          path="/gaussian-splatting"
+          element={
+            <AnimatedPage>
+              <GaussianSplattingPage />
             </AnimatedPage>
           }
         />

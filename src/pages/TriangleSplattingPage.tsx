@@ -254,20 +254,34 @@ const TriangleSplattingPage: React.FC = () => {
 
   const parsePLY = (arrayBuffer: ArrayBuffer) => {
     const text = new TextDecoder().decode(arrayBuffer);
-    const lines = text.split('\n').filter(line => line.trim() !== ''); // Filter empty lines
+    const lines = text.split('\n');
     
     let headerEnd = 0;
     let vertexCount = 0;
+    let faceCount = 0;
     let properties: { type: string; name: string }[] = [];
+    let isInVertexElement = false;
   
     // Parse header
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i].trim();
+      
       if (line.startsWith('element vertex')) {
         vertexCount = parseInt(line.split(' ')[2]);
+        isInVertexElement = true;
+        continue;
       }
-      if (line.startsWith('property')) {
-        const parts = line.split(' ');
+      
+      if (line.startsWith('element face') || line.startsWith('element')) {
+        isInVertexElement = false;
+        if (line.startsWith('element face')) {
+          faceCount = parseInt(line.split(' ')[2]);
+        }
+        continue;
+      }
+      
+      if (line.startsWith('property') && isInVertexElement) {
+        const parts = line.split(/\s+/);
         if (parts.length >= 3) {
           properties.push({
             type: parts[1], // float, uchar, etc.
@@ -275,11 +289,15 @@ const TriangleSplattingPage: React.FC = () => {
           });
         }
       }
+      
       if (line === 'end_header') {
         headerEnd = i + 1;
         break;
       }
     }
+    
+    console.log(`PLY Info: ${vertexCount} vertices, ${faceCount} faces, ${properties.length} properties per vertex`);
+    console.log('Properties:', properties.map(p => `${p.name}(${p.type})`).join(', '));
     
     if (vertexCount === 0) {
       throw new Error('PLY file does not contain any vertices.');
@@ -301,7 +319,7 @@ const TriangleSplattingPage: React.FC = () => {
     
     // Check for required position properties
     if (x_idx === -1 || y_idx === -1 || z_idx === -1) {
-      throw new Error('PLY file must contain x, y, z coordinate properties.');
+      throw new Error(`PLY file must contain x, y, z coordinate properties. Found properties: ${propertyNames.join(', ')}`);
     }
     
     // If no color properties found, create default colors
@@ -313,52 +331,96 @@ const TriangleSplattingPage: React.FC = () => {
     }
 
     // Parse vertex data
+    let successfulVertices = 0;
     for (let i = 0; i < vertexCount; i++) {
       const lineIndex = headerEnd + i;
       if (lineIndex >= lines.length) {
-        throw new Error(`PLY file is truncated. Expected ${vertexCount} vertices, found ${i}.`);
+        console.warn(`PLY file appears truncated. Expected ${vertexCount} vertices, processed ${i}.`);
+        break;
       }
       
       const line = lines[lineIndex];
       if (!line || line.trim() === '') {
-        throw new Error(`Empty line found in vertex data at line ${lineIndex + 1}.`);
+        // Skip empty lines and continue
+        continue;
       }
       
       const values = line.trim().split(/\s+/); // Split on any whitespace
       
-      if (values.length < properties.length) {
-        throw new Error(`Invalid vertex data at line ${lineIndex + 1}. Expected ${properties.length} values, found ${values.length}.`);
+      // More flexible validation - allow fewer values than properties if we have the essentials
+      if (values.length < 3) {
+        console.warn(`Skipping line ${lineIndex + 1}: insufficient data (${values.length} values)`);
+        continue;
+      }
+      
+      // Ensure we have enough values for the required indices
+      const maxRequiredIndex = Math.max(x_idx, y_idx, z_idx, hasColors ? Math.max(r_idx, g_idx, b_idx) : -1);
+      if (values.length <= maxRequiredIndex) {
+        console.warn(`Skipping line ${lineIndex + 1}: insufficient values for required properties (${values.length} values, need ${maxRequiredIndex + 1})`);
+        continue;
       }
       
       // Parse positions
-      vertices[i * 3 + 0] = parseFloat(values[x_idx]);
-      vertices[i * 3 + 1] = parseFloat(values[y_idx]);
-      vertices[i * 3 + 2] = parseFloat(values[z_idx]);
+      const x = parseFloat(values[x_idx]);
+      const y = parseFloat(values[y_idx]);
+      const z = parseFloat(values[z_idx]);
+      
+      // Validate coordinates
+      if (isNaN(x) || isNaN(y) || isNaN(z)) {
+        console.warn(`Skipping line ${lineIndex + 1}: invalid coordinates (${x}, ${y}, ${z})`);
+        continue;
+      }
+      
+      vertices[successfulVertices * 3 + 0] = x;
+      vertices[successfulVertices * 3 + 1] = y;
+      vertices[successfulVertices * 3 + 2] = z;
       
       // Parse colors or use defaults
-      if (hasColors) {
+      if (hasColors && r_idx < values.length && g_idx < values.length && b_idx < values.length) {
         // Handle both 0-1 float and 0-255 integer color formats
         const rVal = parseFloat(values[r_idx]);
         const gVal = parseFloat(values[g_idx]);
         const bVal = parseFloat(values[b_idx]);
         
-        // If values are between 0-1, convert to 0-255
-        const rColor = rVal <= 1.0 ? Math.round(rVal * 255) : Math.round(rVal);
-        const gColor = gVal <= 1.0 ? Math.round(gVal * 255) : Math.round(gVal);
-        const bColor = bVal <= 1.0 ? Math.round(bVal * 255) : Math.round(bVal);
-        
-        colors[i * 3 + 0] = Math.max(0, Math.min(255, rColor));
-        colors[i * 3 + 1] = Math.max(0, Math.min(255, gColor));
-        colors[i * 3 + 2] = Math.max(0, Math.min(255, bColor));
+        if (!isNaN(rVal) && !isNaN(gVal) && !isNaN(bVal)) {
+          // If values are between 0-1, convert to 0-255
+          const rColor = rVal <= 1.0 ? Math.round(rVal * 255) : Math.round(rVal);
+          const gColor = gVal <= 1.0 ? Math.round(gVal * 255) : Math.round(gVal);
+          const bColor = bVal <= 1.0 ? Math.round(bVal * 255) : Math.round(bVal);
+          
+          colors[successfulVertices * 3 + 0] = Math.max(0, Math.min(255, rColor));
+          colors[successfulVertices * 3 + 1] = Math.max(0, Math.min(255, gColor));
+          colors[successfulVertices * 3 + 2] = Math.max(0, Math.min(255, bColor));
+        } else {
+          // Default color if parsing failed
+          colors[successfulVertices * 3 + 0] = 128;
+          colors[successfulVertices * 3 + 1] = 128;
+          colors[successfulVertices * 3 + 2] = 255;
+        }
       } else {
         // Default rainbow colors based on position
-        colors[i * 3 + 0] = Math.round(((vertices[i * 3 + 0] + 1) * 0.5) * 255) % 256;
-        colors[i * 3 + 1] = Math.round(((vertices[i * 3 + 1] + 1) * 0.5) * 255) % 256;
-        colors[i * 3 + 2] = Math.round(((vertices[i * 3 + 2] + 1) * 0.5) * 255) % 256;
+        colors[successfulVertices * 3 + 0] = Math.round(((x + 1) * 0.5) * 255) % 256;
+        colors[successfulVertices * 3 + 1] = Math.round(((y + 1) * 0.5) * 255) % 256;
+        colors[successfulVertices * 3 + 2] = Math.round(((z + 1) * 0.5) * 255) % 256;
       }
+      
+      successfulVertices++;
     }
     
-    return { vertices, colors };
+    console.log(`Successfully parsed ${successfulVertices} out of ${vertexCount} vertices`);
+    
+    if (successfulVertices === 0) {
+      throw new Error('No valid vertices found in PLY file');
+    }
+    
+    // Trim arrays to actual successful vertices
+    const trimmedVertices = new Float32Array(successfulVertices * 3);
+    const trimmedColors = new Uint8Array(successfulVertices * 3);
+    
+    trimmedVertices.set(vertices.subarray(0, successfulVertices * 3));
+    trimmedColors.set(colors.subarray(0, successfulVertices * 3));
+    
+    return { vertices: trimmedVertices, colors: trimmedColors };
   };
 
   const initializeViewer = () => {
