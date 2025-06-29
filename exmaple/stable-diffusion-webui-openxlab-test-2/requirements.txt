@@ -1,0 +1,33 @@
+# Updated requirements for Stable Diffusion WebUI Forge
+# Optimized for OpenXLab deployment
+
+# Core PyTorch (updated versions)
+--extra-index-url https://download.pytorch.org/whl/cu118
+torch==2.1.0+cu118
+torchvision==0.16.0+cu118
+torchaudio==2.1.0+cu118
+torchtext==0.16.0
+torchdata==0.7.0
+
+# Performance optimizations
+xformers==0.0.22.post7
+triton==2.1.0
+
+# Additional dependencies for Forge
+accelerate>=0.21.0
+transformers>=4.25.1
+diffusers>=0.21.0
+opencv-python>=4.8.0
+pillow>=9.5.0
+numpy>=1.24.0
+gradio>=3.50.0
+
+# For better model loading and performance
+safetensors>=0.3.3
+huggingface-hub>=0.16.4
+pydantic>=1.10.0
+omegaconf>=2.3.0
+
+# Optional but recommended
+timm>=0.9.2
+einops>=0.6.1

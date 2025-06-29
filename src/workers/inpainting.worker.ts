@@ -712,7 +712,7 @@ class ObjectRemovalProcessor {
 
          stats.preprocessTime = performance.now() - preprocessStart;
 
-         const inferenceStart = performance.now();
+        const inferenceStart = performance.now();
 
          // Update acceleration status based on GPU
          if (this.gpuInfo?.webgpuSupported) {
@@ -730,7 +730,7 @@ class ObjectRemovalProcessor {
 
        // ---------- Post-processing shared ----------
 
-       const postprocessStart = performance.now();
+          const postprocessStart = performance.now();
 
        postMessage({
          status: 'processing',

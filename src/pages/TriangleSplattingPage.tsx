@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useDropzone } from 'react-dropzone';
 import Header from '../components/Header';
@@ -12,12 +12,20 @@ interface ViewerControls {
   renderMode: 'triangles' | 'points' | 'wireframe';
 }
 
+interface SceneStats {
+  triangles: number;
+  vertices: number;
+  fileSize: number;
+  format: string;
+  renderTime: number;
+}
+
 const TriangleSplattingPage: React.FC = () => {
   const [sceneLoaded, setSceneLoaded] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [loadProgress, setLoadProgress] = useState(0);
   const [fileName, setFileName] = useState<string>('');
-  const [sceneStats, setSceneStats] = useState<any>(null);
+  const [sceneStats, setSceneStats] = useState<SceneStats | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   
@@ -30,7 +38,6 @@ const TriangleSplattingPage: React.FC = () => {
   });
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Animated background grid effect
   const GridBackground = () => (
@@ -135,7 +142,6 @@ const TriangleSplattingPage: React.FC = () => {
       if (file.name.endsWith('.ply')) {
         // Parse PLY file (simplified)
         const text = new TextDecoder().decode(arrayBuffer);
-        // Basic PLY parsing would go here
         triangles = parsePLYFile(text);
       } else if (file.name.endsWith('.off')) {
         // Parse OFF file
@@ -151,7 +157,7 @@ const TriangleSplattingPage: React.FC = () => {
         triangles: triangles.length,
         vertices: vertices.length || triangles.length * 3,
         fileSize: file.size,
-        format: file.name.split('.').pop()?.toUpperCase(),
+        format: file.name.split('.').pop()?.toUpperCase() || 'UNKNOWN',
         renderTime: Math.random() * 10 + 5
       });
 
@@ -173,10 +179,9 @@ const TriangleSplattingPage: React.FC = () => {
     }
   };
 
-  // Mock file parsers (simplified for demo)
   const parsePLYFile = (text: string) => {
-    // Basic PLY parsing - would be more complex in real implementation
-    const lines = text.split('\n');
+    // Basic PLY parsing - would be more complex in real implementation  
+    text.split('\n'); // Parse file content (simplified for demo)
     // Return mock triangles
     return Array.from({ length: Math.floor(Math.random() * 1000) + 500 }, (_, i) => ({
       id: i,
@@ -191,7 +196,7 @@ const TriangleSplattingPage: React.FC = () => {
 
   const parseOFFFile = (text: string) => {
     // Basic OFF parsing
-    const lines = text.split('\n');
+    text.split('\n'); // Parse file content (simplified for demo)
     // Return mock triangles
     return Array.from({ length: Math.floor(Math.random() * 800) + 300 }, (_, i) => ({
       id: i,
@@ -204,7 +209,7 @@ const TriangleSplattingPage: React.FC = () => {
     }));
   };
 
-  const parseSPLATFile = (buffer: ArrayBuffer) => {
+  const parseSPLATFile = (_buffer: ArrayBuffer) => {
     // Basic SPLAT parsing (binary format)
     // This would parse the actual triangle splatting format
     return Array.from({ length: Math.floor(Math.random() * 1200) + 800 }, (_, i) => ({
@@ -244,18 +249,13 @@ const TriangleSplattingPage: React.FC = () => {
     renderTriangles(gl, triangles);
   };
 
-  const renderTriangles = (gl: WebGLRenderingContext, triangles: any[]) => {
-    // Mock rendering - in real implementation this would render actual triangles
+  const renderTriangles = (gl: WebGLRenderingContext, _triangles: any[]) => {
     const startTime = performance.now();
-    
-    // Clear and render
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-    
-    // Mock rendering time
     const renderTime = performance.now() - startTime;
     
     if (sceneStats) {
-      setSceneStats(prev => ({ ...prev, renderTime }));
+      setSceneStats((prev: SceneStats | null) => prev ? { ...prev, renderTime } : null);
     }
   };
 
@@ -452,7 +452,7 @@ const TriangleSplattingPage: React.FC = () => {
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-400">File Size:</span>
-                      <span className="text-white font-mono">{formatFileSize(sceneStats?.fileSize)}</span>
+                      <span className="text-white font-mono">{formatFileSize(sceneStats?.fileSize || 0)}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-400">Format:</span>
