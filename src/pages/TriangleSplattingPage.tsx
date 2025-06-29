@@ -104,7 +104,7 @@ const TriangleSplattingPage: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const glRef = useRef<WebGLRenderingContext | null>(null);
   const animationFrameIdRef = useRef<number>(0);
-  const sceneDataRef = useRef<{ vertices: Float32Array; colors: Uint8Array } | null>(null);
+  const sceneDataRef = useRef<{ vertices: Float32Array; colors: Uint8Array; indices?: Uint32Array } | null>(null);
   const cameraRef = useRef(camera);
   const isDraggingRef = useRef(false);
   const lastMousePosRef = useRef({ x: 0, y: 0 });
@@ -212,22 +212,27 @@ const TriangleSplattingPage: React.FC = () => {
       
       let vertices: Float32Array = new Float32Array();
       let colors: Uint8Array = new Uint8Array();
+      let indices: Uint32Array = new Uint32Array();
       
       if (file.name.endsWith('.ply')) {
         const data = parsePLY(arrayBuffer);
         vertices = data.vertices;
         colors = data.colors;
+        // Note: PLY parser here doesn't extract faces, so we can't render triangles yet.
       } else if (file.name.endsWith('.off')) {
-        throw new Error('.off file format not yet supported. Please use .ply.');
+        const data = parseOFF(arrayBuffer);
+        vertices = data.vertices;
+        colors = data.colors;
+        indices = data.indices;
       } else if (file.name.endsWith('.splat')) {
-        throw new Error('.splat file format not yet supported. Please use .ply.');
+        throw new Error('.splat file format not yet supported. Please use .ply or .off');
       }
 
-      sceneDataRef.current = { vertices, colors };
+      sceneDataRef.current = { vertices, colors, indices };
 
       // Generate scene stats
       setSceneStats({
-        triangles: 0, // Placeholder, as we are rendering points
+        triangles: indices.length / 3,
         vertices: vertices.length / 3,
         fileSize: file.size,
         format: file.name.split('.').pop()?.toUpperCase() || 'UNKNOWN',
@@ -423,6 +428,58 @@ const TriangleSplattingPage: React.FC = () => {
     return { vertices: trimmedVertices, colors: trimmedColors };
   };
 
+  const parseOFF = (arrayBuffer: ArrayBuffer) => {
+    const text = new TextDecoder().decode(arrayBuffer);
+    const lines = text.split('\n').filter(line => line.trim().length > 0 && !line.startsWith('#'));
+
+    if (lines[0].trim() !== 'OFF') {
+      // Some OFF files may have COFF for color
+      if (!lines[0].trim().endsWith('OFF')) {
+        throw new Error('Invalid OFF file header');
+      }
+    }
+
+    const hasColor = lines[0].trim().startsWith('C');
+
+    const [numVertices, numFaces] = lines[1].trim().split(/\s+/).map(Number);
+
+    const vertices = new Float32Array(numVertices * 3);
+    const colors = new Uint8Array(numVertices * 3);
+    const indices = new Uint32Array(numFaces * 3);
+
+    // Read vertices
+    for (let i = 0; i < numVertices; i++) {
+      const line = lines[i + 2].trim().split(/\s+/);
+      vertices[i * 3 + 0] = parseFloat(line[0]);
+      vertices[i * 3 + 1] = parseFloat(line[1]);
+      vertices[i * 3 + 2] = parseFloat(line[2]);
+      if (hasColor) {
+        colors[i * 3 + 0] = parseInt(line[3]);
+        colors[i * 3 + 1] = parseInt(line[4]);
+        colors[i * 3 + 2] = parseInt(line[5]);
+      } else {
+        colors[i * 3 + 0] = 128;
+        colors[i * 3 + 1] = 128;
+        colors[i * 3 + 2] = 255;
+      }
+    }
+
+    // Read faces
+    for (let i = 0; i < numFaces; i++) {
+      const line = lines[i + 2 + numVertices].trim().split(/\s+/).map(Number);
+      // We only support triangles, so we assume the first value is 3
+      if (line[0] !== 3) {
+        console.warn(`Skipping non-triangular face on line ${i + 3 + numVertices}`);
+        continue;
+      }
+      indices[i * 3 + 0] = line[1];
+      indices[i * 3 + 1] = line[2];
+      indices[i * 3 + 2] = line[3];
+    }
+    
+    return { vertices, colors, indices };
+  };
+
   const initializeViewer = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -484,7 +541,7 @@ const TriangleSplattingPage: React.FC = () => {
     const projectionUniformLocation = gl.getUniformLocation(program, "u_projection");
     const viewUniformLocation = gl.getUniformLocation(program, "u_view");
 
-    const { vertices, colors } = sceneDataRef.current!;
+    const { vertices, colors, indices } = sceneDataRef.current!;
     const positionBuffer = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
@@ -492,6 +549,13 @@ const TriangleSplattingPage: React.FC = () => {
     const colorBuffer = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, colors, gl.STATIC_DRAW);
+
+    let indexBuffer: WebGLBuffer | null = null;
+    if (indices && indices.length > 0) {
+      indexBuffer = gl.createBuffer();
+      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
+      gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, indices, gl.STATIC_DRAW);
+    }
 
     const handleMouseDown = (e: React.MouseEvent) => {
       isDraggingRef.current = true;
@@ -585,7 +649,15 @@ const TriangleSplattingPage: React.FC = () => {
       gl.enableVertexAttribArray(colorAttributeLocation);
       gl.vertexAttribPointer(colorAttributeLocation, 3, gl.UNSIGNED_BYTE, true, 0, 0);
 
-      gl.drawArrays(gl.POINTS, 0, vertices.length / 3);
+      if (indexBuffer && indices && indices.length > 0) {
+        // Bind the index buffer before drawing
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
+        // Use drawElements to render triangles
+        gl.drawElements(gl.TRIANGLES, indices.length, gl.UNSIGNED_INT, 0);
+      } else {
+        // Fallback to drawing points if no indices
+        gl.drawArrays(gl.POINTS, 0, vertices.length / 3);
+      }
 
       animationFrameIdRef.current = requestAnimationFrame(renderScene);
     }

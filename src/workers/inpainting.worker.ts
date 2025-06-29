@@ -221,7 +221,7 @@ class ObjectRemovalProcessor {
       if (!gpu.webgpuSupported || gpu.type === 'unknown') {
         try {
           const canvas = new OffscreenCanvas(1, 1);
-          const gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
+          const gl = canvas.getContext('webgl2', { powerPreference: 'high-performance' }) || canvas.getContext('webgl', { powerPreference: 'high-performance' });
           
           if (gl) {
             const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
