@@ -26,164 +26,165 @@ import TermsOfServicePage from './pages/TermsOfServicePage';
 function App() {
   const location = useLocation();
   return (
-    // We don't need a wrapper div here anymore, the layout is handled by pages
-    <AnimatePresence mode="wait">
-      <Routes location={location} key={location.pathname}>
-        <Route
-          path="/"
-          element={
-            <AnimatedPage>
-              <HomePage />
-            </AnimatedPage>
-          }
-        />
-        <Route
-          path="/depth-map"
-          element={
-            <AnimatedPage>
-              <DepthMapPage />
-            </AnimatedPage>
-          }
-        />
-        <Route
-          path="/login"
-          element={
-            <AnimatedPage>
-              <LoginPage />
-            </AnimatedPage>
-          }
-        />
-        <Route
-          path="/auth/callback"
-          element={
-            <AnimatedPage>
-              <AuthCallbackPage />
-            </AnimatedPage>
-          }
-        />
-        <Route
-          path="/account"
-          element={
-            <AnimatedPage>
-              <AccountPage />
-            </AnimatedPage>
-          }
-        />
-        <Route
-          path="/settings"
-          element={
-            <AnimatedPage>
-              <SettingsPage />
-            </AnimatedPage>
-          }
-        />
-        <Route
-          path="/faq"
-          element={
-            <AnimatedPage>
-              <FAQPage />
-            </AnimatedPage>
-          }
-        />
-        <Route
-          path="/pose-estimation"
-          element={
-            <AnimatedPage>
-              <PosePage />
-            </AnimatedPage>
-          }
-        />
-        <Route
-          path="/pose-estimation/results"
-          element={
-            <AnimatedPage>
-              <PoseResultsPage />
-            </AnimatedPage>
-          }
-        />
-        <Route
-          path="/upscaler"
-          element={
-            <AnimatedPage>
-              <NewUpscalerPage />
-            </AnimatedPage>
-          }
-        />
-        <Route
-          path="/doom"
-          element={
-            <AnimatedPage>
-              <DoomPage />
-            </AnimatedPage>
-          }
-        />
-        <Route
-          path="/anime-gallery"
-          element={
-            <AnimatedPage>
-              <AnimeGalleryPage />
-            </AnimatedPage>
-          }
-        />
-        <Route
-          path="/triangle-splatting"
-          element={
-            <AnimatedPage>
-              <TriangleSplattingPage />
-            </AnimatedPage>
-          }
-        />
-        <Route
-          path="/gaussian-splatting"
-          element={
-            <AnimatedPage>
-              <GaussianSplattingPage />
-            </AnimatedPage>
-          }
-        />
-        <Route
-          path="/compare"
-          element={
-            <AnimatedPage>
-              <ImageComparisonPage />
-            </AnimatedPage>
-          }
-        />
-        <Route
-          path="/compare/results"
-          element={
-            <AnimatedPage>
-              <ImageComparisonResultsPage />
-            </AnimatedPage>
-          }
-        />
-        <Route
-          path="/inpainting"
-          element={
-            <AnimatedPage>
-              <InpaintingPage />
-            </AnimatedPage>
-          }
-        />
-        <Route
-          path="/privacy"
-          element={
-            <AnimatedPage>
-              <PrivacyPolicyPage />
-            </AnimatedPage>
-          }
-        />
-        <Route
-          path="/terms"
-          element={
-            <AnimatedPage>
-              <TermsOfServicePage />
-            </AnimatedPage>
-          }
-        />
-        {/* <Route path="/pose-estimation" element={<PosePage />} /> */}
-      </Routes>
-    </AnimatePresence>
+    <div className="min-h-screen bg-gray-950 text-white">
+      <AnimatePresence mode="wait">
+        <Routes location={location} key={location.pathname}>
+          <Route
+            path="/"
+            element={
+              <AnimatedPage>
+                <HomePage />
+              </AnimatedPage>
+            }
+          />
+          <Route
+            path="/depth-map"
+            element={
+              <AnimatedPage>
+                <DepthMapPage />
+              </AnimatedPage>
+            }
+          />
+          <Route
+            path="/login"
+            element={
+              <AnimatedPage>
+                <LoginPage />
+              </AnimatedPage>
+            }
+          />
+          <Route
+            path="/auth/callback"
+            element={
+              <AnimatedPage>
+                <AuthCallbackPage />
+              </AnimatedPage>
+            }
+          />
+          <Route
+            path="/account"
+            element={
+              <AnimatedPage>
+                <AccountPage />
+              </AnimatedPage>
+            }
+          />
+          <Route
+            path="/settings"
+            element={
+              <AnimatedPage>
+                <SettingsPage />
+              </AnimatedPage>
+            }
+          />
+          <Route
+            path="/faq"
+            element={
+              <AnimatedPage>
+                <FAQPage />
+              </AnimatedPage>
+            }
+          />
+          <Route
+            path="/pose-estimation"
+            element={
+              <AnimatedPage>
+                <PosePage />
+              </AnimatedPage>
+            }
+          />
+          <Route
+            path="/pose-estimation/results"
+            element={
+              <AnimatedPage>
+                <PoseResultsPage />
+              </AnimatedPage>
+            }
+          />
+          <Route
+            path="/upscaler"
+            element={
+              <AnimatedPage>
+                <NewUpscalerPage />
+              </AnimatedPage>
+            }
+          />
+          <Route
+            path="/doom"
+            element={
+              <AnimatedPage>
+                <DoomPage />
+              </AnimatedPage>
+            }
+          />
+          <Route
+            path="/anime-gallery"
+            element={
+              <AnimatedPage>
+                <AnimeGalleryPage />
+              </AnimatedPage>
+            }
+          />
+          <Route
+            path="/triangle-splatting"
+            element={
+              <AnimatedPage>
+                <TriangleSplattingPage />
+              </AnimatedPage>
+            }
+          />
+          <Route
+            path="/gaussian-splatting"
+            element={
+              <AnimatedPage>
+                <GaussianSplattingPage />
+              </AnimatedPage>
+            }
+          />
+          <Route
+            path="/compare"
+            element={
+              <AnimatedPage>
+                <ImageComparisonPage />
+              </AnimatedPage>
+            }
+          />
+          <Route
+            path="/compare/results"
+            element={
+              <AnimatedPage>
+                <ImageComparisonResultsPage />
+              </AnimatedPage>
+            }
+          />
+          <Route
+            path="/inpainting"
+            element={
+              <AnimatedPage>
+                <InpaintingPage />
+              </AnimatedPage>
+            }
+          />
+          <Route
+            path="/privacy"
+            element={
+              <AnimatedPage>
+                <PrivacyPolicyPage />
+              </AnimatedPage>
+            }
+          />
+          <Route
+            path="/terms"
+            element={
+              <AnimatedPage>
+                <TermsOfServicePage />
+              </AnimatedPage>
+            }
+          />
+          {/* <Route path="/pose-estimation" element={<PosePage />} /> */}
+        </Routes>
+      </AnimatePresence>
+    </div>
   );
 }
 
