@@ -38,11 +38,11 @@ const HomePage = () => {
                 path="/upscaler"
               />
               <ToolCard
-                title="Image Editor"
-                description="Perform quick crops, and color adjustments to perfect your images."
-                icon="tune"
+                title="Object Removal"
+                description="Remove unwanted objects from images with professional AI technology"
+                icon="auto_fix_high"
                 accent="4"
-                path="/editor"
+                path="/object-removal"
               />
             </div>
           </div>
