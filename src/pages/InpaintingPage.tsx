@@ -53,8 +53,8 @@ const InpaintingPage: React.FC = () => {
     };
     samWorkerRef.current.addEventListener('message', handleSamMessage);
 
-    // Inpainting Worker
-    inpaintingWorkerRef.current = new Worker(new URL('../workers/inpainting.worker.ts', import.meta.url), { type: 'module' });
+    // Inpainting Worker (AOT-GAN)
+    inpaintingWorkerRef.current = new Worker(new URL('../workers/aotgan.worker.ts', import.meta.url), { type: 'module' });
     inpaintingWorkerRef.current.postMessage({ command: 'initialize' });
     
     const handleInpaintingMessage = (event: MessageEvent) => {

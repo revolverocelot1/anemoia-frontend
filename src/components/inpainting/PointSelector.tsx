@@ -18,6 +18,7 @@ const PointSelector: React.FC<PointSelectorProps> = ({ imageUrl, onMaskReady, on
   const [tempMask, setTempMask] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const imageRef = useRef<HTMLImageElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
     if (!samWorker) return;
@@ -30,22 +31,26 @@ const PointSelector: React.FC<PointSelectorProps> = ({ imageUrl, onMaskReady, on
           onProcessing(true);
           break;
         case 'complete':
-          const canvas = document.createElement('canvas');
-          canvas.width = maskImageData.width;
-          canvas.height = maskImageData.height;
-          const ctx = canvas.getContext('2d');
-          if (ctx) {
+          setIsProcessing(false);
+          onProcessing(false);
+          if (maskImageData) {
+            // Convert mask to data URL for preview
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d')!;
+            canvas.width = maskImageData.width;
+            canvas.height = maskImageData.height;
             ctx.putImageData(maskImageData, 0, 0);
             setTempMask(canvas.toDataURL());
-            onMaskReady(maskImageData); // Pass the raw mask data up
+            
+            // Also pass the mask data back to parent
+            onMaskReady(maskImageData);
           }
-          setIsProcessing(false);
-          onProcessing(false);
           break;
         case 'error':
-          console.error('SAM Worker Error:', error);
           setIsProcessing(false);
           onProcessing(false);
+          console.error('SAM Worker Error:', error);
+          alert(`Segmentation failed: ${error}`);
           break;
       }
     };
@@ -54,85 +59,183 @@ const PointSelector: React.FC<PointSelectorProps> = ({ imageUrl, onMaskReady, on
     return () => samWorker.removeEventListener('message', handleWorkerMessage);
   }, [samWorker, onMaskReady, onProcessing]);
 
-  const handleImageClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (isProcessing || !imageRef.current) return;
+  const handleImageClick = (event: React.MouseEvent<HTMLCanvasElement>) => {
+    if (!imageRef.current || isProcessing) return;
 
-    const imageRect = imageRef.current.getBoundingClientRect();
-    const x = e.clientX - imageRect.left;
-    const y = e.clientY - imageRect.top;
+    const canvas = canvasRef.current!;
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
     
-    // Normalize coordinates to image's original dimensions
-    const scaleX = imageRef.current.naturalWidth / imageRect.width;
-    const scaleY = imageRef.current.naturalHeight / imageRect.height;
-    
-    const imagePoint = { x: Math.round(x * scaleX), y: Math.round(y * scaleY) };
-    const newPoints = [...points, imagePoint];
+    const x = (event.clientX - rect.left) * scaleX;
+    const y = (event.clientY - rect.top) * scaleY;
+
+    const newPoint = { x, y };
+    const newPoints = [...points, newPoint];
     setPoints(newPoints);
 
-    // Trigger SAM worker
-    if (samWorker) {
-      samWorker.postMessage({
-        command: 'segment',
-        imageUrl,
-        inputPoints: [[newPoints.map(p => ({ x: p.x, y: p.y }))]],
-      });
+    // If we have points, trigger segmentation
+    if (newPoints.length > 0) {
+      triggerSegmentation(newPoints);
     }
   };
 
-  const handleResetPoints = () => {
+  const triggerSegmentation = async (inputPoints: Point[]) => {
+    if (!samWorker || !imageRef.current) return;
+
+    try {
+      // Convert image to ImageData
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d')!;
+      canvas.width = imageRef.current.naturalWidth;
+      canvas.height = imageRef.current.naturalHeight;
+      ctx.drawImage(imageRef.current, 0, 0);
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
+      // Send to worker with adjusted point coordinates
+      const scaledPoints = inputPoints.map(point => ({
+        x: (point.x / canvasRef.current!.width) * imageData.width,
+        y: (point.y / canvasRef.current!.height) * imageData.height
+      }));
+
+      samWorker.postMessage({
+        command: 'segment',
+        imageData,
+        inputPoints: scaledPoints
+      });
+    } catch (error) {
+      console.error('Failed to trigger segmentation:', error);
+    }
+  };
+
+  const clearPoints = () => {
     setPoints([]);
     setTempMask(null);
-  }
+  };
+
+  const redrawCanvas = () => {
+    const canvas = canvasRef.current;
+    const img = imageRef.current;
+    if (!canvas || !img) return;
+
+    const ctx = canvas.getContext('2d')!;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    // Draw image
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    
+    // Draw points
+    points.forEach((point, index) => {
+      ctx.fillStyle = 'red';
+      ctx.beginPath();
+      ctx.arc(point.x, point.y, 8, 0, 2 * Math.PI);
+      ctx.fill();
+      
+      // Point number
+      ctx.fillStyle = 'white';
+      ctx.font = '14px Arial';
+      ctx.textAlign = 'center';
+      ctx.fillText((index + 1).toString(), point.x, point.y + 4);
+    });
+
+    // Draw mask overlay if available
+    if (tempMask && !isProcessing) {
+      const maskImg = new Image();
+      maskImg.onload = () => {
+        ctx.globalAlpha = 0.5;
+        ctx.fillStyle = 'blue';
+        ctx.globalCompositeOperation = 'multiply';
+        ctx.drawImage(maskImg, 0, 0, canvas.width, canvas.height);
+        ctx.globalAlpha = 1;
+        ctx.globalCompositeOperation = 'source-over';
+      };
+      maskImg.src = tempMask;
+    }
+  };
+
+  useEffect(() => {
+    redrawCanvas();
+  }, [points, tempMask]);
+
+  const handleImageLoad = () => {
+    const canvas = canvasRef.current;
+    const img = imageRef.current;
+    if (!canvas || !img) return;
+
+    // Set canvas size to match image display size
+    const containerWidth = canvas.parentElement?.clientWidth || 600;
+    const aspectRatio = img.naturalHeight / img.naturalWidth;
+    canvas.width = containerWidth;
+    canvas.height = containerWidth * aspectRatio;
+    
+    redrawCanvas();
+  };
 
   return (
-    <div className="relative w-full h-full" onClick={handleImageClick}>
-      <img
-        ref={imageRef}
-        src={imageUrl}
-        alt="Click to select object"
-        className="w-full h-full object-contain cursor-crosshair"
-      />
-
-      {tempMask && (
-        <motion.img
-          src={tempMask}
-          alt="Generated mask"
-          className="absolute top-0 left-0 w-full h-full object-contain pointer-events-none opacity-50"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 0.5 }}
-          transition={{ duration: 0.2 }}
+    <div className="space-y-4">
+      <div className="relative">
+        <img
+          ref={imageRef}
+          src={imageUrl}
+          alt="Image to segment"
+          className="hidden"
+          onLoad={handleImageLoad}
+          crossOrigin="anonymous"
         />
-      )}
-
-      {points.map((p, i) => {
-        if (!imageRef.current) return null;
-        const imageRect = imageRef.current.getBoundingClientRect();
-        const scaleX = imageRect.width / imageRef.current.naturalWidth;
-        const scaleY = imageRect.height / imageRef.current.naturalHeight;
+        <canvas
+          ref={canvasRef}
+          onClick={handleImageClick}
+          className="w-full border-2 border-gray-300 rounded-lg cursor-crosshair"
+          style={{ maxWidth: '100%', height: 'auto' }}
+        />
         
-        return (
-            <motion.div
-                key={i}
-                className="absolute w-3 h-3 bg-green-400 rounded-full border-2 border-white shadow-lg"
-                style={{
-                    left: p.x * scaleX - 6,
-                    top: p.y * scaleY - 6,
-                }}
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-            />
-        );
-      })}
-
-      {isProcessing && (
-          <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-              <div className="text-white">Processing...</div>
+        {isProcessing && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50 rounded-lg">
+            <div className="text-white text-lg font-semibold">
+              <div className="animate-spin w-8 h-8 border-4 border-white border-t-transparent rounded-full mx-auto mb-2"></div>
+              Processing...
+            </div>
           </div>
-      )}
-
-      <div className="absolute top-2 right-2">
-        <button onClick={handleResetPoints} className="px-4 py-2 bg-red-600 text-white rounded-lg">Reset Points</button>
+        )}
       </div>
+      
+      <div className="flex justify-between items-center">
+        <div className="text-sm text-gray-600">
+          Click on the object you want to segment. You have {points.length} point{points.length !== 1 ? 's' : ''}.
+        </div>
+        
+        <div className="flex gap-2">
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={clearPoints}
+            disabled={points.length === 0 || isProcessing}
+            className="px-4 py-2 bg-gray-500 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Clear Points
+          </motion.button>
+          
+          {tempMask && (
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => points.length > 0 && triggerSegmentation(points)}
+              disabled={isProcessing}
+              className="px-4 py-2 bg-blue-500 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Refine Mask
+            </motion.button>
+          )}
+        </div>
+      </div>
+      
+      {tempMask && (
+        <div className="text-center">
+          <div className="text-sm text-green-600 font-medium">
+            ✓ Segmentation complete! The mask is shown in blue overlay.
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -1,30 +1,27 @@
 /**
- * Anemoia SAM Worker (Pipeline Version)
+ * Anemoia SAM Worker (SlimSAM Version)
  *
  * This worker handles segmenting an image based on point prompts
- * using the SlimSAM model via the Transformers.js pipeline API.
- * This is a more robust and simpler approach.
+ * using the SlimSAM model with the correct transformers.js API.
  */
 
-import { pipeline, RawImage, Tensor } from '@huggingface/transformers';
+import { SamModel, AutoProcessor, RawImage } from '@huggingface/transformers';
 
 // --- Interfaces ---
 interface SAMRequest {
   command: 'initialize' | 'segment';
   imageUrl?: string;
-  inputPoints?: { x: number; y: number; }[][]; // Array of point sets
-}
-
-// The output from a mask-generation pipeline
-interface MaskGenerationOutput {
-    masks: RawImage[];
-    scores: Tensor; // This is actually a Tensor
+  imageData?: ImageData;
+  inputPoints?: { x: number; y: number; }[];
 }
 
 // --- Worker State ---
-let generator: any = null; // We use 'any' here to avoid type issues with the pipeline function
+let model: any = null; // Use any to avoid type issues
+let processor: any = null; // Use any to avoid type issues
 let isInitialized = false;
-const modelId = 'Xenova/quantized-mobile-sam';
+
+// Use the smaller SlimSAM model that's proven to work
+const modelId = 'Xenova/slimsam-77-uniform';
 
 // --- Main Message Handler ---
 self.onmessage = async (event: MessageEvent<SAMRequest>) => {
@@ -36,96 +33,196 @@ self.onmessage = async (event: MessageEvent<SAMRequest>) => {
         await initialize();
         break;
       case 'segment':
-        if (event.data.imageUrl && event.data.inputPoints) {
-          await segment(event.data.imageUrl, event.data.inputPoints);
+        if (event.data.imageData && event.data.inputPoints) {
+          await segment(event.data.imageData, event.data.inputPoints);
+        } else if (event.data.imageUrl && event.data.inputPoints) {
+          await segmentFromUrl(event.data.imageUrl, event.data.inputPoints);
         } else {
-          throw new Error('Segment command requires imageUrl and inputPoints.');
+          throw new Error('Missing required data for segmentation');
         }
         break;
       default:
         throw new Error(`Unknown command: ${command}`);
     }
   } catch (error) {
-    postMessage({
+    self.postMessage({
       status: 'error',
-      error: error instanceof Error ? error.message : String(error),
+      error: error instanceof Error ? error.message : 'Unknown error'
     });
   }
 };
 
-// --- Initialization ---
-async function initialize() {
-  if (isInitialized) {
-    postMessage({ status: 'initialized', message: 'SAM worker already initialized.' });
-    return;
-  }
-  
-  postMessage({ status: 'initializing', message: 'Initializing SAM... This may take a moment.' });
-
+// --- Initialize Function ---
+async function initialize(): Promise<void> {
   try {
-    generator = await pipeline('mask-generation' as any, modelId, {
-        progress_callback: (progress: any) => {
-            postMessage({ status: 'initializing', message: `Loading model... (${Math.round(progress.progress)}%)` });
-        }
+    self.postMessage({ status: 'loading', message: 'Initializing SAM model...' });
+
+    // Load model and processor using the correct API
+    model = await SamModel.from_pretrained(modelId, {
+      progress_callback: (progress: any) => {
+        self.postMessage({ 
+          status: 'loading', 
+          message: `Loading model... ${Math.round(progress.progress * 100)}%` 
+        });
+      }
     });
+
+    processor = await AutoProcessor.from_pretrained(modelId, {});
+
     isInitialized = true;
-    postMessage({ status: 'initialized', message: 'SAM is ready.' });
+    self.postMessage({ 
+      status: 'ready', 
+      message: 'SAM model initialized successfully',
+      modelInfo: {
+        model: modelId,
+        backend: 'transformers.js'
+      }
+    });
   } catch (error) {
-    isInitialized = false;
-    throw new Error(`SAM initialization failed: ${error instanceof Error ? error.message : String(error)}`);
+    throw new Error(`SAM initialization failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
 
-// --- Segmentation ---
-async function segment(imageUrl: string, inputPoints: {x:number, y:number}[][]) {
-  if (!generator) {
-    throw new Error('SAM not initialized. Please initialize the worker first.');
+// --- Segment from ImageData ---
+async function segment(imageData: ImageData, inputPoints: { x: number; y: number; }[]): Promise<void> {
+  if (!isInitialized || !model || !processor) {
+    throw new Error('SAM model not initialized');
   }
-
-  postMessage({ status: 'processing', message: 'Running segmentation...' });
 
   try {
-    // The pipeline returns an object with masks and scores
-    const outputs: MaskGenerationOutput = await generator(imageUrl, {
-        points_per_batch: 64,
-        input_points: inputPoints.map(pointSet => pointSet.map(p => [p.x, p.y]))
-    });
+    self.postMessage({ status: 'processing', message: 'Processing image...' });
 
-    if (!outputs.masks || outputs.masks.length === 0) {
-        throw new Error('No masks were generated.');
-    }
+    // Convert ImageData to RawImage
+    const canvas = new OffscreenCanvas(imageData.width, imageData.height);
+    const ctx = canvas.getContext('2d')!;
+    ctx.putImageData(imageData, 0, 0);
     
-    // The scores are in a Tensor, find the index of the highest score
-    const scoresData = outputs.scores.data as Float32Array;
-    let bestIndex = 0;
-    for (let i = 1; i < scoresData.length; i++) {
-        if (scoresData[i] > scoresData[bestIndex]) {
-            bestIndex = i;
-        }
-    }
-    
-    // Select the best mask based on the score
-    const bestMask = outputs.masks[bestIndex];
+    // Convert to blob then to RawImage
+    const blob = await canvas.convertToBlob();
+    const rawImage = await RawImage.fromBlob(blob);
 
-    // The mask is a RawImage. To manipulate it, we convert it to a tensor,
-    // multiply by 255 to make it visible, and then create a new RawImage.
-    const tensor = await bestMask.toTensor();
-    const visibleTensor = tensor.mul(255);
-    const maskImage = RawImage.fromTensor(visibleTensor);
+    // Format input points exactly like the documentation: [[[x, y]]]
+    const input_points = [inputPoints.map(p => [p.x, p.y])];
     
-    // Convert to ImageData to send back to the main thread
-    const maskImageData = new ImageData(
-      new Uint8ClampedArray(maskImage.data),
-      maskImage.width,
-      maskImage.height
+    // Process inputs exactly like the documentation
+    const inputs = await processor(rawImage, { input_points });
+    
+    // Run model
+    self.postMessage({ status: 'processing', message: 'Running segmentation...' });
+    const outputs = await model(inputs);
+
+    // Post-process masks exactly like the documentation
+    const masks = await processor.post_process_masks(
+      outputs.pred_masks, 
+      inputs.original_sizes, 
+      inputs.reshaped_input_sizes
     );
 
-    postMessage({
+    // Get the best mask (highest IoU score)
+    const scores = outputs.iou_scores.data as Float32Array;
+    let bestIndex = 0;
+    for (let i = 1; i < scores.length; i++) {
+      if (scores[i] > scores[bestIndex]) {
+        bestIndex = i;
+      }
+    }
+
+    // Convert mask to ImageData - get the best mask from the first batch
+    const bestMask = masks[0][bestIndex];
+    const maskImageData = tensorToImageData(bestMask, imageData.width, imageData.height);
+
+    self.postMessage({
       status: 'complete',
       maskImageData,
-    }, [maskImageData.data.buffer]);
+      scores: Array.from(scores),
+      message: 'Segmentation complete'
+    });
 
   } catch (error) {
-    throw new Error(`Segmentation failed: ${error instanceof Error ? error.message : String(error)}`);
+    throw new Error(`Segmentation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
+}
+
+// --- Segment from URL ---
+async function segmentFromUrl(imageUrl: string, inputPoints: { x: number; y: number; }[]): Promise<void> {
+  if (!isInitialized || !model || !processor) {
+    throw new Error('SAM model not initialized');
+  }
+
+  try {
+    self.postMessage({ status: 'processing', message: 'Loading image...' });
+
+    // Load image exactly like the documentation
+    const rawImage = await RawImage.read(imageUrl);
+    
+    // Format input points exactly like the documentation: [[[x, y]]]
+    const input_points = [inputPoints.map(p => [p.x, p.y])];
+    
+    // Process inputs exactly like the documentation
+    const inputs = await processor(rawImage, { input_points });
+    
+    // Run model
+    self.postMessage({ status: 'processing', message: 'Running segmentation...' });
+    const outputs = await model(inputs);
+
+    // Post-process masks exactly like the documentation
+    const masks = await processor.post_process_masks(
+      outputs.pred_masks, 
+      inputs.original_sizes, 
+      inputs.reshaped_input_sizes
+    );
+
+    // Get the best mask (highest IoU score)
+    const scores = outputs.iou_scores.data as Float32Array;
+    let bestIndex = 0;
+    for (let i = 1; i < scores.length; i++) {
+      if (scores[i] > scores[bestIndex]) {
+        bestIndex = i;
+      }
+    }
+
+    // Convert mask to ImageData - get the best mask from the first batch
+    const bestMask = masks[0][bestIndex];
+    const maskImageData = tensorToImageData(bestMask, rawImage.width, rawImage.height);
+
+    self.postMessage({
+      status: 'complete',
+      maskImageData,
+      scores: Array.from(scores),
+      message: 'Segmentation complete'
+    });
+
+  } catch (error) {
+    throw new Error(`Segmentation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}
+
+// --- Helper Functions ---
+function tensorToImageData(tensor: any, targetWidth: number, targetHeight: number): ImageData {
+  const data = tensor.data as Float32Array;
+  const [height, width] = tensor.dims.slice(-2);
+  
+  // Create ImageData
+  const imageData = new ImageData(targetWidth, targetHeight);
+  
+  // Resize mask to target dimensions and convert to RGBA
+  for (let y = 0; y < targetHeight; y++) {
+    for (let x = 0; x < targetWidth; x++) {
+      // Map to mask coordinates
+      const maskX = Math.floor((x / targetWidth) * width);
+      const maskY = Math.floor((y / targetHeight) * height);
+      const maskIndex = maskY * width + maskX;
+      
+      // Use 255 for true (white), 0 for false (black) - mask is boolean tensor
+      const maskValue = data[maskIndex] > 0.5 ? 255 : 0;
+      const pixelIndex = (y * targetWidth + x) * 4;
+      
+      imageData.data[pixelIndex] = maskValue;     // R
+      imageData.data[pixelIndex + 1] = maskValue; // G
+      imageData.data[pixelIndex + 2] = maskValue; // B
+      imageData.data[pixelIndex + 3] = maskValue; // A
+    }
+  }
+  
+  return imageData;
 } 
