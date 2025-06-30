@@ -32,8 +32,7 @@ const InpaintingPage: React.FC = () => {
   const [statusMessage, setStatusMessage] = useState('Initializing AI models...');
   const [progress, setProgress] = useState(0);
 
-  // Workers - Only need inpainting worker now
-  const inpaintingWorkerRef = useRef<Worker | null>(null);
+  // Ready state for simplified demo
   const [inpaintingReady, setInpaintingReady] = useState(false);
 
 
