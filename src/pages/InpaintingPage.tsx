@@ -42,23 +42,43 @@ const InpaintingPage: React.FC = () => {
   useEffect(() => {
     const worker = new Worker(new URL('../workers/aotgan.worker.ts', import.meta.url), { type: 'module' });
     setWorkerRef(worker);
+    
     worker.onmessage = (e) => {
-      const { success, imageDataUrl, error: workerError } = e.data as { success: boolean; imageDataUrl?: string; error?: string };
-      if (success && imageDataUrl) {
-        setResultImageUrl(imageDataUrl);
-        setStats({ modelUsed: 'AOT-GAN', acceleration: 'ONNX Runtime Web' });
+      const { status, message, error: workerError, resultImageData } = e.data;
+      
+      setStatusMessage(message || statusMessage);
+
+      if (status === 'ready') {
+        setInpaintingReady(true);
+      }
+      
+      if (status === 'complete' && resultImageData) {
+        const dataUrl = imageDataToDataUrl(resultImageData);
+        setResultImageUrl(dataUrl);
+        setStats({ modelUsed: 'MI-GAN', acceleration: 'ONNX Runtime (WASM)' });
         setIsProcessing(false);
         setStage('result');
-      } else {
-        setError(workerError || 'Unknown error during inpainting');
+      } else if (status === 'error') {
+        setError(workerError || 'An unknown error occurred during inpainting');
         setIsProcessing(false);
         setStage('mask');
       }
     };
-    setInpaintingReady(true);
-    setStatusMessage('Ready for brush-based masking');
+    
     return () => worker.terminate();
   }, []);
+
+  const imageDataToDataUrl = (imageData: ImageData) => {
+    const canvas = document.createElement('canvas');
+    canvas.width = imageData.width;
+    canvas.height = imageData.height;
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+      ctx.putImageData(imageData, 0, 0);
+      return canvas.toDataURL();
+    }
+    return '';
+  };
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
     if (acceptedFiles && acceptedFiles.length > 0) {
@@ -98,27 +118,33 @@ const InpaintingPage: React.FC = () => {
 
     setIsProcessing(true);
     setStage('processing');
-    setStatusMessage('Running AOT-GAN...');
+    setStatusMessage('Preparing image...');
     setProgress(10);
-
-    const reader = new FileReader();
-    reader.onload = () => {
-      setStatusMessage('Sending data to AI model...');
+    
+    // Get image data from the original file
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext('2d')!;
+      ctx.drawImage(img, 0, 0);
+      const imageData = ctx.getImageData(0, 0, img.width, img.height);
+      
+      setStatusMessage('Sending data to MI-GAN worker...');
       setProgress(30);
+
       workerRef.postMessage({
-        imageBuffer: reader.result as ArrayBuffer,
-        maskData: maskData,
-        width: maskData.width,
-        height: maskData.height,
+        imageData,
+        maskData,
       });
-      setProgress(60);
     };
-    reader.onerror = () => {
-      setError('Failed to read image file.');
+    img.onerror = () => {
+      setError('Failed to load image for processing.');
       setIsProcessing(false);
       setStage('mask');
     };
-    reader.readAsArrayBuffer(originalImageFile);
+    img.src = URL.createObjectURL(originalImageFile);
   };
 
   const renderContent = () => {

@@ -1,8 +1,21 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import { resolve } from 'path';
+// This is required for Vite to correctly handle the ONNX runtime web worker
+const wasmContentTypePlugin = {
+    name: 'wasm-content-type-plugin',
+    configureServer(server) {
+        server.middlewares.use((req, res, next) => {
+            if (req.url?.endsWith('.wasm')) {
+                res.setHeader('Content-Type', 'application/wasm');
+            }
+            next();
+        });
+    },
+};
 // https://vite.dev/config/
 export default defineConfig({
-    plugins: [react()],
+    plugins: [react(), wasmContentTypePlugin],
     server: {
         headers: {
             'Cross-Origin-Embedder-Policy': 'require-corp',
@@ -19,11 +32,26 @@ export default defineConfig({
     build: {
         assetsInlineLimit: 0,
         target: 'esnext',
+        rollupOptions: {
+            output: {
+                assetFileNames: (assetInfo) => {
+                    if (assetInfo.name?.endsWith('.wasm')) {
+                        return 'assets/[name][extname]';
+                    }
+                    return 'assets/[name]-[hash][extname]';
+                },
+            },
+        },
     },
     worker: {
         format: 'es',
     },
     optimizeDeps: {
         exclude: ['@tensorflow/tfjs-backend-wasm'],
+    },
+    resolve: {
+        alias: {
+            '@': resolve(__dirname, 'src'),
+        },
     },
 });
