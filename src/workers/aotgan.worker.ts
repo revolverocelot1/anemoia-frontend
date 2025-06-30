@@ -223,4 +223,101 @@ function tealeaInpaint(imageData: ImageData, maskData: ImageData): ImageData {
   });
   
   return result;
-} 
+}
+
+/*
+  AOT-GAN Inpainting Worker
+  -------------------------
+  Performs masked image inpainting using Qualcomm's AOT-GAN ONNX model directly in the browser via onnxruntime-web.
+  Expects message: { imageBuffer: ArrayBuffer, maskData: ImageData, width: number, height: number }
+  Returns: { success: boolean, imageDataUrl?: string, error?: string }
+*/
+
+import * as ort from 'onnxruntime-web';
+
+// Decode image bytes to ImageData of desired size
+async function decodeImage(buffer: ArrayBuffer, width: number, height: number): Promise<ImageData> {
+  const blob = new Blob([buffer]);
+  const bitmap = await createImageBitmap(blob);
+  const canvas = new OffscreenCanvas(width, height);
+  const ctx = canvas.getContext('2d')!;
+  ctx.drawImage(bitmap, 0, 0, width, height);
+  return ctx.getImageData(0, 0, width, height);
+}
+
+// Convert ImageData -> Float32 tensor (channels first, values in [-1, 1])
+function imageToTensor(img: ImageData): ort.Tensor {
+  const { width, height } = img;
+  const data = new Float32Array(3 * width * height);
+  let r = 0, g = width * height, b = 2 * width * height;
+  for (let i = 0; i < img.data.length; i += 4) {
+    const rn = (img.data[i] / 127.5) - 1;
+    const gn = (img.data[i + 1] / 127.5) - 1;
+    const bn = (img.data[i + 2] / 127.5) - 1;
+    data[r++] = rn;
+    data[g++] = gn;
+    data[b++] = bn;
+  }
+  return new ort.Tensor('float32', data, [1, 3, height, width]);
+}
+
+// Convert binary mask ImageData -> Float32 tensor (0 or 1)
+function maskToTensor(mask: ImageData): ort.Tensor {
+  const { width, height } = mask;
+  const data = new Float32Array(width * height);
+  for (let i = 0, j = 0; i < mask.data.length; i += 4, j++) {
+    data[j] = mask.data[i] > 127 ? 1 : 0;
+  }
+  return new ort.Tensor('float32', data, [1, 1, height, width]);
+}
+
+// Tensor -> ImageData
+function tensorToImage(t: ort.Tensor, width: number, height: number): ImageData {
+  const d = t.data as Float32Array;
+  const out = new Uint8ClampedArray(width * height * 4);
+  let r = 0, g = width * height, b = 2 * width * height;
+  for (let i = 0; i < width * height; i++) {
+    out[i * 4] = Math.min(255, Math.max(0, Math.round((d[r++] + 1) * 127.5)));
+    out[i * 4 + 1] = Math.min(255, Math.max(0, Math.round((d[g++] + 1) * 127.5)));
+    out[i * 4 + 2] = Math.min(255, Math.max(0, Math.round((d[b++] + 1) * 127.5)));
+    out[i * 4 + 3] = 255;
+  }
+  return new ImageData(out, width, height);
+}
+
+let sessionPromise: Promise<ort.InferenceSession> | null = null;
+function getSession(): Promise<ort.InferenceSession> {
+  if (sessionPromise) return sessionPromise;
+  sessionPromise = (async () => {
+    const opts: ort.InferenceSession.SessionOptions = {
+      executionProviders: ['webgpu', 'wasm', 'webgl'],
+    } as any;
+    const url = new URL('/models/aot-gan.onnx', self.location.href).href;
+    return ort.InferenceSession.create(url, opts);
+  })();
+  return sessionPromise;
+}
+
+self.onmessage = async (e) => {
+  const { imageBuffer, maskData, width, height } = e.data as {
+    imageBuffer: ArrayBuffer; maskData: ImageData; width: number; height: number;
+  };
+  try {
+    const [session, img] = await Promise.all([getSession(), decodeImage(imageBuffer, width, height)]);
+    const feeds: Record<string, ort.Tensor> = {};
+    const [inputImageName, inputMaskName] = session.inputNames;
+    feeds[inputImageName] = imageToTensor(img);
+    feeds[inputMaskName] = maskToTensor(maskData);
+    const res = await session.run(feeds);
+    const output = res[session.outputNames[0]];
+    const outImg = tensorToImage(output, width, height);
+    const canvas = new OffscreenCanvas(width, height);
+    canvas.getContext('2d')!.putImageData(outImg, 0, 0);
+    const blob = await canvas.convertToBlob({ type: 'image/png' });
+    const urlReader = new FileReader();
+    urlReader.onloadend = () => self.postMessage({ success: true, imageDataUrl: urlReader.result });
+    urlReader.readAsDataURL(blob);
+  } catch (err: any) {
+    self.postMessage({ success: false, error: err?.message ?? String(err) });
+  }
+}; 

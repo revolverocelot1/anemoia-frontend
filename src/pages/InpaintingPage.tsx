@@ -35,14 +35,29 @@ const InpaintingPage: React.FC = () => {
   // Ready state for simplified demo
   const [inpaintingReady, setInpaintingReady] = useState(false);
 
+  // AOT-GAN worker
+  const [workerRef, setWorkerRef] = useState<Worker | null>(null);
 
   // Initialize workers
   useEffect(() => {
-    // Skip worker initialization for now - just mark as ready
-    setTimeout(() => {
-      setInpaintingReady(true);
-      setStatusMessage('Ready for brush-based masking');
-    }, 1000);
+    const worker = new Worker(new URL('../workers/aotgan.worker.ts', import.meta.url), { type: 'module' });
+    setWorkerRef(worker);
+    worker.onmessage = (e) => {
+      const { success, imageDataUrl, error: workerError } = e.data as { success: boolean; imageDataUrl?: string; error?: string };
+      if (success && imageDataUrl) {
+        setResultImageUrl(imageDataUrl);
+        setStats({ modelUsed: 'AOT-GAN', acceleration: 'ONNX Runtime Web' });
+        setIsProcessing(false);
+        setStage('result');
+      } else {
+        setError(workerError || 'Unknown error during inpainting');
+        setIsProcessing(false);
+        setStage('mask');
+      }
+    };
+    setInpaintingReady(true);
+    setStatusMessage('Ready for brush-based masking');
+    return () => worker.terminate();
   }, []);
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
@@ -76,35 +91,34 @@ const InpaintingPage: React.FC = () => {
   };
   
   const handleProcess = () => {
-    if (!originalImageUrl || !maskData) {
-        setError('Please paint areas to remove first.');
-        return;
+    if (!originalImageFile || !maskData || !workerRef) {
+      setError('Missing image, mask or worker not ready.');
+      return;
     }
 
     setIsProcessing(true);
     setStage('processing');
-    setProgress(0);
-    setStatusMessage('Preparing image for inpainting...');
+    setStatusMessage('Running AOT-GAN...');
+    setProgress(10);
 
-    // Simple mock processing for demo
-    setTimeout(() => {
-      setProgress(50);
-      setStatusMessage('Running Telea inpainting algorithm...');
-      
-      setTimeout(() => {
-        setProgress(100);
-        
-        // For now, just return the original image as a placeholder
-        setResultImageUrl(originalImageUrl);
-        setStats({
-          totalTime: 2000,
-          modelUsed: 'Telea Algorithm (Demo)',
-          acceleration: 'CPU'
-        });
-        setIsProcessing(false);
-        setStage('result');
-      }, 1500);
-    }, 1000);
+    const reader = new FileReader();
+    reader.onload = () => {
+      setStatusMessage('Sending data to AI model...');
+      setProgress(30);
+      workerRef.postMessage({
+        imageBuffer: reader.result as ArrayBuffer,
+        maskData: maskData,
+        width: maskData.width,
+        height: maskData.height,
+      });
+      setProgress(60);
+    };
+    reader.onerror = () => {
+      setError('Failed to read image file.');
+      setIsProcessing(false);
+      setStage('mask');
+    };
+    reader.readAsArrayBuffer(originalImageFile);
   };
 
   const renderContent = () => {
