@@ -43,8 +43,8 @@ async function initializeInpainter() {
     isInitialized = true;
     
     self.postMessage({ 
-      status: 'ready', 
-      message: 'Inpainting ready!' 
+      status: 'initialized', 
+      message: 'Ready for brush-based masking' 
     });
   } catch (error) {
     throw new Error(`Initialization failed: ${error instanceof Error ? error.message : String(error)}`);
@@ -70,8 +70,8 @@ async function processImage(imageData: ImageData, maskData: ImageData) {
   
   self.postMessage({
     status: 'complete',
-    result: result,
-    performance: {
+    resultImageData: result,
+    performanceStats: {
       totalTime,
       modelUsed: 'Telea Algorithm',
       acceleration: 'CPU'

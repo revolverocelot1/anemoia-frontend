@@ -450,6 +450,66 @@ textarea:focus-visible {
   background-clip: text;
 }
 
+/* Responsive Fixes */
+html {
+  font-size: 16px;
+  -webkit-text-size-adjust: 100%;
+  -moz-text-size-adjust: 100%;
+  -ms-text-size-adjust: 100%;
+}
+
+@media (max-width: 768px) {
+  html {
+    font-size: 14px;
+  }
+}
+
+/* Ensure proper box sizing */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+/* Container max-width fixes */
+.container {
+  max-width: 100%;
+  margin: 0 auto;
+  padding: 0 1rem;
+}
+
+@media (min-width: 640px) {
+  .container {
+    padding: 0 1.5rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .container {
+    padding: 0 2rem;
+  }
+}
+
+/* Canvas responsive container */
+.canvas-responsive {
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+
+/* Button sizing fixes */
+button {
+  font-size: inherit;
+  line-height: inherit;
+  min-height: 44px; /* Touch target size */
+}
+
+@media (max-width: 768px) {
+  button {
+    padding: 0.75rem 1rem;
+    font-size: 0.875rem;
+  }
+}
+
 /* Inpainting Page Custom Slider Styling */
 .slider {
   appearance: none;
@@ -459,6 +519,7 @@ textarea:focus-visible {
   outline: none;
   cursor: pointer;
   transition: all 0.3s ease;
+  width: 100%;
 }
 
 .slider::-webkit-slider-thumb {
