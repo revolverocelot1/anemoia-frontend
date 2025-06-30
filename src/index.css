@@ -1,3 +1,7 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 /* Basic Reset and Font Setup */
 :root {
   /* Modern Color Palette */
@@ -58,14 +62,29 @@
   box-sizing: border-box;
 }
 
+html {
+  font-size: 16px;
+  -webkit-text-size-adjust: 100%;
+  -moz-text-size-adjust: 100%;
+  -ms-text-size-adjust: 100%;
+  height: 100%;
+}
+
 body {
   margin: 0;
+  padding: 0;
   min-width: 320px;
   min-height: 100vh;
+  height: 100%;
   font-family: "Space Grotesk", "Inter", "Segoe UI", "Noto Sans", sans-serif;
   background: linear-gradient(135deg, var(--bg-primary) 0%, #0F1419 100%);
   color: var(--text-primary);
   overflow-x: hidden;
+}
+
+#root {
+  min-height: 100vh;
+  width: 100%;
 }
 
 /* Scrollbar Styling */
@@ -451,13 +470,6 @@ textarea:focus-visible {
 }
 
 /* Responsive Fixes */
-html {
-  font-size: 16px;
-  -webkit-text-size-adjust: 100%;
-  -moz-text-size-adjust: 100%;
-  -ms-text-size-adjust: 100%;
-}
-
 @media (max-width: 768px) {
   html {
     font-size: 14px;
