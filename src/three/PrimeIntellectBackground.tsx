@@ -3,25 +3,31 @@ import { useFrame, useThree, extend } from '@react-three/fiber';
 import * as THREE from 'three';
 import { shaderMaterial } from '@react-three/drei';
 
-// Custom shader for wireframe planets with data points
-const WireframePlanetMaterial = shaderMaterial(
+// Custom shader for planets with atmospheric glow
+const PlanetMaterial = shaderMaterial(
   {
     time: 0,
     color: new THREE.Color(0x00d4ff),
     emissive: new THREE.Color(0x0066ff),
-    dataIntensity: 1.0,
+    atmosphereColor: new THREE.Color(0x00ffff),
+    fresnelBias: 0.1,
+    fresnelScale: 1.0,
+    fresnelPower: 4.0,
   },
   // Vertex shader
   `
     varying vec3 vNormal;
     varying vec3 vPosition;
     varying vec2 vUv;
+    varying vec3 vViewPosition;
     
     void main() {
       vUv = uv;
       vNormal = normalize(normalMatrix * normal);
+      vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+      vViewPosition = -mvPosition.xyz;
       vPosition = position;
-      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      gl_Position = projectionMatrix * mvPosition;
     }
   `,
   // Fragment shader
@@ -29,174 +35,152 @@ const WireframePlanetMaterial = shaderMaterial(
     uniform float time;
     uniform vec3 color;
     uniform vec3 emissive;
-    uniform float dataIntensity;
+    uniform vec3 atmosphereColor;
+    uniform float fresnelBias;
+    uniform float fresnelScale;
+    uniform float fresnelPower;
     
     varying vec3 vNormal;
     varying vec3 vPosition;
     varying vec2 vUv;
+    varying vec3 vViewPosition;
+    
+    // Noise function for surface details
+    float noise(vec3 p) {
+      vec3 i = floor(p);
+      vec3 f = fract(p);
+      f = f * f * (3.0 - 2.0 * f);
+      
+      float n = dot(i, vec3(1.0, 57.0, 113.0));
+      return mix(
+        mix(
+          mix(sin(n), sin(n + 1.0), f.x),
+          mix(sin(n + 57.0), sin(n + 58.0), f.x),
+          f.y
+        ),
+        mix(
+          mix(sin(n + 113.0), sin(n + 114.0), f.x),
+          mix(sin(n + 170.0), sin(n + 171.0), f.x),
+          f.y
+        ),
+        f.z
+      );
+    }
     
     void main() {
-      // Create grid pattern
-      float grid = 0.0;
-      float gridSize = 10.0;
-      grid += step(0.95, fract(vUv.x * gridSize));
-      grid += step(0.95, fract(vUv.y * gridSize));
+      vec3 viewDirection = normalize(vViewPosition);
+      vec3 normal = normalize(vNormal);
       
-      // Data points animation
-      float dataPoints = 0.0;
-      for(float i = 0.0; i < 5.0; i++) {
-        vec2 center = vec2(
-          sin(time * 0.3 + i * 1.234) * 0.5 + 0.5,
-          cos(time * 0.2 + i * 2.345) * 0.5 + 0.5
-        );
-        float dist = distance(vUv, center);
-        dataPoints += smoothstep(0.1, 0.0, dist) * dataIntensity;
-      }
+      // Fresnel effect for atmosphere
+      float fresnel = fresnelBias + fresnelScale * pow(1.0 + dot(viewDirection, normal), fresnelPower);
       
-      vec3 finalColor = mix(color, emissive, grid + dataPoints);
-      finalColor += emissive * dataPoints * 0.5;
+      // Animated surface pattern
+      float pattern = noise(vPosition * 5.0 + time * 0.1);
+      pattern = smoothstep(0.0, 1.0, pattern);
       
-      gl_FragColor = vec4(finalColor, grid + dataPoints * 0.5 + 0.3);
+      // Base color with pattern
+      vec3 finalColor = mix(color, emissive, pattern * 0.5);
+      
+      // Add atmospheric glow
+      finalColor += atmosphereColor * fresnel * 0.8;
+      
+      // Rim lighting
+      float rim = 1.0 - max(0.0, dot(viewDirection, normal));
+      finalColor += atmosphereColor * pow(rim, 2.0) * 0.5;
+      
+      gl_FragColor = vec4(finalColor, 1.0);
     }
   `
 );
 
-extend({ WireframePlanetMaterial });
+extend({ PlanetMaterial });
 
-// Real solar system data
-interface SolarBody {
+// Planet data with Prime Intellect aesthetic
+interface CelestialBody {
   id: string;
   name: string;
-  type: 'star' | 'planet' | 'dwarf';
-  size: number; // Relative size for visual appeal
-  distance: number; // AU scaled for scene
-  speed: number; // Orbital period factor
+  type: 'planet' | 'star' | 'station';
+  size: number;
+  distance: number;
+  speed: number;
   color: THREE.Color;
   emissive: THREE.Color;
-  actualSize: number; // Real diameter in km
-  orbitalPeriod: number; // Days
-  dataPoints?: number;
+  atmosphereColor: THREE.Color;
+  detail: number;
+  rings?: boolean;
+  moons?: number;
 }
 
-const solarBodies: SolarBody[] = [
+const celestialBodies: CelestialBody[] = [
   {
-    id: 'sun',
-    name: 'Sun',
+    id: 'prime-core',
+    name: 'Prime Core',
     type: 'star',
-    size: 3,
+    size: 2.5,
     distance: 0,
-    speed: 0.05,
-    color: new THREE.Color(0xffd700),
-    emissive: new THREE.Color(0xffaa00),
-    actualSize: 1391000,
-    orbitalPeriod: 0,
-    dataPoints: 50,
+    speed: 0.1,
+    color: new THREE.Color(0xffffff),
+    emissive: new THREE.Color(0x00d4ff),
+    atmosphereColor: new THREE.Color(0x00ffff),
+    detail: 64,
   },
   {
-    id: 'mercury',
-    name: 'Mercury',
+    id: 'compute-1',
+    name: 'Compute Node Alpha',
+    type: 'planet',
+    size: 0.8,
+    distance: 6,
+    speed: 1.2,
+    color: new THREE.Color(0x1a1a2e),
+    emissive: new THREE.Color(0x16213e),
+    atmosphereColor: new THREE.Color(0x0f3460),
+    detail: 32,
+    moons: 2,
+  },
+  {
+    id: 'data-nexus',
+    name: 'Data Nexus',
+    type: 'planet',
+    size: 1.2,
+    distance: 10,
+    speed: 0.8,
+    color: new THREE.Color(0x0f3460),
+    emissive: new THREE.Color(0x533483),
+    atmosphereColor: new THREE.Color(0xe94560),
+    detail: 32,
+    rings: true,
+  },
+  {
+    id: 'neural-cluster',
+    name: 'Neural Cluster',
+    type: 'station',
+    size: 0.6,
+    distance: 14,
+    speed: 0.6,
+    color: new THREE.Color(0x533483),
+    emissive: new THREE.Color(0xc06ff0),
+    atmosphereColor: new THREE.Color(0xff00ff),
+    detail: 32,
+  },
+  {
+    id: 'quantum-relay',
+    name: 'Quantum Relay',
     type: 'planet',
     size: 0.4,
-    distance: 4,
-    speed: 4.15,
-    color: new THREE.Color(0x8c7853),
-    emissive: new THREE.Color(0xd2691e),
-    actualSize: 4879,
-    orbitalPeriod: 88,
-  },
-  {
-    id: 'venus',
-    name: 'Venus',
-    type: 'planet',
-    size: 0.7,
-    distance: 6,
-    speed: 1.62,
-    color: new THREE.Color(0xffc649),
-    emissive: new THREE.Color(0xff8c00),
-    actualSize: 12104,
-    orbitalPeriod: 225,
-  },
-  {
-    id: 'earth',
-    name: 'Earth',
-    type: 'planet',
-    size: 0.7,
-    distance: 8,
-    speed: 1,
-    color: new THREE.Color(0x4169e1),
-    emissive: new THREE.Color(0x00bfff),
-    actualSize: 12742,
-    orbitalPeriod: 365,
-    dataPoints: 30,
-  },
-  {
-    id: 'mars',
-    name: 'Mars',
-    type: 'planet',
-    size: 0.5,
-    distance: 10,
-    speed: 0.53,
-    color: new THREE.Color(0xcd5c5c),
-    emissive: new THREE.Color(0xff4500),
-    actualSize: 6779,
-    orbitalPeriod: 687,
-  },
-  {
-    id: 'jupiter',
-    name: 'Jupiter',
-    type: 'planet',
-    size: 1.5,
-    distance: 14,
-    speed: 0.084,
-    color: new THREE.Color(0xdaa520),
-    emissive: new THREE.Color(0xffa500),
-    actualSize: 139820,
-    orbitalPeriod: 4333,
-    dataPoints: 20,
-  },
-  {
-    id: 'saturn',
-    name: 'Saturn',
-    type: 'planet',
-    size: 1.3,
     distance: 18,
-    speed: 0.034,
-    color: new THREE.Color(0xf4a460),
-    emissive: new THREE.Color(0xffd700),
-    actualSize: 116460,
-    orbitalPeriod: 10759,
-  },
-  {
-    id: 'uranus',
-    name: 'Uranus',
-    type: 'planet',
-    size: 0.9,
-    distance: 22,
-    speed: 0.012,
-    color: new THREE.Color(0x4fd1c5),
+    speed: 0.4,
+    color: new THREE.Color(0x00d4ff),
     emissive: new THREE.Color(0x00ffff),
-    actualSize: 50724,
-    orbitalPeriod: 30687,
-  },
-  {
-    id: 'neptune',
-    name: 'Neptune',
-    type: 'planet',
-    size: 0.9,
-    distance: 26,
-    speed: 0.006,
-    color: new THREE.Color(0x4169e1),
-    emissive: new THREE.Color(0x0000ff),
-    actualSize: 49244,
-    orbitalPeriod: 60190,
+    atmosphereColor: new THREE.Color(0xffffff),
+    detail: 24,
   },
 ];
 
-// Wireframe planet component
-const WireframePlanet = ({ body, onHover, onSelect }: {
-  body: SolarBody;
-  onHover: (body: SolarBody | null) => void;
-  onSelect: (body: SolarBody) => void;
+// Interactive planet component
+const InteractivePlanet = ({ body, onHover, onSelect }: {
+  body: CelestialBody;
+  onHover: (body: CelestialBody | null) => void;
+  onSelect: (body: CelestialBody) => void;
 }) => {
   const meshRef = useRef<THREE.Mesh>(null!);
   const groupRef = useRef<THREE.Group>(null!);
@@ -218,8 +202,20 @@ const WireframePlanet = ({ body, onHover, onSelect }: {
       // Update shader uniforms
       if (materialRef.current) {
         materialRef.current.time = time;
-        materialRef.current.dataIntensity = hovered ? 2.0 : 1.0;
       }
+    }
+    
+    // Hover effect
+    if (hovered && meshRef.current) {
+      meshRef.current.scale.lerp(
+        new THREE.Vector3(1.1, 1.1, 1.1).multiplyScalar(body.size),
+        0.1
+      );
+    } else if (meshRef.current) {
+      meshRef.current.scale.lerp(
+        new THREE.Vector3(1, 1, 1).multiplyScalar(body.size),
+        0.1
+      );
     }
   });
   
@@ -245,34 +241,25 @@ const WireframePlanet = ({ body, onHover, onSelect }: {
           onSelect(body);
         }}
       >
-        <sphereGeometry args={[body.size, 32, 16]} />
-        <meshBasicMaterial
-          color={body.emissive}
-          wireframe
-          transparent
-          opacity={hovered ? 0.8 : 0.4}
-        />
-      </mesh>
-      
-      {/* Data visualization layer */}
-      <mesh position={[body.distance, 0, 0]} scale={1.05}>
-        <sphereGeometry args={[body.size, 16, 8]} />
+        <icosahedronGeometry args={[1, body.detail]} />
         {/* @ts-ignore - custom shader material */}
-        <wireframePlanetMaterial
+        <planetMaterial
           ref={materialRef}
           color={body.color}
           emissive={body.emissive}
-          transparent
-          side={THREE.DoubleSide}
+          atmosphereColor={body.atmosphereColor}
+          fresnelBias={0.1}
+          fresnelScale={1.0}
+          fresnelPower={hovered ? 2.0 : 4.0}
         />
       </mesh>
       
-      {/* Saturn's rings */}
-      {body.id === 'saturn' && (
+      {/* Rings */}
+      {body.rings && (
         <mesh rotation={[-Math.PI / 2, 0, 0]} position={[body.distance, 0, 0]}>
           <ringGeometry args={[body.size * 1.5, body.size * 2.5, 64]} />
           <meshBasicMaterial
-            color={body.emissive}
+            color={body.atmosphereColor}
             opacity={0.3}
             transparent
             side={THREE.DoubleSide}
@@ -280,13 +267,28 @@ const WireframePlanet = ({ body, onHover, onSelect }: {
         </mesh>
       )}
       
+      {/* Moons */}
+      {body.moons && Array.from({ length: body.moons }).map((_, i) => (
+        <mesh
+          key={i}
+          position={[
+            body.distance + Math.cos(i * Math.PI) * body.size * 2,
+            0,
+            Math.sin(i * Math.PI) * body.size * 2
+          ]}
+        >
+          <icosahedronGeometry args={[body.size * 0.2, 8]} />
+          <meshBasicMaterial color={body.atmosphereColor} />
+        </mesh>
+      ))}
+      
       {/* Orbital path */}
       {body.distance > 0 && (
         <mesh rotation={[-Math.PI / 2, 0, 0]}>
           <ringGeometry args={[body.distance - 0.05, body.distance + 0.05, 128]} />
           <meshBasicMaterial
-            color={body.emissive}
-            opacity={hovered ? 0.5 : 0.2}
+            color={body.atmosphereColor}
+            opacity={hovered ? 0.3 : 0.1}
             transparent
           />
         </mesh>
@@ -295,8 +297,11 @@ const WireframePlanet = ({ body, onHover, onSelect }: {
   );
 };
 
-// Data stream visualization
-const DataStreams = ({ bodies }: { bodies: SolarBody[] }) => {
+// Connection lines between planets
+const ConnectionNetwork = ({ bodies, activeBody }: {
+  bodies: CelestialBody[];
+  activeBody: CelestialBody | null;
+}) => {
   const linesRef = useRef<THREE.Group>(null!);
   
   useFrame((state) => {
@@ -305,82 +310,65 @@ const DataStreams = ({ bodies }: { bodies: SolarBody[] }) => {
     }
   });
   
-  return (
-    <group ref={linesRef}>
-      {bodies.map((body, i) => {
-        if (!body.dataPoints || i >= bodies.length - 1) return null;
-        
-        return Array.from({ length: body.dataPoints }).map((_, j) => {
-          const angle = (j / (body.dataPoints || 1)) * Math.PI * 2;
-          const nextBody = bodies[i + 1];
-          
-          return (
-            <line key={`${body.id}-stream-${j}`}>
-              <bufferGeometry>
-                <bufferAttribute
-                  attach="attributes-position"
-                  args={[new Float32Array([
-                    body.distance + Math.cos(angle) * body.size,
-                    Math.sin(angle) * body.size,
-                    0,
-                    nextBody.distance,
-                    0,
-                    0
-                  ]), 3]}
-                  count={2}
-                />
-              </bufferGeometry>
-              <lineBasicMaterial
-                color={body.emissive}
-                opacity={0.1}
-                transparent
+  const connections = useMemo(() => {
+    const lines: JSX.Element[] = [];
+    bodies.forEach((body1, i) => {
+      bodies.slice(i + 1).forEach((body2) => {
+        const opacity = activeBody && (activeBody.id === body1.id || activeBody.id === body2.id) ? 0.5 : 0.1;
+        lines.push(
+          <line key={`${body1.id}-${body2.id}`}>
+            <bufferGeometry>
+              <bufferAttribute
+                attach="attributes-position"
+                args={[new Float32Array([
+                  body1.distance, 0, 0,
+                  body2.distance, 0, 0
+                ]), 3]}
+                count={2}
               />
-            </line>
-          );
-        });
-      }).flat().filter(Boolean)}
-    </group>
-  );
+            </bufferGeometry>
+            <lineBasicMaterial color={0x00d4ff} opacity={opacity} transparent />
+          </line>
+        );
+      });
+    });
+    return lines;
+  }, [bodies, activeBody]);
+  
+  return <group ref={linesRef}>{connections}</group>;
 };
 
-// Enhanced particle field
-const DataParticleField = ({ count = 10000 }: { count?: number }) => {
+// Particle field for depth
+const ParticleField = ({ count = 5000 }: { count?: number }) => {
   const particlesRef = useRef<THREE.Points>(null!);
   
-  const [positions, colors, sizes] = useMemo(() => {
+  const [positions, colors] = useMemo(() => {
     const pos = new Float32Array(count * 3);
     const col = new Float32Array(count * 3);
-    const siz = new Float32Array(count);
     
-    for (let i = 0; i < count; i++) {
-      const i3 = i * 3;
-      const r = 5 + Math.random() * 100;
+    for (let i = 0; i < count * 3; i += 3) {
+      const r = 30 + Math.random() * 70;
       const theta = Math.random() * Math.PI * 2;
       const phi = Math.acos(Math.random() * 2 - 1);
       
-      pos[i3] = r * Math.sin(phi) * Math.cos(theta);
-      pos[i3 + 1] = r * Math.sin(phi) * Math.sin(theta);
-      pos[i3 + 2] = r * Math.cos(phi);
+      pos[i] = r * Math.sin(phi) * Math.cos(theta);
+      pos[i + 1] = r * Math.sin(phi) * Math.sin(theta);
+      pos[i + 2] = r * Math.cos(phi);
       
-      // Color based on distance
-      const intensity = 1 - (r - 5) / 95;
-      col[i3] = 0;
-      col[i3 + 1] = intensity * 0.8;
-      col[i3 + 2] = intensity;
-      
-      siz[i] = Math.random() * 0.5 + 0.1;
+      // Color variation
+      const intensity = Math.random() * 0.5 + 0.5;
+      col[i] = 0;
+      col[i + 1] = intensity * 0.8;
+      col[i + 2] = intensity;
     }
     
-    return [pos, col, siz];
+    return [pos, col];
   }, [count]);
   
   useFrame((state) => {
     if (particlesRef.current) {
-      particlesRef.current.rotation.y = state.clock.elapsedTime * 0.002;
-      
-      // Pulsing effect
-      const scale = 1 + Math.sin(state.clock.elapsedTime * 0.5) * 0.1;
-      particlesRef.current.scale.setScalar(scale);
+      particlesRef.current.rotation.y = state.clock.elapsedTime * 0.005;
+      particlesRef.current.rotation.x = Math.sin(state.clock.elapsedTime * 0.003) * 0.1;
     }
   });
   
@@ -389,13 +377,12 @@ const DataParticleField = ({ count = 10000 }: { count?: number }) => {
       <bufferGeometry>
         <bufferAttribute attach="attributes-position" args={[positions, 3]} />
         <bufferAttribute attach="attributes-color" args={[colors, 3]} />
-        <bufferAttribute attach="attributes-size" args={[sizes, 1]} />
       </bufferGeometry>
       <pointsMaterial
         size={0.2}
         vertexColors
         transparent
-        opacity={0.4}
+        opacity={0.6}
         sizeAttenuation
         blending={THREE.AdditiveBlending}
       />
@@ -407,16 +394,16 @@ const DataParticleField = ({ count = 10000 }: { count?: number }) => {
 const PrimeIntellectBackground = () => {
   const groupRef = useRef<THREE.Group>(null!);
   const { camera, mouse } = useThree();
-  const [hoveredBody, setHoveredBody] = useState<SolarBody | null>(null);
-  const [selectedBody, setSelectedBody] = useState<SolarBody | null>(null);
+  const [hoveredBody, setHoveredBody] = useState<CelestialBody | null>(null);
+  const [selectedBody, setSelectedBody] = useState<CelestialBody | null>(null);
   const [zoom, setZoom] = useState(1);
   
-  // Enhanced mouse interaction
+  // Mouse-based camera movement
   useFrame(() => {
     if (groupRef.current) {
-      // Full rotation based on mouse position
-      const targetRotationX = mouse.y * Math.PI * 0.5;
-      const targetRotationY = mouse.x * Math.PI;
+      // Smooth rotation based on mouse position
+      const targetRotationX = mouse.y * 0.3;
+      const targetRotationY = mouse.x * 0.3;
       
       groupRef.current.rotation.x = THREE.MathUtils.lerp(
         groupRef.current.rotation.x,
@@ -430,16 +417,16 @@ const PrimeIntellectBackground = () => {
       );
     }
     
-    // Camera zoom
-    const targetZoom = selectedBody ? 0.3 : zoom;
-    camera.position.z = THREE.MathUtils.lerp(camera.position.z, 40 / targetZoom, 0.05);
+    // Camera zoom based on selection
+    const targetZoom = selectedBody ? 0.5 : zoom;
+    camera.position.z = THREE.MathUtils.lerp(camera.position.z, 25 / targetZoom, 0.05);
   });
   
   // Mouse wheel zoom
   useEffect(() => {
     const handleWheel = (e: WheelEvent) => {
       e.preventDefault();
-      setZoom((prev) => Math.max(0.1, Math.min(3, prev + e.deltaY * -0.001)));
+      setZoom((prev) => Math.max(0.5, Math.min(2, prev + e.deltaY * -0.001)));
     };
     
     window.addEventListener('wheel', handleWheel, { passive: false });
@@ -448,23 +435,21 @@ const PrimeIntellectBackground = () => {
   
   return (
     <>
-      {/* Ambient lighting */}
-      <ambientLight intensity={0.1} />
-      
-      {/* Sun lighting */}
-      <pointLight position={[0, 0, 0]} intensity={3} color={0xffd700} />
+      {/* Main lighting */}
+      <ambientLight intensity={0.05} />
+      <pointLight position={[0, 0, 0]} intensity={2} color={0x00d4ff} />
       
       {/* Background particles */}
-      <DataParticleField />
+      <ParticleField />
       
       {/* Solar system group */}
       <group ref={groupRef}>
-        {/* Data streams between planets */}
-        <DataStreams bodies={solarBodies} />
+        {/* Connection network */}
+        <ConnectionNetwork bodies={celestialBodies} activeBody={hoveredBody} />
         
-        {/* Solar bodies */}
-        {solarBodies.map((body) => (
-          <WireframePlanet
+        {/* Celestial bodies */}
+        {celestialBodies.map((body) => (
+          <InteractivePlanet
             key={body.id}
             body={body}
             onHover={setHoveredBody}
@@ -473,7 +458,7 @@ const PrimeIntellectBackground = () => {
         ))}
       </group>
       
-      {/* Info overlay */}
+      {/* UI overlay for hovered planet */}
       {hoveredBody && (
         <div
           style={{
@@ -481,31 +466,24 @@ const PrimeIntellectBackground = () => {
             bottom: '20px',
             left: '50%',
             transform: 'translateX(-50%)',
-            background: 'rgba(0, 0, 0, 0.9)',
+            background: 'rgba(0, 0, 0, 0.8)',
             border: '1px solid #00d4ff',
             borderRadius: '8px',
-            padding: '16px 24px',
+            padding: '12px 24px',
             color: '#00d4ff',
             fontFamily: 'monospace',
             fontSize: '14px',
             pointerEvents: 'none',
             backdropFilter: 'blur(10px)',
-            boxShadow: '0 0 20px rgba(0, 212, 255, 0.5)',
           }}
         >
-          <div style={{ fontWeight: 'bold', marginBottom: '8px', fontSize: '16px' }}>
-            {hoveredBody.name}
-          </div>
-          <div style={{ opacity: 0.8, fontSize: '12px' }}>
-            <div>Diameter: {hoveredBody.actualSize.toLocaleString()} km</div>
-            <div>Orbital Period: {hoveredBody.orbitalPeriod} days</div>
-            <div>Distance from Sun: {hoveredBody.distance} AU</div>
-          </div>
+          <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>{hoveredBody.name}</div>
+          <div style={{ opacity: 0.7, fontSize: '12px' }}>Type: {hoveredBody.type}</div>
         </div>
       )}
       
       {/* Fog for depth */}
-      <fog attach="fog" args={['#000511', 50, 200]} />
+      <fog attach="fog" args={['#000511', 30, 100]} />
     </>
   );
 };

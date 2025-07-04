@@ -477,8 +477,6 @@ const SplatViewerPage = () => {
   const [stats, setStats] = useState<any>({});
   const [error, setError] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
-  const [lumaUrl, setLumaUrl] = useState('');
-  const [showLumaInput, setShowLumaInput] = useState(false);
 
   // Unified file handler
   const handleFiles = useCallback(async (files: FileList | File[]) => {
@@ -542,115 +540,45 @@ const SplatViewerPage = () => {
       <Header />
       <ViewerSettingsProvider>
         <main className="flex-1 flex flex-col items-center justify-center p-4 gap-4 relative">
-          {/* Add Luma AI toggle button */}
-          <div className="w-full max-w-4xl flex justify-between items-center mb-4">
-            <h1 className="text-2xl md:text-3xl font-bold text-white">3D Splat Viewer</h1>
-            <button
-              onClick={() => setShowLumaInput(!showLumaInput)}
-              className="px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg hover:from-purple-600 hover:to-pink-600 transition-all text-sm font-medium flex items-center gap-2"
-            >
-              <span className="material-symbols-outlined text-base">
-                {showLumaInput ? 'upload_file' : 'language'}
-              </span>
-              {showLumaInput ? 'Upload File' : 'Load from Luma'}
-            </button>
-          </div>
-
           <CardGlass className="w-full h-[70vh] flex-grow overflow-hidden flex items-center justify-center relative">
             <AnimatePresence mode="wait">
               {!fileUrl ? (
-                showLumaInput ? (
-                  // Luma AI URL input
-                  <motion.div
-                    key="luma-input"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    className="w-full max-w-md p-6"
-                  >
-                    <div className="space-y-4">
-                      <div className="text-center mb-6">
-                        <span className="material-symbols-outlined text-6xl text-purple-400 mb-4 block">language</span>
-                        <h3 className="text-xl font-semibold text-white mb-2">Load from Luma AI</h3>
-                        <p className="text-gray-400 text-sm">
-                          Import your Luma AI captures directly
-                        </p>
-                      </div>
-                      <input
-                        type="text"
-                        placeholder="Enter Luma AI capture URL"
-                        value={lumaUrl}
-                        onChange={(e) => setLumaUrl(e.target.value)}
-                        className="w-full px-4 py-3 bg-[#0a0a0a] border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 transition-colors"
-                      />
-                      <button
-                        onClick={async () => {
-                          if (lumaUrl) {
-                            try {
-                              // Extract capture ID from Luma URL
-                              const captureId = lumaUrl.match(/capture\/([a-zA-Z0-9-]+)/)?.[1];
-                              if (captureId) {
-                                // Note: This is a placeholder - actual Luma API integration would require authentication
-                                alert('Luma AI integration coming soon! For now, please download the PLY file from Luma and upload it.');
-                                setShowLumaInput(false);
-                              } else {
-                                setError('Invalid Luma AI URL. Please use a valid capture URL.');
-                              }
-                            } catch (error) {
-                              console.error('Error loading from Luma:', error);
-                              setError('Failed to load from Luma AI. Please check the URL and try again.');
-                            }
-                          }
-                        }}
-                        disabled={!lumaUrl}
-                        className="w-full px-4 py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg hover:from-purple-600 hover:to-pink-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-medium"
-                      >
-                        Load Splat
-                      </button>
-                      <p className="text-xs text-gray-500 text-center">
-                        Example: https://lumalabs.ai/capture/abc123...
+                <motion.div
+                  key="dropzone"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="w-full h-full"
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  onDrop={handleDrop}
+                >
+                  <div className={`w-full h-full flex flex-col items-center justify-center text-center border-2 border-dashed transition-all rounded-lg ${isDragging ? 'border-blue-400 bg-blue-900/20' : 'border-gray-600'}`}>
+                    <input
+                      id="splat-file-upload"
+                      type="file"
+                      className="hidden"
+                      accept=".ply,.tsf"
+                      onChange={(e) => handleFiles(e.target.files || [])}
+                    />
+                    <div className="space-y-4 flex flex-col items-center">
+                      <motion.div animate={{ y: [0, -10, 0] }} transition={{ duration: 1.5, repeat: Infinity }}>
+                        <span className="material-symbols-outlined text-6xl text-blue-400">cloud_upload</span>
+                      </motion.div>
+                      <p className="text-xl text-gray-300">
+                        {isDragging ? "Release to upload!" : "Drag & drop a file"}
                       </p>
-                    </div>
-                  </motion.div>
-                ) : (
-                  // File upload interface
-                  <motion.div
-                    key="dropzone"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    className="w-full h-full"
-                    onDragOver={handleDragOver}
-                    onDragLeave={handleDragLeave}
-                    onDrop={handleDrop}
-                  >
-                    <div className={`w-full h-full flex flex-col items-center justify-center text-center border-2 border-dashed transition-all rounded-lg ${isDragging ? 'border-blue-400 bg-blue-900/20' : 'border-gray-600'}`}>
-                      <input
-                        id="splat-file-upload"
-                        type="file"
-                        className="hidden"
-                        accept=".ply,.tsf"
-                        onChange={(e) => handleFiles(e.target.files || [])}
-                      />
-                      <div className="space-y-4 flex flex-col items-center">
-                        <motion.div animate={{ y: [0, -10, 0] }} transition={{ duration: 1.5, repeat: Infinity }}>
-                          <span className="material-symbols-outlined text-6xl text-blue-400">cloud_upload</span>
-                        </motion.div>
-                        <p className="text-xl text-gray-300">
-                          {isDragging ? "Release to upload!" : "Drag & drop a file"}
-                        </p>
-                        <div className="flex items-center w-full max-w-xs">
-                          <div className="flex-grow border-t border-gray-700"></div>
-                          <span className="flex-shrink mx-4 text-gray-500 text-sm">OR</span>
-                          <div className="flex-grow border-t border-gray-700"></div>
-                        </div>
-                        <label htmlFor="splat-file-upload" className="bg-blue-600 text-white font-bold py-3 px-8 rounded-lg hover:bg-blue-500 transition-all focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-opacity-75 cursor-pointer">
-                          Select from Computer
-                        </label>
+                      <div className="flex items-center w-full max-w-xs">
+                        <div className="flex-grow border-t border-gray-700"></div>
+                        <span className="flex-shrink mx-4 text-gray-500 text-sm">OR</span>
+                        <div className="flex-grow border-t border-gray-700"></div>
                       </div>
+                      <label htmlFor="splat-file-upload" className="bg-blue-600 text-white font-bold py-3 px-8 rounded-lg hover:bg-blue-500 transition-all focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-opacity-75 cursor-pointer">
+                        Select from Computer
+                      </label>
                     </div>
-                  </motion.div>
-                )
+                  </div>
+                </motion.div>
               ) : (
                 <motion.div key="renderer" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="w-full h-full">
                   <UnifiedRenderer fileType={fileType} fileUrl={fileUrl} onStatsUpdate={handleStatsUpdate} />
