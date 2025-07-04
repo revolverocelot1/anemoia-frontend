@@ -193,7 +193,7 @@ const PosePage = () => {
               transition={{ duration: 0.6, delay: 0.2 }}
             >
                 <div>
-                <label className="block text-sm font-semibold text-gray-300 mb-4" htmlFor="image-upload">
+                <label className="block text-sm font-semibold text-gray-300 mb-4" htmlFor="pose-file-upload">
                   Upload Image for Pose Detection
                 </label>
                 <div 
@@ -212,11 +212,11 @@ const PosePage = () => {
                       </svg>
                     </motion.div>
                     <div className="text-sm text-gray-400">
-                      <label htmlFor="file-upload" className="relative cursor-pointer rounded-md font-semibold text-blue-400 hover:text-blue-300 focus-within:outline-none focus-within:ring-2 focus-within:ring-blue-500 focus-within:ring-offset-2 focus-within:ring-offset-gray-900 transition-colors">
+                      <label htmlFor="pose-file-upload" className="relative cursor-pointer rounded-md font-semibold text-blue-400 hover:text-blue-300 focus-within:outline-none focus-within:ring-2 focus-within:ring-blue-500 focus-within:ring-offset-2 focus-within:ring-offset-gray-900 transition-colors">
                           <span>Upload a file</span>
                         <input 
-                          id="file-upload" 
-                          name="file-upload" 
+                          id="pose-file-upload" 
+                          name="pose-file-upload" 
                           type="file" 
                           className="sr-only" 
                           accept="image/*" 

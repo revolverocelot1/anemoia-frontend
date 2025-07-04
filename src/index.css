@@ -1,3 +1,17 @@
+@import url('/fonts/inter.css');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html, body {
+  @apply bg-panel text-gray-200 font-sans tracking-tight antialiased;
+}
+
+h1, h2, h3, h4, h5 {
+  @apply font-bold text-white;
+}
+
 /* Basic Reset and Font Setup */
 :root {
   /* Modern Color Palette */
@@ -81,6 +95,8 @@ body {
 #root {
   min-height: 100vh;
   width: 100%;
+  position: relative;
+  z-index: 1;
 }
 
 /* Scrollbar Styling */

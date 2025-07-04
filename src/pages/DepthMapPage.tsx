@@ -81,7 +81,7 @@ const InputView = ({ onFileChange, onGenerate, imagePreview, isDisabled }: {
                     transition={{ duration: 0.6, delay: 0.2 }}
                 >
             <div>
-                        <label className="block text-sm font-semibold text-gray-300 mb-4" htmlFor="file-upload">
+                        <label className="block text-sm font-semibold text-gray-300 mb-4" htmlFor="depth-file-upload">
                     Upload Image
                 </label>
                 <div
@@ -113,14 +113,14 @@ const InputView = ({ onFileChange, onGenerate, imagePreview, isDisabled }: {
                                 <div className="text-sm text-gray-400">
                             <label
                                         className="relative cursor-pointer rounded-md font-semibold text-blue-400 hover:text-blue-300 focus-within:outline-none focus-within:ring-2 focus-within:ring-blue-500 focus-within:ring-offset-2 focus-within:ring-offset-gray-900 transition-colors"
-                                htmlFor="file-upload"
+                                htmlFor="depth-file-upload"
                                 tabIndex={-1}
                             >
                                 <span>Upload a file</span>
                                 <input
                                     className="sr-only"
-                                    id="file-upload"
-                                    name="file-upload"
+                                    id="depth-file-upload"
+                                    name="depth-file-upload"
                                     type="file"
                                     accept="image/*"
                                     onChange={handleInputChange}

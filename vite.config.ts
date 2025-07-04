@@ -1,24 +1,10 @@
-import { defineConfig, type ViteDevServer } from 'vite'
+import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { resolve } from 'path'
-import type { Connect } from 'vite'
-
-// This is required for Vite to correctly handle the ONNX runtime web worker
-const wasmContentTypePlugin = {
-  name: 'wasm-content-type-plugin',
-  configureServer(server: ViteDevServer) {
-    server.middlewares.use((req: Connect.IncomingMessage, res: any, next: Connect.NextFunction) => {
-      if (req.url?.endsWith('.wasm')) {
-        res.setHeader('Content-Type', 'application/wasm')
-      }
-      next()
-    })
-  },
-}
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react(), wasmContentTypePlugin],
+  plugins: [react()],
   server: {
     headers: {
       'Cross-Origin-Embedder-Policy': 'require-corp',
@@ -50,7 +36,12 @@ export default defineConfig({
     format: 'es',
   },
   optimizeDeps: {
-    exclude: ['@tensorflow/tfjs-backend-wasm'],
+    exclude: [
+      '@tensorflow/tfjs-backend-wasm', 
+      'onnxruntime-web',
+      'onnxruntime-web/dist/ort-wasm-simd-threaded.jsep.mjs',
+      'onnxruntime-web/dist/ort-wasm-simd-threaded.mjs'
+    ],
   },
   resolve: {
     alias: {

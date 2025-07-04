@@ -10,6 +10,7 @@ import { env } from '@huggingface/transformers';
 import App from './App';
 import { AuthProvider } from './context/AuthContext';
 import './index.css';
+import { initializeGPU } from './utils/gpuUtils';
 
 // Initialize Sentry for error tracking
 Sentry.init({
@@ -34,6 +35,13 @@ env.allowRemoteModels = true;
 if (env.backends?.onnx?.wasm) {
     env.backends.onnx.wasm.wasmPaths = '/';
 }
+
+// Initialize GPU acceleration
+initializeGPU().then(() => {
+  console.log('GPU acceleration initialized');
+}).catch(error => {
+  console.error('GPU initialization failed:', error);
+});
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
