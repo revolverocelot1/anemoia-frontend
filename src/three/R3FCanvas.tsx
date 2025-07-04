@@ -4,13 +4,14 @@ import PrimeIntellectBackground from './PrimeIntellectBackground';
 
 const R3FCanvas = () => {
   return (
-    <div className="fixed inset-0 w-full h-full -z-10">
+    <div className="fixed inset-0 w-full h-full -z-10 pointer-events-none">
       <Canvas
         camera={{ position: [0, 0, 40], fov: 60 }}
         style={{ 
           background: 'radial-gradient(ellipse at center, #000511 0%, #000000 100%)',
           width: '100%',
           height: '100%',
+          pointerEvents: 'auto',
         }}
         gl={{
           antialias: true,

@@ -1,45 +1,39 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { supabase } from '../services/supabase';
 import LoadingOverlay from '../components/LoadingOverlay';
 
 const AuthCallbackPage = () => {
   const navigate = useNavigate();
-  const { setToken } = useAuth();
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const token = params.get('token');
-    const authSuccess = params.get('auth');
+    // Handle Supabase OAuth callback
+    const handleAuthCallback = async () => {
+      try {
+        // Get the session from the URL hash
+        const { data: { session }, error } = await supabase.auth.getSession();
+        
+        if (error) {
+          console.error('Auth callback error:', error);
+          navigate('/login?error=auth_failed', { replace: true });
+          return;
+        }
 
-    // Handle demo authentication from render.com redirect
-    if (authSuccess === 'success') {
-      // For demo, create a mock JWT token
-      const mockUser = {
-        sub: 'demo_' + Date.now(),
-        email: 'demo@example.com',
-        name: 'Demo User',
-        exp: Math.floor(Date.now() / 1000) + (24 * 60 * 60) // 24 hours
-      };
-      
-      // Create a simple JWT-like token (not cryptographically secure - just for demo)
-      const header = btoa(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
-      const payload = btoa(JSON.stringify(mockUser));
-      const mockToken = `${header}.${payload}.demo_signature`;
-      
-      setToken(mockToken);
-      navigate('/account', { replace: true });
-      return;
-    }
+        if (session) {
+          // Successfully authenticated
+          navigate('/account', { replace: true });
+        } else {
+          // No session found
+          navigate('/login?error=no_session', { replace: true });
+        }
+      } catch (err) {
+        console.error('Unexpected error during auth callback:', err);
+        navigate('/login?error=unexpected', { replace: true });
+      }
+    };
 
-    if (token) {
-      setToken(token);
-      navigate('/account', { replace: true });
-    } else {
-      // Failed – redirect to login with error
-      navigate('/login?error=auth_failed', { replace: true });
-    }
-  }, [navigate, setToken]);
+    handleAuthCallback();
+  }, [navigate]);
 
   return <LoadingOverlay message="Completing authentication..." />;
 };
