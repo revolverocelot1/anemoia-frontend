@@ -1,21 +1,77 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 
 const DoomPage: React.FC = () => {
   const gameContainerRef = useRef<HTMLDivElement>(null);
+  const [gameState, setGameState] = useState<'menu' | 'loading' | 'playing'>('menu');
+  const [progress, setProgress] = useState(0);
+  const [isIframeLoaded, setIsIframeLoaded] = useState(false);
+
+  useEffect(() => {
+    // Simulate initial loading progress
+    if (gameState === 'loading' && !isIframeLoaded) {
+      const interval = setInterval(() => {
+        setProgress(prev => {
+          if (prev >= 50) {
+            clearInterval(interval);
+            return 50; // Wait at 50% for iframe to load
+          }
+          return prev + Math.random() * 10;
+        });
+      }, 200);
+      return () => clearInterval(interval);
+    }
+  }, [gameState, isIframeLoaded]);
+
+  const handleStartGame = () => {
+    setGameState('loading');
+    setProgress(0);
+    setIsIframeLoaded(false);
+  };
+
+  const handleIframeLoad = () => {
+    setIsIframeLoaded(true);
+    // Complete the loading progress
+    const completeInterval = setInterval(() => {
+      setProgress(prev => {
+        if (prev >= 100) {
+          clearInterval(completeInterval);
+          setTimeout(() => setGameState('playing'), 500);
+          return 100;
+        }
+        return prev + 10;
+      });
+    }, 100);
+  };
 
   const handleFullscreen = () => {
     if (gameContainerRef.current) {
-      gameContainerRef.current.requestFullscreen().catch(err => {
-        console.error(`Error attempting to enable full-screen mode: ${err.message} (${err.name})`);
-      });
+      const iframe = gameContainerRef.current.querySelector('iframe');
+      if (iframe) {
+        iframe.requestFullscreen().catch(err => {
+          console.error(`Error attempting to enable full-screen mode: ${err.message}`);
+        });
+      }
     }
   };
 
+  // Listen for messages from iframe
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data && event.data.action === 'exitDoom') {
+        setGameState('menu');
+        setIsIframeLoaded(false);
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, []);
+
   return (
-    <div className="relative flex size-full min-h-screen flex-col dark group/design-root overflow-x-hidden">
+    <div className="relative flex size-full min-h-screen flex-col dark group/design-root overflow-x-hidden" style={{ backgroundColor: 'rgba(0, 0, 0, 0.95)' }}>
       <div className="layout-container flex h-full grow flex-col">
         <Header />
         
@@ -26,149 +82,180 @@ const DoomPage: React.FC = () => {
             <motion.div
               initial={{ opacity: 0, y: 30 }}
               animate={{ opacity: 1, y: 0 }}
-              className="text-center mb-12"
+              className="text-center mb-8"
             >
-              <div className="flex items-center justify-center space-x-4 mb-6">
-                <motion.div
-                  initial={{ scale: 0 }}
-                  animate={{ scale: 1 }}
-                  transition={{ delay: 0.2, type: 'spring', stiffness: 200 }}
-                  className="w-20 h-20 bg-gradient-to-r from-red-600 to-red-800 rounded-2xl flex items-center justify-center shadow-xl"
-                >
-                  <span className="material-symbols-outlined text-white text-4xl">videogame_asset</span>
-                </motion.div>
-              </div>
-              
-              <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-4 tracking-tighter">
+              <h1 className="text-5xl md:text-6xl font-bold mb-4 text-white">
                 DOOM Classic
               </h1>
-              <p className="text-lg md:text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto">
-                Experience the legendary first-person shooter that defined a genre. 
-                Powered by WebAssembly technology for authentic gameplay directly in your browser.
+              <p className="text-lg text-gray-300 max-w-2xl mx-auto">
+                The legendary first-person shooter running in your browser via WebAssembly
               </p>
             </motion.div>
 
-            {/* Game Interface */}
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 0.3 }}
-              className="w-full max-w-6xl"
-            >
-              <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl overflow-hidden border border-gray-200 dark:border-gray-700">
-                <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-red-50 to-orange-50 dark:from-red-900/20 dark:to-orange-900/20">
-                  <div className="flex items-center space-x-4">
-                    <div className="w-12 h-12 bg-red-600 rounded-xl flex items-center justify-center shadow-lg">
-                      <span className="material-symbols-outlined text-white text-2xl">videogame_asset</span>
+            {/* Game Container */}
+            <div ref={gameContainerRef} className="w-full max-w-5xl">
+              <div className="relative aspect-[16/10] bg-black rounded-lg overflow-hidden shadow-2xl border border-red-900/20">
+                
+                {/* Menu State */}
+                {gameState === 'menu' && (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-b from-gray-900 to-black"
+                  >
+                    <div className="text-center">
+                      <motion.div
+                        initial={{ scale: 0 }}
+                        animate={{ scale: 1 }}
+                        transition={{ type: "spring", stiffness: 200 }}
+                        className="mb-8"
+                      >
+                        <div className="text-8xl font-bold text-red-600 mb-2" style={{ fontFamily: 'Impact, sans-serif' }}>
+                          DOOM
+                        </div>
+                        <div className="text-xl text-gray-400">WebAssembly Edition</div>
+                      </motion.div>
+                      
+                      <div className="space-y-4">
+                        <motion.button
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.95 }}
+                          onClick={handleStartGame}
+                          className="px-8 py-4 bg-red-600 hover:bg-red-700 text-white rounded-lg font-bold text-xl transition-all shadow-lg hover:shadow-red-600/50 w-64"
+                        >
+                          Start Game
+                        </motion.button>
+                      </div>
+                      
+                      <p className="text-sm text-gray-500 mt-8">
+                        Press F11 for fullscreen • Use WASD to move • Mouse to look
+                      </p>
                     </div>
-                    <div>
-                      <h3 className="text-xl font-bold text-gray-900 dark:text-white">
-                        DOOM Classic WebAssembly Edition
-                      </h3>
-                      <p className="text-gray-600 dark:text-gray-300">Ready to play • No downloads required</p>
+                  </motion.div>
+                )}
+
+                {/* Loading State */}
+                {gameState === 'loading' && (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center bg-black z-10">
+                    <div className="text-center">
+                      <div className="text-4xl font-bold text-red-600 mb-8">Loading DOOM...</div>
+                      <div className="w-64 h-4 bg-gray-800 rounded-full overflow-hidden mb-4">
+                        <motion.div
+                          className="h-full bg-gradient-to-r from-red-600 to-red-500"
+                          initial={{ width: 0 }}
+                          animate={{ width: `${progress}%` }}
+                          transition={{ duration: 0.3 }}
+                        />
+                      </div>
+                      <div className="text-gray-400">{Math.round(progress)}%</div>
                     </div>
                   </div>
-                  <div className="flex space-x-3">
-                    <motion.button
-                      onClick={handleFullscreen}
-                      className="px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl font-semibold transition-colors flex items-center space-x-2 shadow-lg hover:shadow-xl"
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                    >
-                      <span className="material-symbols-outlined text-lg">fullscreen</span>
-                      <span>Play Fullscreen</span>
-                    </motion.button>
+                )}
+
+                {/* Playing State - Embedded DOOM */}
+                {(gameState === 'playing' || gameState === 'loading') && (
+                  <iframe
+                    src="/doom/doom-game.html"  // Using webDOOM implementation
+                    className={`w-full h-full border-0 ${gameState === 'loading' ? 'invisible' : 'visible'}`}
+                    onLoad={handleIframeLoad}
+                    allow="fullscreen; autoplay; gamepad; keyboard-lock"
+                    title="DOOM Game"
+                  />
+                )}
+
+                {/* Game Controls Overlay */}
+                <div className="absolute bottom-4 right-4 flex gap-2">
+                  {gameState === 'playing' && (
+                    <>
+                      <button
+                        onClick={() => {
+                          setGameState('menu');
+                          setIsIframeLoaded(false);
+                        }}
+                        className="px-4 py-2 bg-gray-800/80 hover:bg-gray-700/80 text-white rounded-lg text-sm backdrop-blur transition-all"
+                      >
+                        Exit Game
+                      </button>
+                      <button
+                        onClick={handleFullscreen}
+                        className="px-4 py-2 bg-gray-800/80 hover:bg-gray-700/80 text-white rounded-lg text-sm backdrop-blur transition-all flex items-center gap-2"
+                      >
+                        <span className="material-symbols-outlined text-lg">fullscreen</span>
+                        Fullscreen
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {/* Game Info */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3 }}
+                className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-6"
+              >
+                <div className="bg-gray-800/50 p-6 rounded-lg backdrop-blur">
+                  <div className="flex items-center gap-3 mb-3">
+                    <span className="material-symbols-outlined text-red-500">speed</span>
+                    <h3 className="font-bold text-white">Performance</h3>
                   </div>
+                  <p className="text-sm text-gray-300">
+                    WebAssembly powered for native-like performance directly in your browser
+                  </p>
                 </div>
                 
-                <div ref={gameContainerRef} className="aspect-video bg-black">
-                  <iframe
-                    src="https://ustymukhman.github.io/webDOOM/public/"
-                    className="w-full h-full"
-                    title="DOOM Classic"
-                    allow="gamepad; midi; encrypted-media; fullscreen"
-                    sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
-                  />
-                </div>
-
-                {/* Game Info Footer */}
-                <div className="p-6 bg-gray-50 dark:bg-gray-900/50">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div className="text-center">
-                      <div className="w-12 h-12 bg-blue-500 rounded-xl flex items-center justify-center mx-auto mb-3">
-                        <span className="material-symbols-outlined text-white">speed</span>
-                      </div>
-                      <h4 className="font-bold text-gray-900 dark:text-white mb-2">Instant Play</h4>
-                      <p className="text-sm text-gray-600 dark:text-gray-300">No downloads or installation required</p>
-                    </div>
-                    
-                    <div className="text-center">
-                      <div className="w-12 h-12 bg-green-500 rounded-xl flex items-center justify-center mx-auto mb-3">
-                        <span className="material-symbols-outlined text-white">security</span>
-                      </div>
-                      <h4 className="font-bold text-gray-900 dark:text-white mb-2">Safe & Secure</h4>
-                      <p className="text-sm text-gray-600 dark:text-gray-300">Runs in browser sandbox for security</p>
-                    </div>
-                    
-                    <div className="text-center">
-                      <div className="w-12 h-12 bg-purple-500 rounded-xl flex items-center justify-center mx-auto mb-3">
-                        <span className="material-symbols-outlined text-white">devices</span>
-                      </div>
-                      <h4 className="font-bold text-gray-900 dark:text-white mb-2">Cross-Platform</h4>
-                      <p className="text-sm text-gray-600 dark:text-gray-300">Works on desktop, tablet, and mobile</p>
-                    </div>
+                <div className="bg-gray-800/50 p-6 rounded-lg backdrop-blur">
+                  <div className="flex items-center gap-3 mb-3">
+                    <span className="material-symbols-outlined text-green-500">security</span>
+                    <h3 className="font-bold text-white">Self-Hosted</h3>
                   </div>
-                </div>
-              </div>
-            </motion.div>
-
-            {/* About Section */}
-            <motion.div
-              initial={{ opacity: 0, y: 40 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.6 }}
-              className="mt-16 w-full max-w-4xl"
-            >
-              <div className="bg-gradient-to-r from-red-50 to-orange-50 dark:from-red-900/10 dark:to-orange-900/10 rounded-2xl p-8 border border-red-100 dark:border-red-800/20">
-                <div className="text-center">
-                  <h3 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white">About DOOM</h3>
-                  <p className="text-gray-600 dark:text-gray-300 mb-6 leading-relaxed">
-                    Released in 1993, DOOM revolutionized the gaming industry and popularized the first-person shooter genre. 
-                    This WebAssembly port allows you to experience this classic game directly in your browser with no downloads required.
+                  <p className="text-sm text-gray-300">
+                    Play directly on this site without external dependencies
                   </p>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
-                    <div className="text-left">
-                      <h4 className="font-bold mb-3 text-gray-900 dark:text-white flex items-center">
-                        <span className="material-symbols-outlined text-red-500 mr-2">gamepad</span>
-                        Controls
-                      </h4>
-                      <ul className="text-sm text-gray-600 dark:text-gray-300 space-y-1">
-                        <li><strong>WASD</strong> - Move around</li>
-                        <li><strong>Mouse</strong> - Look and aim</li>
-                        <li><strong>Left Click</strong> - Shoot</li>
-                        <li><strong>Space</strong> - Open doors/activate</li>
-                        <li><strong>Shift</strong> - Run</li>
-                      </ul>
-                    </div>
-                    
-                    <div className="text-left">
-                      <h4 className="font-bold mb-3 text-gray-900 dark:text-white flex items-center">
-                        <span className="material-symbols-outlined text-red-500 mr-2">settings</span>
-                        Features
-                      </h4>
-                      <ul className="text-sm text-gray-600 dark:text-gray-300 space-y-1">
-                        <li>• Classic DOOM gameplay</li>
-                        <li>• Original graphics and sound</li>
-                        <li>• Save game functionality</li>
-                        <li>• Configurable controls</li>
-                        <li>• Multiple difficulty levels</li>
-                      </ul>
-                    </div>
-                  </div>
                 </div>
+                
+                <div className="bg-gray-800/50 p-6 rounded-lg backdrop-blur">
+                  <div className="flex items-center gap-3 mb-3">
+                    <span className="material-symbols-outlined text-blue-500">videogame_asset</span>
+                    <h3 className="font-bold text-white">Classic Experience</h3>
+                  </div>
+                  <p className="text-sm text-gray-300">
+                    The authentic DOOM experience with all original levels and gameplay
+                  </p>
+                </div>
+              </motion.div>
+
+              {/* Controls Reference */}
+              {gameState === 'playing' && (
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.5 }}
+                  className="mt-6 p-4 bg-gray-800/30 rounded-lg"
+                >
+                  <h3 className="font-bold text-white mb-2">Quick Controls:</h3>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm text-gray-300">
+                    <div><kbd className="px-2 py-1 bg-gray-700 rounded text-xs">W/A/S/D</kbd> Movement</div>
+                    <div><kbd className="px-2 py-1 bg-gray-700 rounded text-xs">Mouse</kbd> Look/Aim</div>
+                    <div><kbd className="px-2 py-1 bg-gray-700 rounded text-xs">Click</kbd> Fire</div>
+                    <div><kbd className="px-2 py-1 bg-gray-700 rounded text-xs">E</kbd> Use/Open</div>
+                    <div><kbd className="px-2 py-1 bg-gray-700 rounded text-xs">Shift</kbd> Run</div>
+                    <div><kbd className="px-2 py-1 bg-gray-700 rounded text-xs">1-7</kbd> Weapons</div>
+                    <div><kbd className="px-2 py-1 bg-gray-700 rounded text-xs">Tab</kbd> Map</div>
+                    <div><kbd className="px-2 py-1 bg-gray-700 rounded text-xs">Esc</kbd> Menu</div>
+                  </div>
+                </motion.div>
+              )}
+
+              {/* WebAssembly Notice */}
+              <div className="mt-6 p-4 bg-yellow-900/20 border border-yellow-700/30 rounded-lg">
+                <p className="text-sm text-yellow-200">
+                  <strong>Note:</strong> This is a WebAssembly port of DOOM running entirely in your browser. 
+                  First load may take a moment while downloading game assets (~11MB).
+                </p>
               </div>
-            </motion.div>
+            </div>
 
           </div>
         </main>

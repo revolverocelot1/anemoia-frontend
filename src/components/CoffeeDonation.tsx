@@ -2,35 +2,37 @@
 import { motion, AnimatePresence } from 'framer-motion';
 
 const CoffeeDonation = () => {
-  const [isVisible, setIsVisible] = useState(false);
+  const [isVisible, setIsVisible] = useState(true); // Start visible for testing
   const [showCount, setShowCount] = useState(0);
 
   // Show the button periodically with cartoon pop effect
   useEffect(() => {
+    // Hide after 3 seconds initially
+    const hideTimer = setTimeout(() => {
+      setIsVisible(false);
+    }, 3000);
+
     const showButton = () => {
       setIsVisible(true);
       setShowCount(prev => prev + 1);
       
-      // Auto-hide after 1.5 seconds
+      // Auto-hide after 3 seconds
       setTimeout(() => {
         setIsVisible(false);
-      }, 1500);
+      }, 3000);
     };
 
-    // Initial show after 30 seconds
-    const initialTimer = setTimeout(showButton, 30000);
-    
-    // Show every 5 minutes
-    const interval = setInterval(showButton, 300000);
+    // Show every 2 minutes
+    const interval = setInterval(showButton, 120000);
 
     return () => {
-      clearTimeout(initialTimer);
+      clearTimeout(hideTimer);
       clearInterval(interval);
     };
   }, []);
 
   const handleClick = () => {
-    window.open('https://www.buymeacoffee.com/yourusername', '_blank');
+    window.open('https://www.buymeacoffee.com/ocelot', '_blank');
     setIsVisible(false);
   };
 
@@ -41,13 +43,15 @@ const CoffeeDonation = () => {
           key={showCount} // Force re-animation on each show
           initial={{ scale: 0, opacity: 0, y: 100 }}
           animate={{ 
-            scale: [0, 1.2, 0.9, 1],
+            scale: 1,
             opacity: 1,
             y: 0,
             transition: {
               type: "spring",
               duration: 0.6,
-              bounce: 0.6
+              bounce: 0.6,
+              damping: 10,
+              stiffness: 100
             }
           }}
           exit={{ 
@@ -59,7 +63,7 @@ const CoffeeDonation = () => {
               ease: "easeIn"
             }
           }}
-          className="fixed bottom-6 right-6 z-50"
+          className="fixed bottom-6 right-6 z-[9999]"
           style={{ pointerEvents: 'auto' }}
         >
           <motion.button
@@ -168,3 +172,4 @@ const CoffeeDonation = () => {
 };
 
 export default CoffeeDonation;
+ 

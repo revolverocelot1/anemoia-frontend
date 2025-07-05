@@ -25,18 +25,18 @@ const ToolCard = ({ title, description, icon, accent, path, variants }: ToolCard
 
   return (
     <motion.div variants={variants}>
-      <Link to={path} className="card h-full" data-accent={accent}>
-        <div className="p-6 flex flex-col items-start text-left flex-1">
-          <div className="icon-container" data-accent={accent}>
-            <IconComp className="text-current w-8 h-8" />
+      <Link to={path} className="card h-full block" data-accent={accent}>
+        <div className="p-6 flex flex-col items-start text-left flex-1 h-full">
+          <div className="icon-container mb-4" data-accent={accent}>
+            <IconComp className="text-white w-8 h-8" style={{ width: '32px', height: '32px' }} />
           </div>
-          <h3 className="text-lg font-bold mb-2 text-white">{title}</h3>
-          <p className="text-sm text-[var(--text-secondary)] flex-1">{description}</p>
-        </div>
-        <div className="px-6 pb-4 mt-auto">
-          <div className="flex items-center text-sm font-medium text-[var(--primary-color)]">
-            <span>Use Tool</span>
-            <span className="material-symbols-outlined text-lg ml-1">arrow_forward</span>
+          <h3 className="text-xl font-bold mb-3 text-white">{title}</h3>
+          <p className="text-base text-gray-300 flex-1 leading-relaxed">{description}</p>
+          <div className="mt-4 pt-4 w-full">
+            <div className="flex items-center text-sm font-medium text-cyan-400 hover:text-cyan-300 transition-colors">
+              <span>Use Tool</span>
+              <span className="material-symbols-outlined text-lg ml-1">arrow_forward</span>
+            </div>
           </div>
         </div>
       </Link>

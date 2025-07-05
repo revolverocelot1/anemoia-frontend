@@ -37,15 +37,34 @@ export default defineConfig({
   },
   optimizeDeps: {
     exclude: [
-      '@tensorflow/tfjs-backend-wasm', 
-      'onnxruntime-web',
-      'onnxruntime-web/dist/ort-wasm-simd-threaded.jsep.mjs',
+      '@tensorflow/tfjs',
+      '@tensorflow/tfjs-backend-webgl',
+      '@tensorflow/tfjs-backend-webgpu',
+      '@tensorflow/tfjs-backend-wasm',
+      '@tensorflow/tfjs-backend-cpu',
+      '@tensorflow/tfjs-converter',
+      '@tensorflow/tfjs-core',
+      '@tensorflow/tfjs-layers',
+      '@tensorflow-models/pose-detection',
       'onnxruntime-web/dist/ort-wasm-simd-threaded.mjs'
     ],
+    include: [
+      'three',
+      '@react-three/fiber',
+      '@react-three/drei',
+      '@react-three/postprocessing',
+      'postprocessing'
+    ],
+    esbuildOptions: {
+      target: 'es2020'
+    }
   },
   resolve: {
     alias: {
       '@': resolve(__dirname, 'src'),
+      'three': 'three',
+      '@react-three/fiber': '@react-three/fiber',
+      '@react-three/drei': '@react-three/drei'
     },
   },
 })

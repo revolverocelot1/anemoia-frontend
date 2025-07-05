@@ -61,7 +61,7 @@ export default function AccountPage() {
       setDeleteLoading(false);
       setShowDeleteConfirm(false);
       setDeletePassword('');
-    }
+      }
   };
 
   const containerVariants = {
@@ -91,7 +91,7 @@ export default function AccountPage() {
             </div>
             <p className="mt-4 text-gray-400">Loading your account...</p>
           </div>
-        </div>
+      </div>
       </AnimatedPage>
     );
   }
@@ -138,7 +138,7 @@ export default function AccountPage() {
                   <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                   </svg>
-                </div>
+            </div>
               </motion.div>
               
               <div className="flex-1 text-center md:text-left">
@@ -151,7 +151,7 @@ export default function AccountPage() {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
                     </svg>
                     <span className="font-mono font-semibold">{user.anemo_id || `ANEMO-${user.id.slice(0, 4).toUpperCase()}`}</span>
-                  </div>
+          </div>
 
                   <div className="flex items-center space-x-2 text-green-400">
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -168,7 +168,7 @@ export default function AccountPage() {
                       <span className="capitalize">{user.provider} Account</span>
                     </div>
                   )}
-                </div>
+            </div>
               </div>
             </div>
           </motion.div>
@@ -242,10 +242,10 @@ export default function AccountPage() {
                       <p className="text-sm text-gray-400 mb-2">From: {email.from}</p>
                       <div className="text-sm text-gray-300" dangerouslySetInnerHTML={{ __html: email.html || email.text }} />
                     </div>
-                  ))}
-                </div>
+              ))}
+        </div>
               )}
-            </motion.div>
+          </motion.div>
           )}
 
           {/* Account Actions */}

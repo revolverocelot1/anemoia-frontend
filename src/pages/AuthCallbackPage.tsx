@@ -22,14 +22,14 @@ const AuthCallbackPage = () => {
         if (session) {
           // Successfully authenticated
           navigate('/account', { replace: true });
-        } else {
+    } else {
           // No session found
           navigate('/login?error=no_session', { replace: true });
         }
       } catch (err) {
         console.error('Unexpected error during auth callback:', err);
         navigate('/login?error=unexpected', { replace: true });
-      }
+    }
     };
 
     handleAuthCallback();

@@ -308,7 +308,7 @@ const MeshRenderer = ({ url }: { url: string }) => {
       <Center>
         <mesh geometry={geom}>
           <meshStandardMaterial vertexColors side={THREE.DoubleSide} metalness={0.2} roughness={0.8} />
-        </mesh>
+    </mesh>
       </Center>
     </Bounds>
   );
@@ -500,7 +500,7 @@ const SplatViewerPage = () => {
       setError('Unsupported file type. Please upload a .ply or .tsf file.');
       return;
     }
-
+    
     setFileType(determinedType);
     setFile(fileToProcess);
     setFileUrl(URL.createObjectURL(fileToProcess));
@@ -523,7 +523,7 @@ const SplatViewerPage = () => {
     setIsDragging(false);
     handleFiles(e.dataTransfer.files);
   };
-
+  
   const handleStatsUpdate = useCallback((newStats: any) => {
     setStats((prev: any) => ({ ...prev, ...newStats }));
   }, []);
@@ -558,7 +558,7 @@ const SplatViewerPage = () => {
 
           <CardGlass className="w-full h-[70vh] flex-grow overflow-hidden flex items-center justify-center relative">
             <AnimatePresence mode="wait">
-              {!fileUrl ? (
+          {!fileUrl ? (
                 showLumaInput ? (
                   // Luma AI URL input
                   <motion.div
@@ -568,7 +568,7 @@ const SplatViewerPage = () => {
                     exit={{ opacity: 0 }}
                     className="w-full max-w-md p-6"
                   >
-                    <div className="space-y-4">
+              <div className="space-y-4">
                       <div className="text-center mb-6">
                         <span className="material-symbols-outlined text-6xl text-purple-400 mb-4 block">language</span>
                         <h3 className="text-xl font-semibold text-white mb-2">Load from Luma AI</h3>
@@ -647,8 +647,8 @@ const SplatViewerPage = () => {
                         <label htmlFor="splat-file-upload" className="bg-blue-600 text-white font-bold py-3 px-8 rounded-lg hover:bg-blue-500 transition-all focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-opacity-75 cursor-pointer">
                           Select from Computer
                         </label>
-                      </div>
-                    </div>
+              </div>
+            </div>
                   </motion.div>
                 )
               ) : (
@@ -659,43 +659,43 @@ const SplatViewerPage = () => {
             </AnimatePresence>
           </CardGlass>
           
-          {file && (
-            <motion.div 
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
+        {file && (
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
               className="w-full max-w-4xl"
-            >
+          >
               <CardGlass className="p-4">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                <div>
-                  <p className="text-gray-400">File</p>
-                  <p className="font-bold truncate">{file.name}</p>
-                </div>
-                <div>
-                  <p className="text-gray-400">Size</p>
-                  <p className="font-bold">{formatBytes(file.size)}</p>
-                </div>
-                <div>
-                  <p className="text-gray-400">Vertices</p>
-                  <p className="font-bold">{stats.vertexCount?.toLocaleString() || 'N/A'}</p>
-                </div>
-                <div>
-                  <p className="text-gray-400">Faces/Triangles</p>
-                  <p className="font-bold">{stats.faceCount?.toLocaleString() || 'N/A'}</p>
-                </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+              <div>
+                <p className="text-gray-400">File</p>
+                <p className="font-bold truncate">{file.name}</p>
               </div>
+              <div>
+                <p className="text-gray-400">Size</p>
+                <p className="font-bold">{formatBytes(file.size)}</p>
+              </div>
+              <div>
+                <p className="text-gray-400">Vertices</p>
+                <p className="font-bold">{stats.vertexCount?.toLocaleString() || 'N/A'}</p>
+              </div>
+              <div>
+                <p className="text-gray-400">Faces/Triangles</p>
+                <p className="font-bold">{stats.faceCount?.toLocaleString() || 'N/A'}</p>
+              </div>
+            </div>
                 {stats.loadingProgress > 0 && stats.loadingProgress < 100 && (
-                <div className="w-full bg-gray-700 rounded-full h-2 mt-2">
-                  <motion.div
-                    className="bg-blue-500 h-2 rounded-full"
+              <div className="w-full bg-gray-700 rounded-full h-2 mt-2">
+                <motion.div
+                  className="bg-blue-500 h-2 rounded-full"
                       animate={{ width: `${stats.loadingProgress}%` }}
-                  />
-                </div>
-              )}
+                />
+              </div>
+            )}
               </CardGlass>
-            </motion.div>
-          )}
-          
+          </motion.div>
+        )}
+        
           {error && (
             <motion.div initial={{opacity: 0}} animate={{opacity: 1}}>
               <CardGlass className="p-4 border border-red-500/20 bg-red-500/10">
@@ -707,7 +707,7 @@ const SplatViewerPage = () => {
             </motion.div>
           )}
           <SplatViewerControls />
-        </main>
+      </main>
       </ViewerSettingsProvider>
       <Footer />
     </div>

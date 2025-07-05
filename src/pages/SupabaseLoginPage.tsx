@@ -122,6 +122,13 @@ export default function SupabaseLoginPage() {
                 </button>
               </div>
 
+              <div className="mt-6 p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
+                <p className="text-yellow-400 text-sm">
+                  <strong>Note:</strong> OAuth providers need to be configured in your Supabase dashboard. 
+                  If you're seeing redirect errors, please ensure Google, Twitter, and GitHub OAuth apps are properly set up in your Supabase project settings.
+                </p>
+              </div>
+
               <div className="mt-8 text-center">
                 <p className="text-sm text-gray-400">
                   By signing in, you agree to our{' '}

@@ -3,7 +3,7 @@ import Footer from '../components/Footer';
 import ToolCard from '../components/ToolCard';
 import Sidebar from '../components/Sidebar';
 import { motion, type Variants, type Transition } from 'framer-motion';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { BsTools } from 'react-icons/bs';
 
 const containerVariants: Variants = {
@@ -39,14 +39,92 @@ const HomePage = () => {
     setSidebarOpen(!sidebarOpen);
   };
 
+  // Debug logging
+  useEffect(() => {
+    console.log('HomePage mounted');
+    
+    // Check if elements are visible
+    const checkVisibility = () => {
+      const toolCards = document.querySelectorAll('.card');
+      console.log('Found tool cards:', toolCards.length);
+      
+      toolCards.forEach((card, index) => {
+        const rect = card.getBoundingClientRect();
+        const styles = window.getComputedStyle(card);
+        console.log(`Card ${index}:`, {
+          visible: rect.width > 0 && rect.height > 0,
+          position: { top: rect.top, left: rect.left },
+          zIndex: styles.zIndex,
+          opacity: styles.opacity,
+          display: styles.display
+        });
+      });
+
+      // Check main container
+      const mainContainer = document.querySelector('.relative.flex.size-full.min-h-screen.flex-col');
+      if (mainContainer) {
+        const mainStyles = window.getComputedStyle(mainContainer as Element);
+        console.log('Main container styles:', {
+          backgroundColor: mainStyles.backgroundColor,
+          zIndex: mainStyles.zIndex,
+          position: mainStyles.position
+        });
+      }
+
+      // Check 3D canvas
+      const canvas = document.querySelector('canvas');
+      if (canvas) {
+        const canvasContainer = canvas.closest('div');
+        const canvasStyles = window.getComputedStyle(canvasContainer as Element);
+        console.log('Canvas container styles:', {
+          zIndex: canvasStyles.zIndex,
+          position: canvasStyles.position
+        });
+      }
+
+      // Check Material Symbols font
+      const testIcon = document.querySelector('.material-symbols-outlined');
+      if (testIcon) {
+        const iconStyles = window.getComputedStyle(testIcon);
+        console.log('Material Symbols font:', {
+          fontFamily: iconStyles.fontFamily,
+          fontSize: iconStyles.fontSize,
+          fontWeight: iconStyles.fontWeight,
+          display: iconStyles.display
+        });
+      }
+
+      // Check icon containers
+      const iconContainers = document.querySelectorAll('.icon-container');
+      iconContainers.forEach((container, index) => {
+        const rect = container.getBoundingClientRect();
+        console.log(`Icon container ${index}:`, {
+          width: rect.width,
+          height: rect.height,
+          display: window.getComputedStyle(container).display
+        });
+      });
+    };
+
+    // Run check after a short delay to ensure DOM is ready
+    setTimeout(checkVisibility, 100);
+
+    // Check if Material Symbols font is loaded
+    document.fonts.ready.then(() => {
+      console.log('Fonts loaded');
+      const materialSymbolsLoaded = document.fonts.check('1em Material Symbols Outlined');
+      console.log('Material Symbols Outlined loaded:', materialSymbolsLoaded);
+    });
+  }, []);
+
   return (
-    <div className="relative flex size-full min-h-screen flex-col dark group/design-root overflow-x-hidden">
+    <div className="relative flex size-full min-h-screen flex-col dark group/design-root overflow-x-hidden" style={{ position: 'relative', zIndex: 10 }}>
       {/* Sidebar */}
       <Sidebar isOpen={sidebarOpen} onToggle={toggleSidebar} />
       
-      <div className="layout-container flex h-full grow flex-col">
+      <div className="layout-container flex h-full grow flex-col" style={{ position: 'relative', zIndex: 20 }}>
         <Header />
-        <main className="px-6 md:px-10 lg:px-20 xl:px-40 flex flex-1 justify-center py-8 overflow-y-auto">
+        <main className="px-6 md:px-10 lg:px-20 xl:px-40 flex flex-1 justify-center py-8 overflow-y-auto" style={{ position: 'relative', zIndex: 30 }}>
           <div className="layout-content-container flex flex-col items-center max-w-7xl flex-1 w-full">
             <div className="max-w-7xl mx-auto px-4 py-20">
               <motion.div
@@ -71,6 +149,10 @@ const HomePage = () => {
                   <span className="inline-flex items-center gap-2">
                     <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
                     GPU Acceleration Active
+                  </span>
+                  <span className="mx-2">•</span>
+                  <span className="text-gray-400">
+                    Press <kbd className="px-2 py-1 bg-gray-700 rounded text-xs">Ctrl+B</kbd> to toggle 3D background
                   </span>
                 </motion.div>
               </motion.div>
@@ -192,6 +274,11 @@ const HomePage = () => {
                   <p className="text-gray-400">Instant results with GPU-optimized shaders and parallel compute operations</p>
                 </div>
               </motion.div>
+
+              {/* Background control hint */}
+              <div className="text-center text-gray-500 text-sm mt-6">
+                Press <kbd className="px-2 py-1 bg-gray-700 rounded text-xs">Ctrl+B</kbd> to toggle 3D background
+              </div>
             </div>
           </div>
         </main>

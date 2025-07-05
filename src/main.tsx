@@ -12,6 +12,22 @@ import { AuthProvider } from './context/AuthContext';
 import './index.css';
 import { initializeGPU } from './utils/gpuUtils';
 
+// Pre-load Three.js modules to ensure they're available
+import * as THREE from 'three';
+import * as R3F from '@react-three/fiber';
+import * as Drei from '@react-three/drei';
+
+// Make them globally available for debugging
+(window as any).THREE = THREE;
+(window as any).__R3F__ = R3F;
+(window as any).__DREI__ = Drei;
+
+console.log('Three.js modules loaded:', {
+  three: !!THREE,
+  r3f: !!R3F,
+  drei: !!Drei
+});
+
 // Initialize Sentry for error tracking
 Sentry.init({
   dsn: import.meta.env.VITE_SENTRY_DSN_FRONTEND,

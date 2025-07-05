@@ -1,39 +1,78 @@
+import React, { useEffect, useState } from 'react';
+import { Canvas } from '@react-three/fiber';
+import { Box } from '@react-three/drei';
+import * as THREE from 'three';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 
-const TestPage = () => {
+const TestPage: React.FC = () => {
+  const [moduleStatus, setModuleStatus] = useState({
+    three: false,
+    r3f: false,
+    drei: false,
+    error: null as string | null,
+  });
+
+  useEffect(() => {
+    // Check if modules are loaded
+    try {
+      setModuleStatus({
+        three: !!THREE && !!THREE.BoxGeometry,
+        r3f: !!(window as any).__R3F__,
+        drei: !!Box,
+        error: null,
+      });
+    } catch (e: any) {
+      setModuleStatus(prev => ({ ...prev, error: e.message }));
+    }
+  }, []);
+
   return (
-    <div className="min-h-screen flex flex-col">
-      <Header />
-      
-      <main className="flex-1 flex items-center justify-center p-8">
-        <div className="bg-gray-900/50 backdrop-blur-sm rounded-2xl p-8 max-w-2xl w-full border border-cyan-500/20">
-          <h1 className="text-3xl font-bold mb-4 text-cyan-400">3D Background Test</h1>
-          
-          <div className="space-y-4 text-gray-300">
-            <p>This page tests if the 3D background is rendering properly.</p>
+    <div className="relative flex size-full min-h-screen flex-col" style={{ backgroundColor: '#0a0a0a' }}>
+      <div className="layout-container flex h-full grow flex-col">
+        <Header />
+        
+        <main className="px-40 flex flex-1 justify-center py-5">
+          <div className="layout-content-container flex flex-col w-[960px] max-w-[960px] py-5 max-w-[960px] flex-1">
+            <h1 className="text-white text-4xl font-black leading-tight tracking-[-0.033em] pb-3 pt-6">Test Page</h1>
             
-            <div className="bg-gray-800/50 rounded-lg p-4 border border-gray-700">
-              <h2 className="text-xl font-semibold mb-2 text-white">Expected:</h2>
-              <ul className="list-disc list-inside space-y-1">
-                <li>Animated wireframe cube in the center</li>
-                <li>8 colored spheres orbiting around</li>
-                <li>Blue grid on the floor</li>
-                <li>Cyan and magenta point lights</li>
-              </ul>
+            {/* Module Status */}
+            <div className="bg-gray-900 p-4 rounded-lg mb-4">
+              <h2 className="text-white text-xl mb-3">Module Loading Status:</h2>
+              <div className="space-y-2">
+                <div className={moduleStatus.three ? 'text-green-400' : 'text-red-400'}>
+                  Three.js: {moduleStatus.three ? '✓ Loaded' : '✗ Not Loaded'}
+                </div>
+                <div className={moduleStatus.r3f ? 'text-green-400' : 'text-red-400'}>
+                  React Three Fiber: {moduleStatus.r3f ? '✓ Loaded' : '✗ Not Loaded'}
+                </div>
+                <div className={moduleStatus.drei ? 'text-green-400' : 'text-red-400'}>
+                  Drei: {moduleStatus.drei ? '✓ Loaded' : '✗ Not Loaded'}
+                </div>
+                {moduleStatus.error && (
+                  <div className="text-red-400">Error: {moduleStatus.error}</div>
+                )}
+              </div>
             </div>
-            
-            <div className="bg-gray-800/50 rounded-lg p-4 border border-gray-700">
-              <h2 className="text-xl font-semibold mb-2 text-white">Debug Info:</h2>
-              <p>Canvas element should be at z-index: 0</p>
-              <p>Main content at z-index: 1</p>
-              <p>Background should be transparent</p>
+
+            {/* Simple Three.js Canvas Test */}
+            <div className="bg-gray-900 p-4 rounded-lg">
+              <h2 className="text-white text-xl mb-3">Three.js Canvas Test:</h2>
+              <div style={{ height: '400px', width: '100%' }}>
+                <Canvas camera={{ position: [0, 0, 5] }}>
+                  <ambientLight intensity={0.5} />
+                  <pointLight position={[10, 10, 10]} />
+                  <Box args={[1, 1, 1]}>
+                    <meshStandardMaterial color="hotpink" />
+                  </Box>
+                </Canvas>
+              </div>
             </div>
           </div>
-        </div>
-      </main>
-      
-      <Footer />
+        </main>
+        
+        <Footer />
+      </div>
     </div>
   );
 };

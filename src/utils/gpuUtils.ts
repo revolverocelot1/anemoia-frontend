@@ -1,17 +1,24 @@
 // GPU Utilities for forcing high-performance GPU usage
 
 export interface GPUInfo {
-  vendor: string;
-  renderer: string;
-  isNvidia: boolean;
-  isAMD: boolean;
-  isIntel: boolean;
-  powerPreference: 'high-performance' | 'low-power' | 'default';
+  tier: number;
+  type: string;
+  fps?: number;
+  device?: string;
+  renderer?: string;
+  webGLVersion?: number;
+  webGLSupported: boolean;
+  webGLContext?: string;
+  maxTextureSize?: number;
+  vendor?: string;
+  unmaskedVendor?: string;
+  unmaskedRenderer?: string;
 }
 
 export class GPUManager {
   private static instance: GPUManager;
   private gpuInfo: GPUInfo | null = null;
+  private detectionPromise: Promise<GPUInfo> | null = null;
 
   private constructor() {}
 
@@ -20,6 +27,57 @@ export class GPUManager {
       GPUManager.instance = new GPUManager();
     }
     return GPUManager.instance;
+  }
+
+  async getGPUInfo(): Promise<GPUInfo> {
+    if (this.gpuInfo) {
+      return this.gpuInfo;
+    }
+
+    if (this.detectionPromise) {
+      return this.detectionPromise;
+    }
+
+    this.detectionPromise = this.detectGPUInfo();
+    this.gpuInfo = await this.detectionPromise;
+    return this.gpuInfo;
+  }
+
+  private async detectGPUInfo(): Promise<GPUInfo> {
+    return detectGPU();
+  }
+
+  isHighPerformanceGPU(): boolean {
+    if (!this.gpuInfo) return false;
+    
+    const renderer = (this.gpuInfo.unmaskedRenderer || this.gpuInfo.renderer || '').toLowerCase();
+    return renderer.includes('nvidia') || 
+           renderer.includes('geforce') || 
+           renderer.includes('radeon') ||
+           (renderer.includes('amd') && !renderer.includes('integrated'));
+  }
+
+  getRecommendedSettings() {
+    if (!this.gpuInfo) {
+      return {
+        enableShadows: false,
+        enablePostProcessing: false,
+        enableReflections: false,
+        pixelRatio: 1,
+        antialiasing: false,
+      };
+    }
+
+    const isHighEnd = this.isHighPerformanceGPU();
+    const gpuTier = this.gpuInfo.tier || 1;
+
+    return {
+      enableShadows: isHighEnd && gpuTier >= 2,
+      enablePostProcessing: isHighEnd && gpuTier >= 3,
+      enableReflections: isHighEnd && gpuTier >= 3,
+      pixelRatio: Math.min(window.devicePixelRatio, isHighEnd ? 2 : 1),
+      antialiasing: isHighEnd && gpuTier >= 2,
+    };
   }
 
   // Detect GPU information from WebGL context
@@ -38,16 +96,29 @@ export class GPUManager {
     const isAMD = /amd/i.test(vendor) || /amd/i.test(renderer) || /radeon/i.test(renderer);
     const isIntel = /intel/i.test(vendor) || /intel/i.test(renderer);
 
-    // Force high-performance for dedicated GPUs
-    const powerPreference = (isNvidia || isAMD) ? 'high-performance' : 'default';
+    // Determine tier and type based on GPU
+    let tier = 1;
+    let type = 'integrated';
+    
+    if (isNvidia || (isAMD && !renderer.toLowerCase().includes('integrated'))) {
+      tier = 3;
+      type = 'discrete';
+    } else if (isIntel) {
+      tier = 1;
+      type = 'integrated';
+    }
 
     this.gpuInfo = {
+      tier,
+      type,
       vendor,
       renderer,
-      isNvidia,
-      isAMD,
-      isIntel,
-      powerPreference
+      unmaskedVendor: vendor,
+      unmaskedRenderer: renderer,
+      webGLSupported: true,
+      webGLVersion: gl instanceof WebGL2RenderingContext ? 2 : 1,
+      webGLContext: gl instanceof WebGL2RenderingContext ? 'webgl2' : 'webgl',
+      maxTextureSize: gl.getParameter(gl.MAX_TEXTURE_SIZE)
     };
 
     console.log('GPU Detected:', this.gpuInfo);
@@ -159,9 +230,17 @@ export class GPUManager {
       const device = await adapter.requestDevice();
       console.log('WebGPU device acquired:', device);
 
-      // Log adapter info
-      const info = await adapter.requestAdapterInfo();
-      console.log('WebGPU Adapter Info:', info);
+      // Log adapter info if available (not all browsers support this yet)
+      if ('requestAdapterInfo' in adapter && typeof adapter.requestAdapterInfo === 'function') {
+        try {
+          const info = await adapter.requestAdapterInfo();
+          console.log('WebGPU Adapter Info:', info);
+        } catch (e) {
+          console.log('WebGPU Adapter Info not available');
+        }
+      } else {
+        console.log('WebGPU Adapter Info not supported in this browser');
+      }
 
       return true;
     } catch (error) {
@@ -193,17 +272,28 @@ export class GPUManager {
 
   private getDefaultGPUInfo(): GPUInfo {
     return {
+      tier: 1,
+      type: 'integrated',
       vendor: 'Unknown',
       renderer: 'Unknown',
-      isNvidia: false,
-      isAMD: false,
-      isIntel: false,
-      powerPreference: 'default'
+      webGLSupported: false,
+      webGLVersion: 0,
+      webGLContext: 'none'
     };
   }
 
-  getGPUInfo(): GPUInfo | null {
-    return this.gpuInfo;
+  async logGPUInfo() {
+    const info = await this.getGPUInfo();
+    console.group('GPU Information');
+    console.log('Vendor:', info.vendor);
+    console.log('Renderer:', info.renderer);
+    console.log('Tier:', info.tier);
+    console.log('Type:', info.type);
+    console.log('WebGL Version:', info.webGLVersion);
+    console.log('WebGL Supported:', info.webGLSupported);
+    console.log('Max Texture Size:', info.maxTextureSize);
+    console.log('Recommended Settings:', this.getRecommendedSettings());
+    console.groupEnd();
   }
 }
 
@@ -234,4 +324,167 @@ export const initializeGPU = async (): Promise<void> => {
 };
 
 // Export singleton instance
-export const gpuManager = GPUManager.getInstance(); 
+export const gpuManager = GPUManager.getInstance();
+
+export const detectGPU = async (): Promise<GPUInfo> => {
+  console.log('Starting GPU detection...');
+  
+  // First check basic WebGL support
+  const canvas = document.createElement('canvas');
+  let gl: WebGLRenderingContext | WebGL2RenderingContext | null = null;
+  let webGLVersion = 0;
+  let webGLContext = 'none';
+  
+  try {
+    // Try WebGL2 first
+    gl = canvas.getContext('webgl2') as WebGL2RenderingContext;
+    if (gl) {
+      webGLVersion = 2;
+      webGLContext = 'webgl2';
+    } else {
+      // Fall back to WebGL1
+      gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl') as WebGLRenderingContext;
+      if (gl) {
+        webGLVersion = 1;
+        webGLContext = 'webgl';
+      }
+    }
+  } catch (e) {
+    console.error('WebGL context creation failed:', e);
+  }
+  
+  if (!gl) {
+    console.error('WebGL not supported');
+    return {
+      tier: 0,
+      type: 'unknown',
+      webGLSupported: false,
+      webGLVersion: 0,
+      webGLContext: 'none'
+    };
+  }
+  
+  // Get basic WebGL info
+  const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
+  const vendor = gl.getParameter(gl.VENDOR);
+  const renderer = gl.getParameter(gl.RENDERER);
+  const maxTextureSize = gl.getParameter(gl.MAX_TEXTURE_SIZE);
+  
+  let unmaskedVendor = vendor;
+  let unmaskedRenderer = renderer;
+  
+  if (debugInfo) {
+    unmaskedVendor = gl.getParameter(debugInfo.UNMASKED_VENDOR_WEBGL);
+    unmaskedRenderer = gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL);
+  }
+  
+  console.log('WebGL Info:', {
+    webGLVersion,
+    webGLContext,
+    vendor,
+    renderer,
+    unmaskedVendor,
+    unmaskedRenderer,
+    maxTextureSize,
+    extensions: gl.getSupportedExtensions()
+  });
+  
+  // Try to detect with GPU.js if available
+  try {
+    const { getGPUTier } = await import('detect-gpu');
+    const gpuTier = await getGPUTier();
+    
+    console.log('GPU Tier Detection:', gpuTier);
+    
+    return {
+      tier: gpuTier.tier,
+      type: gpuTier.type || 'unknown',
+      fps: gpuTier.fps,
+      device: gpuTier.device,
+      renderer: gpuTier.gpu,
+      webGLSupported: true,
+      webGLVersion,
+      webGLContext,
+      maxTextureSize,
+      vendor,
+      unmaskedVendor,
+      unmaskedRenderer
+    };
+  } catch (error) {
+    console.warn('GPU tier detection failed, using fallback:', error);
+    
+    // Fallback detection based on renderer string
+    let tier = 1;
+    let type = 'integrated';
+    
+    const rendererLower = (unmaskedRenderer || renderer || '').toLowerCase();
+    
+    if (rendererLower.includes('nvidia') || rendererLower.includes('geforce')) {
+      tier = 3;
+      type = 'discrete';
+    } else if (rendererLower.includes('radeon') || rendererLower.includes('amd')) {
+      tier = 3;
+      type = 'discrete';
+    } else if (rendererLower.includes('intel')) {
+      tier = 1;
+      type = 'integrated';
+    } else if (rendererLower.includes('mali') || rendererLower.includes('adreno')) {
+      tier = 1;
+      type = 'mobile';
+    }
+    
+    return {
+      tier,
+      type,
+      webGLSupported: true,
+      webGLVersion,
+      webGLContext,
+      maxTextureSize,
+      vendor,
+      renderer: unmaskedRenderer || renderer,
+      unmaskedVendor,
+      unmaskedRenderer
+    };
+  }
+};
+
+export const isLowEndDevice = (gpuInfo: GPUInfo): boolean => {
+  console.log('Checking if low-end device:', {
+    tier: gpuInfo.tier,
+    type: gpuInfo.type,
+    webGLVersion: gpuInfo.webGLVersion
+  });
+  
+  // More lenient for deployment environments
+  const isLowEnd = gpuInfo.tier === 0 || 
+    (gpuInfo.tier === 1 && gpuInfo.type === 'mobile') ||
+    !gpuInfo.webGLSupported ||
+    (gpuInfo.maxTextureSize !== undefined && gpuInfo.maxTextureSize < 4096);
+    
+  console.log('Is low-end device:', isLowEnd);
+  return isLowEnd;
+};
+
+// Log deployment environment info
+export const logDeploymentInfo = () => {
+  const info = {
+    userAgent: navigator.userAgent,
+    platform: navigator.platform,
+    vendor: navigator.vendor,
+    language: navigator.language,
+    onLine: navigator.onLine,
+    hardwareConcurrency: navigator.hardwareConcurrency,
+    deviceMemory: (navigator as any).deviceMemory,
+    connection: (navigator as any).connection,
+    isRender: window.location.hostname.includes('onrender.com'),
+    isLocalhost: window.location.hostname === 'localhost',
+    protocol: window.location.protocol,
+    hostname: window.location.hostname,
+    screenResolution: `${window.screen.width}x${window.screen.height}`,
+    windowSize: `${window.innerWidth}x${window.innerHeight}`,
+    pixelRatio: window.devicePixelRatio
+  };
+  
+  console.log('Deployment Environment:', info);
+  return info;
+}; 

@@ -5,7 +5,7 @@
 @tailwind utilities;
 
 html, body {
-  @apply bg-panel text-gray-200 font-sans tracking-tight antialiased;
+  @apply text-gray-200 font-sans tracking-tight antialiased;
 }
 
 h1, h2, h3, h4, h5 {
@@ -50,7 +50,6 @@ h1, h2, h3, h4, h5 {
 
   color-scheme: dark;
   color: var(--text-primary);
-  background-color: var(--bg-primary);
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -87,7 +86,6 @@ body {
   min-height: 100vh;
   height: 100%;
   font-family: "Space Grotesk", "Inter", "Segoe UI", "Noto Sans", sans-serif;
-  background: linear-gradient(135deg, var(--bg-primary) 0%, #0F1419 100%);
   color: var(--text-primary);
   overflow-x: hidden;
 }
@@ -97,6 +95,89 @@ body {
   width: 100%;
   position: relative;
   z-index: 1;
+}
+
+/* Fix for content visibility over 3D background */
+.layout-container,
+.relative.flex.size-full.min-h-screen.flex-col {
+  position: relative;
+  z-index: 10;
+  background: transparent;
+}
+
+/* Ensure main content is above background */
+main {
+  position: relative;
+  z-index: 10;
+}
+
+/* Card and button z-index fixes */
+.card,
+.button,
+.upload-area,
+.floating-panel {
+  position: relative;
+  z-index: 20;
+}
+
+/* Additional fixes for tool cards */
+.card {
+  display: flex;
+  flex-direction: column;
+  background: rgba(30, 41, 59, 0.95) !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  border-radius: 1rem;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  overflow: hidden;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 1px solid var(--border-primary);
+  cursor: pointer;
+  position: relative !important;
+  z-index: 50 !important;
+}
+
+/* Ensure all interactive elements are clickable */
+a, button, [role="button"], .card {
+  position: relative !important;
+  z-index: 50 !important;
+}
+
+/* Fix for the main container */
+.dark.group\/design-root {
+  position: relative !important;
+  z-index: 10 !important;
+  isolation: isolate !important;
+}
+
+/* Header and Footer z-index */
+header,
+footer {
+  position: relative;
+  z-index: 30;
+}
+
+/* Sidebar z-index */
+.sidebar {
+  z-index: 50;
+}
+
+/* Modal and overlay z-index */
+.modal,
+.overlay {
+  z-index: 100;
+}
+
+/* Dark mode container fix */
+.dark {
+  position: relative;
+  z-index: 1;
+}
+
+/* Ensure all page containers are visible */
+[class*="flex"][class*="size-full"][class*="min-h-screen"] {
+  position: relative;
+  z-index: 2;
 }
 
 /* Scrollbar Styling */
@@ -180,20 +261,6 @@ main {
 }
 
 /* Card Styles */
-.card {
-  display: flex;
-  flex-direction: column;
-  background: var(--bg-card);
-  backdrop-filter: blur(12px);
-  border-radius: 1rem;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-  overflow: hidden;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  border: 1px solid var(--border-primary);
-  cursor: pointer;
-  position: relative;
-}
-
 .card::before {
   content: '';
   position: absolute;
@@ -288,13 +355,34 @@ main {
 /* Icon Container */
 .icon-container {
   margin-bottom: 1rem;
-  padding: 0.875rem;
+  padding: 1rem;
   border-radius: 9999px;
   color: white;
   transition: all 0.3s;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
+  width: 64px;
+  height: 64px;
+  min-width: 64px;
+  min-height: 64px;
+  flex-shrink: 0;
+}
+
+/* Ensure icons inside containers are properly sized and centered */
+.icon-container svg,
+.icon-container .material-symbols-outlined {
+  width: 32px !important;
+  height: 32px !important;
+  font-size: 32px !important;
+  line-height: 1 !important;
+  display: block !important;
+  margin: 0 !important;
+}
+
+/* Fix React Icons alignment */
+.icon-container svg {
+  fill: currentColor;
 }
 
 .icon-container[data-accent="1"] {
@@ -311,6 +399,14 @@ main {
 
 .icon-container[data-accent="4"] {
   background: linear-gradient(135deg, var(--accent-blue) 0%, #2563EB 100%);
+}
+
+.icon-container[data-accent="5"] {
+  background: linear-gradient(135deg, #EC4899 0%, #BE185D 100%);
+}
+
+.icon-container[data-accent="6"] {
+  background: linear-gradient(135deg, #06B6D4 0%, #0891B2 100%);
 }
 
 /* Typography */
@@ -423,6 +519,10 @@ p {
 
 .fade-in {
   animation: fadeIn 0.6s ease-out;
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-out;
 }
 
 @keyframes slideIn {
