@@ -1,15 +1,15 @@
 import { Link, useNavigate } from 'react-router-dom';
-import { useSupabaseAuth } from '../context/SupabaseAuthContext';
+import { useAuth } from '../context/AuthContext';
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const Header = () => {
-  const { user, signOut } = useSupabaseAuth();
+  const { user, logout, isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
-  const handleSignOut = async () => {
-    await signOut();
+  const handleSignOut = () => {
+    logout();
     navigate('/');
   };
 
@@ -39,13 +39,13 @@ const Header = () => {
       </nav>
 
       <div className="flex items-center gap-4">
-        {user ? (
+        {isAuthenticated && user ? (
           <div className="flex items-center gap-4">
             <Link
               to="/account"
               className="text-sm font-medium text-gray-300 hover:text-white transition-colors"
             >
-              {user.email?.split('@')[0]}
+              {user.name || user.email?.split('@')[0]}
             </Link>
             <button
               onClick={handleSignOut}
@@ -105,7 +105,7 @@ const Header = () => {
               >
                 Settings
               </Link>
-              {user && (
+              {isAuthenticated && (
                 <Link
                   to="/account"
                   className="text-sm font-medium text-gray-300 hover:text-white transition-colors"

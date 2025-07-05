@@ -24,8 +24,8 @@ import SplatViewerPage from './pages/SplatViewerPage';
 import TestPage from './pages/TestPage';
 import CoffeeDonation from './components/CoffeeDonation';
 import FileUploadFix from './components/FileUploadFix';
-import { SupabaseAuthProvider } from './context/SupabaseAuthContext';
-import SupabaseLoginPage from './pages/SupabaseLoginPage';
+import { AuthProvider } from './context/AuthContext';
+import LoginPage from './pages/LoginPage';
 import { useState, useEffect, Suspense, lazy } from 'react';
 import { detectGPU, logDeploymentInfo } from './utils/gpuUtils';
 
@@ -212,7 +212,7 @@ function App() {
       
       <FileUploadFix />
       <div style={{ position: 'relative', zIndex: 10 }}>
-        <SupabaseAuthProvider>
+        <AuthProvider>
           <Routes>
             <Route
               path="/"
@@ -234,7 +234,7 @@ function App() {
               path="/login"
               element={
                 <AnimatedPage>
-                  <SupabaseLoginPage />
+                  <LoginPage />
                 </AnimatedPage>
               }
             />
@@ -368,7 +368,7 @@ function App() {
             />
             <Route path="/misc" element={<Navigate to="/" />} />
           </Routes>
-        </SupabaseAuthProvider>
+        </AuthProvider>
         <CoffeeDonation />
       </div>
     </>

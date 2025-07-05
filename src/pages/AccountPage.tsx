@@ -1,68 +1,20 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
-import { authService } from '../services/authService';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import AnimatedPage from '../components/AnimatedPage';
 import { useNavigate } from 'react-router-dom';
 
-interface TestEmail {
-  id: string;
-  from: string;
-  subject: string;
-  text: string;
-  html: string;
-  timestamp: number;
-}
-
 export default function AccountPage() {
   const navigate = useNavigate();
-  const { isAuthenticated, user, logout, isLoading: authLoading, token } = useAuth();
-  const [testEmails, setTestEmails] = useState<TestEmail[]>([]);
-  const [loadingEmails, setLoadingEmails] = useState(false);
-  const [showEmails, setShowEmails] = useState(false);
-  const [deleteLoading, setDeleteLoading] = useState(false);
-  const [deletePassword, setDeletePassword] = useState('');
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const { isAuthenticated, user, logout, isLoading: authLoading } = useAuth();
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
       navigate('/login');
     }
   }, [authLoading, isAuthenticated, navigate]);
-
-  const fetchTestEmails = async () => {
-    if (!user?.email) return;
-    
-    setLoadingEmails(true);
-    try {
-      const emails = await authService.getTestEmails(user.email);
-      setTestEmails(emails);
-      setShowEmails(true);
-    } catch (error) {
-      console.error('Failed to fetch test emails:', error);
-    } finally {
-      setLoadingEmails(false);
-    }
-  };
-
-  const handleDeleteAccount = async () => {
-    if (!token || !deletePassword) return;
-    
-    setDeleteLoading(true);
-    try {
-      await authService.deleteAccount(token, deletePassword);
-      logout();
-      navigate('/');
-    } catch (error: any) {
-      alert(error.message || 'Failed to delete account');
-    } finally {
-      setDeleteLoading(false);
-      setShowDeleteConfirm(false);
-      setDeletePassword('');
-      }
-  };
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -91,7 +43,7 @@ export default function AccountPage() {
             </div>
             <p className="mt-4 text-gray-400">Loading your account...</p>
           </div>
-      </div>
+        </div>
       </AnimatedPage>
     );
   }
@@ -99,6 +51,9 @@ export default function AccountPage() {
   if (!isAuthenticated || !user) {
     return null; // Will redirect via useEffect
   }
+
+  const accountCreatedDate = new Date();
+  accountCreatedDate.setMonth(accountCreatedDate.getMonth() - 1); // Demo: Show account created 1 month ago
 
   return (
     <AnimatedPage>
@@ -138,7 +93,7 @@ export default function AccountPage() {
                   <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                   </svg>
-            </div>
+                </div>
               </motion.div>
               
               <div className="flex-1 text-center md:text-left">
@@ -150,25 +105,16 @@ export default function AccountPage() {
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
                     </svg>
-                    <span className="font-mono font-semibold">{user.anemo_id || `ANEMO-${user.id.slice(0, 4).toUpperCase()}`}</span>
-          </div>
+                    <span className="font-mono font-semibold">ANEMO-{user.email.slice(0, 4).toUpperCase()}</span>
+                  </div>
 
                   <div className="flex items-center space-x-2 text-green-400">
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
-                    <span>{user.emailVerified ? 'Verified' : 'Unverified'}</span>
+                    <span>Active</span>
                   </div>
-
-                  {user.provider && (
-                    <div className="flex items-center space-x-2 text-purple-400">
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                      <span className="capitalize">{user.provider} Account</span>
-                    </div>
-                  )}
-            </div>
+                </div>
               </div>
             </div>
           </motion.div>
@@ -198,7 +144,7 @@ export default function AccountPage() {
                 <h3 className="text-lg font-semibold text-white">Member Since</h3>
               </div>
               <p className="text-3xl font-bold text-green-400">
-                {new Date(user.createdAt).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
+                {accountCreatedDate.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
               </p>
               <p className="text-sm text-gray-400 mt-1">Join date</p>
             </motion.div>
@@ -207,46 +153,46 @@ export default function AccountPage() {
               <div className="flex items-center space-x-3 mb-4">
                 <div className="w-10 h-10 bg-purple-500/10 rounded-lg flex items-center justify-center">
                   <svg className="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
                   </svg>
                 </div>
-                <h3 className="text-lg font-semibold text-white">Test Emails</h3>
+                <h3 className="text-lg font-semibold text-white">Tools Available</h3>
               </div>
-              <p className="text-3xl font-bold text-purple-400">{user.email.split('@')[0]}@mc639.testmail.app</p>
-              <button
-                onClick={fetchTestEmails}
-                disabled={loadingEmails}
-                className="text-sm text-purple-400 hover:text-purple-300 mt-1 underline"
-              >
-                {loadingEmails ? 'Loading...' : 'Check emails'}
-              </button>
+              <p className="text-3xl font-bold text-purple-400">6</p>
+              <p className="text-sm text-gray-400 mt-1">AI-powered tools</p>
             </motion.div>
           </div>
 
-          {/* Test Emails Section */}
-          {showEmails && (
-            <motion.div variants={itemVariants} className="bg-gray-800/20 backdrop-blur-sm rounded-2xl p-8 border border-cyan-500/20 mb-8">
-              <h3 className="text-2xl font-bold text-white mb-6">Test Emails</h3>
-              {testEmails.length === 0 ? (
-                <p className="text-gray-400">No test emails found</p>
-              ) : (
-                <div className="space-y-4 max-h-96 overflow-y-auto">
-                  {testEmails.map((email) => (
-                    <div key={email.id} className="bg-gray-700/20 rounded-lg p-4 border border-gray-600/30">
-                      <div className="flex justify-between items-start mb-2">
-                        <h4 className="font-semibold text-white">{email.subject}</h4>
-                        <span className="text-xs text-gray-400">
-                          {new Date(email.timestamp).toLocaleString()}
-                        </span>
-                      </div>
-                      <p className="text-sm text-gray-400 mb-2">From: {email.from}</p>
-                      <div className="text-sm text-gray-300" dangerouslySetInnerHTML={{ __html: email.html || email.text }} />
-                    </div>
-              ))}
-        </div>
-              )}
+          {/* Quick Actions */}
+          <motion.div variants={itemVariants} className="bg-gray-800/20 backdrop-blur-sm rounded-2xl p-8 border border-cyan-500/20 mb-8">
+            <h3 className="text-2xl font-bold text-white mb-6">Quick Actions</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <motion.button
+                onClick={() => navigate('/')}
+                className="flex items-center space-x-3 px-6 py-4 bg-cyan-600/20 text-cyan-400 border border-cyan-600/30 rounded-xl font-semibold hover:bg-cyan-600/30 transition-colors duration-300"
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                </svg>
+                <span>Back to Tools</span>
+              </motion.button>
+
+              <motion.button
+                onClick={() => navigate('/settings')}
+                className="flex items-center space-x-3 px-6 py-4 bg-purple-600/20 text-purple-400 border border-purple-600/30 rounded-xl font-semibold hover:bg-purple-600/30 transition-colors duration-300"
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+                <span>Settings</span>
+              </motion.button>
+            </div>
           </motion.div>
-          )}
 
           {/* Account Actions */}
           <motion.div variants={itemVariants} className="flex flex-col md:flex-row gap-4">
@@ -261,64 +207,7 @@ export default function AccountPage() {
               </svg>
               <span>Sign Out</span>
             </motion.button>
-            
-            <motion.button
-              onClick={() => setShowDeleteConfirm(true)}
-              className="flex-1 flex items-center justify-center space-x-3 px-6 py-3 bg-gray-700/20 text-gray-300 border border-gray-600/30 rounded-xl font-semibold hover:bg-gray-700/30 transition-colors duration-300"
-              whileHover={{ scale: 1.02, y: -2 }}
-              whileTap={{ scale: 0.98 }}
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-              </svg>
-              <span>Delete Account</span>
-            </motion.button>
           </motion.div>
-
-          {/* Delete Account Confirmation */}
-          {showDeleteConfirm && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50"
-            >
-              <motion.div
-                initial={{ scale: 0.9, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                className="bg-gray-900 rounded-2xl p-6 max-w-md w-full border border-red-500/20"
-              >
-                <h3 className="text-xl font-bold text-white mb-4">Delete Account</h3>
-                <p className="text-gray-400 mb-4">
-                  This action cannot be undone. Please enter your password to confirm.
-                </p>
-                <input
-                  type="password"
-                  placeholder="Enter your password"
-                  value={deletePassword}
-                  onChange={(e) => setDeletePassword(e.target.value)}
-                  className="w-full px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-red-500 transition-colors mb-4"
-                />
-                <div className="flex gap-3">
-                  <button
-                    onClick={() => {
-                      setShowDeleteConfirm(false);
-                      setDeletePassword('');
-                    }}
-                    className="flex-1 px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition-colors"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleDeleteAccount}
-                    disabled={!deletePassword || deleteLoading}
-                    className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-500 transition-colors disabled:opacity-50"
-                  >
-                    {deleteLoading ? 'Deleting...' : 'Delete Account'}
-                  </button>
-                </div>
-              </motion.div>
-            </motion.div>
-          )}
         </motion.div>
 
         <Footer />

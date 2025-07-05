@@ -17,61 +17,142 @@ export interface LoginData {
 }
 
 export interface User {
-  id: string;
-  anemo_id: string;
   email: string;
   name: string;
-  emailVerified: boolean;
-  provider?: 'local' | 'google' | 'twitter';
-  createdAt: string;
 }
 
 export interface AuthResponse {
-  token: string;
+  access_token: string;
+  token_type: string;
   user: User;
 }
 
 class AuthService {
+  private token: string | null = null;
+
+  constructor() {
+    // Load token from localStorage on initialization
+    this.token = localStorage.getItem('auth_token');
+  }
+
   // Sign up with email/password
-  async signup(data: SignupData): Promise<AuthResponse> {
-    const response = await fetch(`${API_BASE_URL}/auth/signup`, {
+  async signup(email: string, password: string, name?: string): Promise<AuthResponse> {
+    const response = await fetch(`${API_BASE_URL}/auth/signup?email=${encodeURIComponent(email)}&password=${encodeURIComponent(password)}${name ? `&name=${encodeURIComponent(name)}` : ''}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        ...data,
-        testmail: {
-          apiKey: TESTMAIL_API_KEY,
-          namespace: TESTMAIL_NAMESPACE,
-        },
-      }),
     });
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.message || 'Signup failed');
+      throw new Error(error.detail || 'Signup failed');
+    }
+
+    const data = await response.json();
+    this.setToken(data.access_token);
+    return data;
+  }
+
+  // Login with email/password
+  async login(email: string, password: string): Promise<AuthResponse> {
+    const response = await fetch(`${API_BASE_URL}/auth/login?email=${encodeURIComponent(email)}&password=${encodeURIComponent(password)}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.detail || 'Login failed');
+    }
+
+    const data = await response.json();
+    this.setToken(data.access_token);
+    return data;
+  }
+
+  // Demo login (no credentials needed)
+  async demoLogin(): Promise<AuthResponse> {
+    const response = await fetch(`${API_BASE_URL}/auth/demo`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.detail || 'Demo login failed');
+    }
+
+    const data = await response.json();
+    this.setToken(data.access_token);
+    return data;
+  }
+
+  // Get user profile
+  async getProfile(): Promise<User> {
+    if (!this.token) {
+      throw new Error('Not authenticated');
+    }
+
+    const response = await fetch(`${API_BASE_URL}/auth/profile`, {
+      headers: {
+        'Authorization': `Bearer ${this.token}`,
+      },
+    });
+
+    if (!response.ok) {
+      if (response.status === 401) {
+        this.logout();
+        throw new Error('Session expired');
+      }
+      const error = await response.json();
+      throw new Error(error.detail || 'Failed to fetch profile');
     }
 
     return response.json();
   }
 
-  // Login with email/password
-  async login(data: LoginData): Promise<AuthResponse> {
-    const response = await fetch(`${API_BASE_URL}/auth/login`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(data),
-    });
+  // Logout
+  logout(): void {
+    this.token = null;
+    localStorage.removeItem('auth_token');
+    localStorage.removeItem('auth_user');
+  }
 
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || 'Login failed');
+  // Check if user is authenticated
+  isAuthenticated(): boolean {
+    return !!this.token;
+  }
+
+  // Get current token
+  getToken(): string | null {
+    return this.token;
+  }
+
+  // Set token and save to localStorage
+  private setToken(token: string): void {
+    this.token = token;
+    localStorage.setItem('auth_token', token);
+  }
+
+  // Get stored user info
+  getStoredUser(): User | null {
+    const userStr = localStorage.getItem('auth_user');
+    if (!userStr) return null;
+    try {
+      return JSON.parse(userStr);
+    } catch {
+      return null;
     }
+  }
 
-    return response.json();
+  // Store user info
+  storeUser(user: User): void {
+    localStorage.setItem('auth_user', JSON.stringify(user));
   }
 
   // Request password reset
@@ -128,22 +209,6 @@ class AuthService {
     if (!response.ok) {
       const error = await response.json();
       throw new Error(error.message || 'Email verification failed');
-    }
-
-    return response.json();
-  }
-
-  // Get user profile
-  async getProfile(token: string): Promise<User> {
-    const response = await fetch(`${API_BASE_URL}/auth/profile`, {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-      },
-    });
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || 'Failed to fetch profile');
     }
 
     return response.json();
