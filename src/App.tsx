@@ -367,6 +367,8 @@ function App() {
               }
             />
             <Route path="/misc" element={<Navigate to="/" />} />
+            {/* Catch-all route for non-existent pages */}
+            <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </AuthProvider>
         <CoffeeDonation />
