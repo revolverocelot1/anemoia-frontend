@@ -16,7 +16,6 @@ interface WorkerResponse {
 }
 
 let whisperPipeline: Pipeline | null = null;
-let currentModel: string | null = null;
 
 // Handle messages from main thread
 self.addEventListener('message', async (event: MessageEvent<WorkerMessage>) => {
@@ -77,8 +76,6 @@ async function loadModel(modelPath: string, quantized: boolean) {
     }
   );
   
-  currentModel = modelPath;
-  
   postResponse({
     type: 'loaded',
     data: { model: modelPath }
@@ -127,7 +124,6 @@ function disposePipeline() {
     // @ts-ignore - dispose method might not be typed
     whisperPipeline.dispose?.();
     whisperPipeline = null;
-    currentModel = null;
   }
   
   postResponse({

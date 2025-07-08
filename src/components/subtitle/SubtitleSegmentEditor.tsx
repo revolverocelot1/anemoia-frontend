@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { useSubtitleStore } from '../../stores/subtitle-store';
 import type { SubtitleSegment } from '../../types/subtitle';
 

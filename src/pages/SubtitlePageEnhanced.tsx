@@ -1,34 +1,31 @@
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { VideoPreview } from '../components/subtitle/VideoPreview';
-import { TranscriptionPanel } from '../components/subtitle/TranscriptionPanel';
-import { SubtitleSegmentEditor } from '../components/subtitle/SubtitleSegmentEditor';
-import { SubtitleTimeline } from '../components/subtitle/SubtitleTimeline';
-import { SubtitleStyleControls } from '../components/subtitle/SubtitleStyleControls';
-import ResizableVideoContainer from '../components/subtitle/ResizableVideoContainer';
-import WhisperModelManager from '../components/subtitle/WhisperModelManager';
 import { useSubtitleStore } from '../stores/subtitle-store';
-import { useSubtitleKeyboardShortcuts } from '../hooks/useSubtitleKeyboardShortcuts';
+import { VideoPreview } from '../components/subtitle/VideoPreview';
+import { SubtitleTimeline } from '../components/subtitle/SubtitleTimeline';
+import { SubtitleSegmentEditor } from '../components/subtitle/SubtitleSegmentEditor';
+import { SubtitleStyleControls } from '../components/subtitle/SubtitleStyleControls';
+import { TranscriptionPanel } from '../components/subtitle/TranscriptionPanel';
+import { WhisperModelManager } from '../components/subtitle/WhisperModelManager';
+import ResizableVideoContainer from '../components/subtitle/ResizableVideoContainer';
 import { useAutoSave } from '../hooks/useAutoSave';
-import { SubtitleSegment, SubtitleStyle } from '../types/subtitle';
+import { useSubtitleKeyboardShortcuts } from '../hooks/useSubtitleKeyboardShortcuts';
 import { exportToSRT, exportToWebVTT } from '../lib/subtitle-utils';
+import type { SubtitleSegment, SubtitleStyle } from '../types/subtitle';
 
 const SubtitlePageEnhanced: React.FC = () => {
   const navigate = useNavigate();
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const videoContainerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  
-  // State management
-  const [videoFile, setVideoFile] = useState<File | null>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
   const [videoUrl, setVideoUrl] = useState<string>('');
-  const [currentTime, setCurrentTime] = useState(0);
+  const [videoFile, setVideoFile] = useState<File | null>(null);
   const [duration, setDuration] = useState(0);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [exportFormat, setExportFormat] = useState<'srt' | 'vtt'>('srt');
+  const [currentTime, setCurrentTime] = useState(0);
   const [showExportMenu, setShowExportMenu] = useState(false);
+  const [exportFormat, setExportFormat] = useState<'srt' | 'vtt'>('srt');
   const [showTimeline, setShowTimeline] = useState(true);
+  const [isPlaying, setIsPlaying] = useState(false);
   
   // Subtitle store
   const {
@@ -38,14 +35,11 @@ const SubtitlePageEnhanced: React.FC = () => {
     addSegment,
     updateSegment,
     deleteSegment,
-    setActiveTrack,
     updateTrackStyle,
     selectedSegmentIds,
     selectSegment,
     clearSelection,
-    playbackTime,
     setPlaybackTime,
-    isPlaying: storeIsPlaying,
     setIsPlaying: setStoreIsPlaying,
     selectedModel,
     setSelectedModel
@@ -96,7 +90,7 @@ const SubtitlePageEnhanced: React.FC = () => {
   };
 
   // Handle video metadata
-  const handleLoadedMetadata = () => {
+  const handleVideoMetadata = () => {
     if (videoRef.current && currentProject) {
       const videoDuration = videoRef.current.duration;
       setDuration(videoDuration);
@@ -134,11 +128,11 @@ const SubtitlePageEnhanced: React.FC = () => {
   };
 
   // Handle subtitle update
-  const handleSubtitleUpdate = (id: string, updates: Partial<SubtitleSegment>) => {
-    if (activeTrack) {
-      updateSegment(activeTrack.id, id, updates);
-    }
-  };
+  // const handleSubtitleUpdate = (id: string, updates: Partial<SubtitleSegment>) => {
+  //   if (activeTrack) {
+  //     updateSegment(activeTrack.id, id, updates);
+  //   }
+  // };
 
   // Handle subtitle add
   const handleAddSubtitle = () => {
@@ -154,14 +148,14 @@ const SubtitlePageEnhanced: React.FC = () => {
   };
 
   // Handle delete
-  const handleDeleteSubtitle = (id: string) => {
-    if (activeTrack) {
-      deleteSegment(activeTrack.id, id);
-      if (selectedSegmentIds.includes(id)) {
-        clearSelection();
-      }
-    }
-  };
+  // const handleDeleteSubtitle = (id: string) => {
+  //   if (activeTrack) {
+  //     deleteSegment(activeTrack.id, id);
+  //     if (selectedSegmentIds.includes(id)) {
+  //       clearSelection();
+  //     }
+  //   }
+  // };
 
   // Handle export
   const handleExport = () => {
@@ -193,11 +187,11 @@ const SubtitlePageEnhanced: React.FC = () => {
   };
 
   // Handle style update
-  const handleStyleUpdate = (style: Partial<SubtitleStyle>) => {
-    if (activeTrack) {
-      updateTrackStyle(activeTrack.id, style);
-    }
-  };
+  // const handleStyleUpdate = (style: Partial<SubtitleStyle>) => {
+  //   if (activeTrack) {
+  //     updateTrackStyle(activeTrack.id, style);
+  //   }
+  // };
 
   // Update playing state
   useEffect(() => {
@@ -337,7 +331,7 @@ const SubtitlePageEnhanced: React.FC = () => {
                     videoUrl={videoUrl}
                     videoFile={videoFile || undefined}
                     onTimeUpdate={handleTimeUpdate}
-                    onDurationChange={(dur) => setDuration(dur)}
+                    onDurationChange={(dur: number) => setDuration(dur)}
                   />
                   
                   {/* Enhanced Subtitle Overlay */}

@@ -1,6 +1,6 @@
 import { pipeline, env } from '@xenova/transformers';
 import type { Pipeline } from '@xenova/transformers';
-import { WHISPER_MODELS, type WhisperModel } from '../config/whisper-models';
+import { WHISPER_MODELS } from '../config/whisper-models';
 
 // Configure environment
 env.allowRemoteModels = true;

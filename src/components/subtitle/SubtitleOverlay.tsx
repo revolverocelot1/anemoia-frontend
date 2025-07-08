@@ -1,7 +1,7 @@
-import React, { useRef, useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion, useDragControls } from 'framer-motion';
 import { useSubtitleStore } from '../../stores/subtitle-store';
-import type { SubtitleSegment, SubtitleTrack, SubtitlePosition } from '../../types/subtitle';
+import type { SubtitlePosition } from '../../types/subtitle';
 
 interface SubtitleOverlayProps {
   containerRef: React.RefObject<HTMLDivElement>;
@@ -77,7 +77,7 @@ export const SubtitleOverlay: React.FC<SubtitleOverlayProps> = ({
   };
   
   // Handle drag end
-  const handleDragEnd = (event: any, info: any) => {
+  const handleDragEnd = (_event: any, info: any) => {
     if (!activeTrack || !containerBounds.width || !containerBounds.height) return;
     
     const currentPos = getPositionInPixels(activeTrack.position);

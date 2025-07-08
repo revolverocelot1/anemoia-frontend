@@ -65,7 +65,6 @@ export const SubtitleTimeline: React.FC<SubtitleTimelineProps> = ({
     
     const rect = timelineRef.current.getBoundingClientRect();
     const x = e.clientX - rect.left;
-    const deltaX = x - draggedSegment.initialX;
     const deltaTime = pixelToTime(x) - pixelToTime(draggedSegment.initialX);
     
     let newStartTime = draggedSegment.initialStartTime;
