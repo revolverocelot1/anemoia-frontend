@@ -6,7 +6,7 @@
     "lib": ["ES2020", "DOM", "DOM.Iterable", "WebWorker"],
     "module": "ESNext",
     "skipLibCheck": true,
-    "types": ["@types/pixelmatch", "@types/offscreencanvas"],
+    "types": ["vite/client", "@types/pixelmatch", "@types/offscreencanvas"],
 
     /* Bundler mode */
     "moduleResolution": "bundler",
@@ -22,5 +22,12 @@
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["src"]
+  "include": ["src"],
+  "exclude": [
+    "src/opencut-z/opencut-core/**/*",
+    "src/opencut-z/OpenCutZApp.tsx",
+    "src/opencut-z/RealOpenCutZEditor.tsx",
+    "src/opencut-z/components/**/*",
+    "src/opencut-z/providers/**/*"
+  ]
 }

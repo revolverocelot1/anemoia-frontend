@@ -1,3 +1,4 @@
+import { useState, useEffect, lazy, Suspense } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import AnimatedPage from './components/AnimatedPage';
 import HomePage from './pages/HomePage';
@@ -11,7 +12,6 @@ import AccountPage from './pages/AccountPage';
 import NewUpscalerPage from './pages/NewUpscalerPage';
 import DoomPage from './pages/DoomPage';
 import AnimeGalleryPage from './pages/AnimeGalleryPage';
-import AGHPBArchivePage from './pages/AGHPBArchivePage';
 // import TriangleSplattingPage from './pages/TriangleSplattingPage';
 // import GaussianSplattingPage from './pages/GaussianSplattingPage';
 // We will create these pages next
@@ -23,11 +23,12 @@ import TermsOfServicePage from './pages/TermsOfServicePage';
 import SplatViewerPage from './pages/SplatViewerPage';
 import TestPage from './pages/TestPage';
 import CoffeeDonation from './components/CoffeeDonation';
-import FileUploadFix from './components/FileUploadFix';
+// import FileUploadFix from './components/FileUploadFix';
 import { AuthProvider } from './context/AuthContext';
 import LoginPage from './pages/LoginPage';
-import { useState, useEffect, Suspense, lazy } from 'react';
 import { detectGPU, logDeploymentInfo } from './utils/gpuUtils';
+import FaceSwapPage from './pages/FaceSwapPage';
+import SubtitlePageEnhanced from './pages/SubtitlePageEnhanced';
 
 // Lazy load R3FCanvas to ensure proper module loading
 const R3FCanvas = lazy(() => import('./three/R3FCanvas'));
@@ -210,7 +211,8 @@ function App() {
         </div>
       )}
       
-      <FileUploadFix />
+      {/* Temporarily disabled FileUploadFix to test video editor */}
+      {/* <FileUploadFix /> */}
       <div style={{ position: 'relative', zIndex: 10 }}>
         <AuthProvider>
           <Routes>
@@ -311,14 +313,6 @@ function App() {
               }
             />
             <Route
-              path="/aghpb-archive"
-              element={
-                <AnimatedPage>
-                  <AGHPBArchivePage />
-                </AnimatedPage>
-              }
-            />
-            <Route
               path="/splat-viewer"
               element={
                 <AnimatedPage>
@@ -339,6 +333,22 @@ function App() {
               element={
                 <AnimatedPage>
                   <ImageComparisonResultsPage />
+                </AnimatedPage>
+              }
+            />
+            <Route
+              path="/face-swap"
+              element={
+                <AnimatedPage>
+                  <FaceSwapPage />
+                </AnimatedPage>
+              }
+            />
+            <Route
+              path="/subtitle"
+              element={
+                <AnimatedPage>
+                  <SubtitlePageEnhanced />
                 </AnimatedPage>
               }
             />

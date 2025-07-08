@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DOOM - Anemoia</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            background: #000;
+            color: #fff;
+            font-family: Arial, sans-serif;
+            overflow: hidden;
+            width: 100vw;
+            height: 100vh;
+        }
+        
+        #doom-container {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+        }
+        
+        #doom-frame {
+            width: 100%;
+            height: 100%;
+            border: none;
+            background: #000;
+        }
+        
+        .controls {
+            position: fixed;
+            bottom: 10px;
+            right: 10px;
+            z-index: 1000;
+            display: flex;
+            gap: 10px;
+        }
+        
+        .control-btn {
+            padding: 8px 16px;
+            background: rgba(200, 0, 0, 0.8);
+            color: #fff;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+        
+        .control-btn:hover {
+            background: rgba(255, 0, 0, 1);
+            transform: scale(1.05);
+        }
+        
+        #loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            font-size: 24px;
+            z-index: 100;
+        }
+        
+        .spinner {
+            border: 4px solid rgba(255, 0, 0, 0.3);
+            border-radius: 50%;
+            border-top: 4px solid #ff0000;
+            width: 60px;
+            height: 60px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .info {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 12px;
+            color: #ccc;
+            z-index: 1000;
+        }
+        
+        .hidden {
+            display: none !important;
+        }
+    </style>
+</head>
+<body>
+    <div id="doom-container">
+        <div id="loading">
+            <div>Loading DOOM...</div>
+            <div class="spinner"></div>
+            <div style="font-size: 14px; color: #888; margin-top: 20px;">
+                This may take a moment on first load
+            </div>
+        </div>
+        
+        <!-- Using js-dos which has a working DOOM implementation -->
+        <iframe 
+            id="doom-frame"
+            src="https://js-dos.com/v7/doom/"
+            allow="fullscreen; autoplay; keyboard-lock; gamepad"
+            onload="onDoomLoad()"
+            class="hidden"
+            sandbox="allow-scripts allow-same-origin allow-pointer-lock allow-forms"
+        ></iframe>
+    </div>
+    
+    <div class="info hidden" id="info">
+        <strong>DOOM Controls:</strong><br>
+        Arrow Keys / WASD: Move<br>
+        Ctrl / Mouse Click: Fire<br>
+        Space: Use/Open doors<br>
+        Shift: Run<br>
+        1-7: Select weapons<br>
+        Tab: Map<br>
+        Esc: Menu
+    </div>
+    
+    <div class="controls hidden" id="controls">
+        <button class="control-btn" onclick="toggleInfo()">Show Controls</button>
+        <button class="control-btn" onclick="toggleFullscreen()">Fullscreen</button>
+        <button class="control-btn" onclick="exitGame()">Exit</button>
+    </div>
+
+    <script>
+        let infoVisible = false;
+        
+        function onDoomLoad() {
+            // Hide loading screen and show the game
+            document.getElementById('loading').classList.add('hidden');
+            document.getElementById('doom-frame').classList.remove('hidden');
+            document.getElementById('controls').classList.remove('hidden');
+            
+            // Show controls info briefly
+            document.getElementById('info').classList.remove('hidden');
+            setTimeout(() => {
+                if (!infoVisible) {
+                    document.getElementById('info').classList.add('hidden');
+                }
+            }, 5000);
+        }
+        
+        function toggleInfo() {
+            const info = document.getElementById('info');
+            const button = document.querySelector('.control-btn');
+            infoVisible = !infoVisible;
+            
+            if (infoVisible) {
+                info.classList.remove('hidden');
+                button.textContent = 'Hide Controls';
+            } else {
+                info.classList.add('hidden');
+                button.textContent = 'Show Controls';
+            }
+        }
+        
+        function toggleFullscreen() {
+            const container = document.getElementById('doom-container');
+            if (!document.fullscreenElement) {
+                container.requestFullscreen().catch(err => {
+                    console.error('Error attempting fullscreen:', err);
+                });
+            } else {
+                document.exitFullscreen();
+            }
+        }
+        
+        function exitGame() {
+            if (window.parent !== window) {
+                // We're in an iframe, send message to parent
+                window.parent.postMessage({ action: 'exitDoom' }, '*');
+            } else {
+                // Try to go back or close
+                if (window.history.length > 1) {
+                    window.history.back();
+                } else {
+                    window.location.href = '/doom';
+                }
+            }
+        }
+        
+        // Keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'F11') {
+                e.preventDefault();
+                toggleFullscreen();
+            }
+        });
+        
+        // Focus the iframe for keyboard input
+        window.onload = function() {
+            setTimeout(() => {
+                document.getElementById('doom-frame').focus();
+            }, 1000);
+        };
+    </script>
+</body>
+</html> 

@@ -1,0 +1,182 @@
+/* Reactive Button Dark Theme - Inspired by effect.kit */
+.reactive-button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  overflow: hidden;
+  transition: all 0.2s ease;
+  background: transparent;
+  color: #e5e7eb;
+  font-family: inherit;
+  outline: none;
+}
+
+.reactive-button::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(30, 30, 30, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: inherit;
+  transition: all 0.3s ease;
+  z-index: 0;
+}
+
+.reactive-button:hover:not(:disabled)::before {
+  background: rgba(40, 40, 40, 0.9);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.reactive-button:active:not(:disabled)::before {
+  background: rgba(20, 20, 20, 0.9);
+}
+
+.reactive-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Button Content */
+.button-content {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* Sizes */
+.reactive-button.small {
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+}
+
+.reactive-button.medium {
+  padding: 0.75rem 1.5rem;
+  font-size: 1rem;
+}
+
+.reactive-button.large {
+  padding: 1rem 2rem;
+  font-size: 1.125rem;
+}
+
+/* Variants */
+.reactive-button.primary::before {
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.2), rgba(139, 92, 246, 0.2));
+  border-color: rgba(139, 92, 246, 0.4);
+}
+
+.reactive-button.primary:hover:not(:disabled)::before {
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.3), rgba(139, 92, 246, 0.3));
+  border-color: rgba(139, 92, 246, 0.6);
+}
+
+.reactive-button.primary .button-glow {
+  background: radial-gradient(circle at center, rgba(139, 92, 246, 0.4), transparent);
+}
+
+.reactive-button.secondary::before {
+  background: rgba(30, 30, 30, 0.6);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.reactive-button.secondary:hover:not(:disabled)::before {
+  background: rgba(40, 40, 40, 0.8);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.reactive-button.secondary .button-glow {
+  background: radial-gradient(circle at center, rgba(255, 255, 255, 0.1), transparent);
+}
+
+.reactive-button.danger::before {
+  background: rgba(239, 68, 68, 0.1);
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+.reactive-button.danger:hover:not(:disabled)::before {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: rgba(239, 68, 68, 0.5);
+}
+
+.reactive-button.danger .button-glow {
+  background: radial-gradient(circle at center, rgba(239, 68, 68, 0.3), transparent);
+}
+
+/* Glow Effect */
+.button-glow {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 100%;
+  height: 100%;
+  transform: translate(-50%, -50%);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.reactive-button:hover:not(:disabled) .button-glow {
+  opacity: 1;
+}
+
+/* Loading State */
+.reactive-button.loading {
+  pointer-events: none;
+}
+
+.button-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  border-top-color: currentColor;
+  border-radius: 50%;
+  animation: button-spin 0.8s linear infinite;
+}
+
+@keyframes button-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Hover Effects */
+.reactive-button:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.reactive-button.primary:hover:not(:disabled) {
+  box-shadow: 0 10px 30px rgba(139, 92, 246, 0.3);
+}
+
+.reactive-button.secondary:hover:not(:disabled) {
+  box-shadow: 0 10px 30px rgba(255, 255, 255, 0.1);
+}
+
+.reactive-button.danger:hover:not(:disabled) {
+  box-shadow: 0 10px 30px rgba(239, 68, 68, 0.3);
+}
+
+/* Active State */
+.reactive-button:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+/* Focus State */
+.reactive-button:focus-visible {
+  outline: 2px solid rgba(139, 92, 246, 0.5);
+  outline-offset: 2px;
+}
+
+/* Responsive */
+@media (max-width: 640px) {
+  .reactive-button.large {
+    padding: 0.875rem 1.75rem;
+    font-size: 1rem;
+  }
+} 

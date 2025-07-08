@@ -4,8 +4,61 @@
 @tailwind components;
 @tailwind utilities;
 
+/* OpenCut-Z Dark Theme Variables */
+@layer base {
+  :root {
+    --background: 0 0% 8%;
+    --foreground: 0 0% 89%;
+    --card: 0 0% 14.9%;
+    --card-foreground: 0 0% 98%;
+    --popover: 0 0% 14.9%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 180 95% 40%;
+    --primary-foreground: 0 0% 9%;
+    --secondary: 0 0% 14.9%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 0 0% 14.9%;
+    --muted-foreground: 0 0% 63.9%;
+    --accent: 0 0% 14.9%;
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 100% 60%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 0 0% 17%;
+    --input: 0 0% 14.9%;
+    --ring: 0 0% 83.1%;
+  }
+}
+
+/* Custom scrollbar for OpenCut style */
+@layer utilities {
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+  
+  /* Custom scrollbar styles */
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: hsl(var(--background));
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: hsl(var(--muted));
+    border-radius: 4px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--muted-foreground));
+  }
+}
+
 html, body {
   @apply text-gray-200 font-sans tracking-tight antialiased;
+  background-color: #0F172A !important;
 }
 
 h1, h2, h3, h4, h5 {
@@ -88,6 +141,7 @@ body {
   font-family: "Space Grotesk", "Inter", "Segoe UI", "Noto Sans", sans-serif;
   color: var(--text-primary);
   overflow-x: hidden;
+  background-color: #0F172A !important;
 }
 
 #root {
@@ -95,6 +149,7 @@ body {
   width: 100%;
   position: relative;
   z-index: 1;
+  background-color: transparent !important;
 }
 
 /* Fix for content visibility over 3D background */
@@ -102,13 +157,30 @@ body {
 .relative.flex.size-full.min-h-screen.flex-col {
   position: relative;
   z-index: 10;
-  background: transparent;
+  background: transparent !important;
 }
 
 /* Ensure main content is above background */
 main {
   position: relative;
   z-index: 10;
+  background-color: transparent !important;
+}
+
+/* Fix the 3D background positioning */
+.fixed.inset-0 {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  z-index: -1 !important;
+}
+
+/* Ensure content is visible */
+.min-h-screen > div:last-child {
+  position: relative !important;
+  z-index: 10 !important;
 }
 
 /* Card and button z-index fixes */
@@ -180,22 +252,18 @@ footer {
   z-index: 2;
 }
 
-/* Scrollbar Styling */
-::-webkit-scrollbar {
-  width: 8px;
+/* Shimmer animation for coming soon features */
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
 }
 
-::-webkit-scrollbar-track {
-  background: var(--bg-secondary);
-}
-
-::-webkit-scrollbar-thumb {
-  background: var(--border-secondary);
-  border-radius: 4px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: var(--accent-blue);
+.animate-shimmer {
+  animation: shimmer 2s infinite;
 }
 
 /* Layout Container */
@@ -868,4 +936,112 @@ button {
 
 .dark .slider::-moz-range-track {
   background-color: #374151;
+}/* Terminal Animations */
+@keyframes glitch-1 {
+  0%, 100% { 
+    clip-path: inset(0 0 0 0); 
+    transform: translate(0);
+  }
+  20% { 
+    clip-path: inset(20% 0 30% 0); 
+    transform: translate(-2px, 2px);
+  }
+  40% { 
+    clip-path: inset(50% 0 20% 0); 
+    transform: translate(2px, -2px);
+  }
+  60% { 
+    clip-path: inset(10% 0 60% 0); 
+    transform: translate(-1px, 1px);
+  }
+  80% { 
+    clip-path: inset(80% 0 5% 0); 
+    transform: translate(1px, -1px);
+  }
 }
+
+@keyframes glitch-2 {
+  0%, 100% { 
+    clip-path: inset(0 0 0 0); 
+    transform: translate(0);
+  }
+  20% { 
+    clip-path: inset(60% 0 10% 0); 
+    transform: translate(2px, -2px);
+  }
+  40% { 
+    clip-path: inset(20% 0 60% 0); 
+    transform: translate(-2px, 2px);
+  }
+  60% { 
+    clip-path: inset(30% 0 40% 0); 
+    transform: translate(1px, -1px);
+  }
+  80% { 
+    clip-path: inset(10% 0 80% 0); 
+    transform: translate(-1px, 1px);
+  }
+}
+
+@keyframes hologram {
+  0%, 100% {
+    opacity: 1;
+    filter: brightness(1) contrast(1);
+  }
+  50% {
+    opacity: 0.95;
+    filter: brightness(1.1) contrast(1.1) hue-rotate(2deg);
+  }
+}
+
+.animate-glitch-1 {
+  animation: glitch-1 0.3s infinite linear alternate-reverse;
+}
+
+.animate-glitch-2 {
+  animation: glitch-2 0.3s infinite linear alternate-reverse;
+}
+.animate-hologram {
+  animation: hologram 2s ease-in-out infinite;
+}
+
+/* Terminal font styling */
+.font-terminal {
+  font-family: 'Courier New', 'Consolas', 'Monaco', monospace;
+  letter-spacing: 0.05em;
+}
+
+/* Custom Terminal Scrollbar */
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #00ffff40 #00000080;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: #00000080;
+  border: 1px solid #00ffff20;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #00ffff40;
+  border: 1px solid #00ffff60;
+  transition: all 0.3s ease;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #00ffff60;
+  border-color: #00ffff80;
+  box-shadow: 0 0 5px #00ffff;
+}
+
+.custom-scrollbar::-webkit-scrollbar-corner {
+  background: #00000080;
+}
+
+
+

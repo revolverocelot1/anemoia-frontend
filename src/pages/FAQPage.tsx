@@ -14,7 +14,7 @@ const faqData: { [key: string]: FAQItem[] } = {
   'Getting Started': [
     {
       q: 'What is Anemoia?',
-      a: 'Anemoia is a comprehensive AI-powered image processing platform that offers advanced tools for depth map generation, pose estimation, image upscaling, and image comparison. Our tools use state-of-the-art machine learning models to provide professional-quality results.'
+      a: 'Anemoia is a cutting-edge WebGL Studio that offers GPU-accelerated AI tools for creative professionals. Our platform features advanced image processing, video editing, face swapping, subtitle generation, and 3D visualization tools - all powered by WebGL and WebGPU technology for real-time performance directly in your browser.'
     },
     {
       q: 'Do I need to create an account to use the tools?',
@@ -26,7 +26,7 @@ const faqData: { [key: string]: FAQItem[] } = {
     },
     {
       q: 'What browsers are supported?',
-      a: 'Anemoia works best on modern browsers including Chrome, Firefox, Safari, and Edge. We recommend using the latest version for optimal performance and feature support.'
+      a: 'Anemoia works best on modern browsers including Chrome, Firefox, Safari, and Edge. We recommend using the latest version for optimal performance and WebGL/WebGPU feature support. A dedicated GPU is recommended for best performance.'
     }
   ],
   'Image Processing Tools': [
@@ -43,22 +43,58 @@ const faqData: { [key: string]: FAQItem[] } = {
       a: 'Unlike simple pixel interpolation, our AI upscaler uses Real-ESRGAN (Enhanced Super-Resolution GAN) technology to intelligently predict and generate missing details. This results in sharper, more natural-looking high-resolution images with preserved textures and reduced artifacts.'
     },
     {
+      q: 'How does the Face Swap AI work?',
+      a: 'Our Face Swap tool uses advanced neural networks and WebGL acceleration to seamlessly swap faces between images. It detects facial features, preserves expressions, and blends skin tones for realistic results. The tool is currently in beta with ongoing improvements to the AI model.'
+    },
+    {
       q: 'How does the image comparison tool work?',
       a: 'Our advanced image comparison tool uses multiple algorithms including structural similarity (SSIM), mean squared error (MSE), feature detection, and AI-powered object recognition. It provides detailed analysis with difference highlighting, statistical metrics, and can detect objects and text changes.'
+    }
+  ],
+  'Video Tools': [
+    {
+      q: 'What is Video Caption Studio?',
+      a: 'Video Caption Studio is our AI-powered subtitle generation and editing tool. It uses Whisper AI for automatic transcription, supports multiple languages, and provides a professional timeline editor for precise caption timing. Perfect for content creators, educators, and accessibility compliance.'
+    },
+    {
+      q: 'How accurate is the automatic transcription?',
+      a: 'Our transcription uses OpenAI\'s Whisper model, which achieves near-human accuracy for clear audio. Accuracy depends on audio quality, background noise, and speaker clarity. The tool supports over 90 languages and can handle multiple speakers, technical terminology, and various accents.'
+    },
+    {
+      q: 'What subtitle formats can I export?',
+      a: 'Video Caption Studio supports industry-standard formats including SRT (SubRip), VTT (WebVTT), and more formats coming soon. You can customize styling, positioning, and timing before export. All exports maintain frame-accurate synchronization.'
+    },
+    {
+      q: 'Is there a video editor available?',
+      a: 'Yes! We\'re developing a comprehensive video editor with timeline editing, transitions, effects, and GPU-accelerated rendering. It\'s currently in active development and will be released soon. Early access may be available for premium users.'
+    }
+  ],
+  '3D & Graphics Tools': [
+    {
+      q: 'What is the 3D Splat Viewer?',
+      a: 'Our 3D Splat Viewer is a WebGL-powered renderer for cutting-edge 3D formats including Gaussian Splats, Triangle Splats, and PLY point clouds. It supports real-time rendering of photorealistic 3D captures and is perfect for viewing NeRF outputs and 3D scans.'
+    },
+    {
+      q: 'Can I view my own 3D models?',
+      a: 'Yes! The Splat Viewer supports uploading your own .splat, .ply, and compatible 3D files. We handle models up to 500MB with optimized WebGL rendering. Larger files may require compression or decimation for smooth browser performance.'
+    },
+    {
+      q: 'What makes your 3D rendering special?',
+      a: 'We use custom WebGL shaders optimized for modern GPUs, supporting millions of points/splats with real-time performance. Our renderer includes advanced features like adaptive level-of-detail, frustum culling, and GPU-based sorting for optimal performance.'
     }
   ],
   'Technical & Privacy': [
     {
       q: 'How is my data handled and stored?',
-      a: 'Your privacy is our priority. Images are processed securely and temporarily stored only during processing. We automatically delete all uploaded images and generated results after a short period. We never use your images for training or any other purposes without explicit consent.'
+      a: 'Your privacy is our priority. Images and videos are processed locally using WebGL when possible. For cloud features, files are encrypted, processed securely, and automatically deleted after processing. We never use your content for training without explicit consent.'
     },
     {
       q: 'Why is the first use of a tool slower than subsequent uses?',
-      a: 'The first time you use a tool, we need to load the AI model into memory, which can take a few seconds. Once loaded, the model is cached for much faster processing on subsequent uses during your session.'
+      a: 'The first time you use a tool, we need to load the AI model and initialize WebGL resources, which can take a few seconds. Once loaded, models are cached in your browser for much faster processing on subsequent uses during your session.'
     },
     {
       q: 'What file formats are supported?',
-      a: 'We support all common image formats including JPEG, PNG, GIF, and WebP. For best results, we recommend using high-quality images. File size limits vary by tool but generally support files up to 10MB.'
+      a: 'We support common formats: Images (JPEG, PNG, WebP, GIF), Videos (MP4, WebM, MOV), 3D files (PLY, SPLAT). File size limits vary by tool but generally support files up to 100MB for images and 500MB for videos.'
     },
     {
       q: 'Can I use the API for my applications?',
@@ -67,20 +103,20 @@ const faqData: { [key: string]: FAQItem[] } = {
   ],
   'Troubleshooting': [
     {
-      q: 'My image processing failed. What should I do?',
-      a: 'First, ensure your image is in a supported format (JPEG, PNG, GIF) and under the size limit. Try refreshing the page and uploading again. If the problem persists, the image might be too complex or contain unsupported elements. Contact support if you continue experiencing issues.'
+      q: 'My image/video processing failed. What should I do?',
+      a: 'First, ensure your file is in a supported format and under the size limit. Check your internet connection and browser console for errors. Try refreshing the page and clearing browser cache. If issues persist, contact support with error details.'
     },
     {
       q: 'The tool is loading slowly or not responding.',
-      a: 'Slow performance can be caused by large image files, slow internet connection, or high server load. Try using a smaller image, clearing your browser cache, or waiting a few minutes before trying again. Ensure you\'re using a modern browser with JavaScript enabled.'
+      a: 'Performance depends on your GPU, file size, and browser. Try: 1) Using a smaller file, 2) Closing other GPU-intensive tabs, 3) Updating your graphics drivers, 4) Using Chrome/Edge for best WebGL performance, 5) Disabling browser extensions that might interfere.'
     },
     {
-      q: 'Can I process multiple images at once?',
-      a: 'Currently, our tools process one image at a time to ensure optimal quality and speed. Batch processing features are planned for future releases. Premium users will get early access to batch processing capabilities.'
+      q: 'Can I process multiple files at once?',
+      a: 'Currently, most tools process one file at a time for optimal quality. Batch processing is available for some tools in premium tier. Video Caption Studio supports queue processing for multiple videos.'
     },
     {
-      q: 'Why can\'t I see my downloaded results?',
-      a: 'Check your browser\'s download folder or download settings. Some browsers may block automatic downloads - you might need to allow downloads from our site. If you\'re still having trouble, try right-clicking the download button and selecting "Save as".'
+      q: 'Why can\'t I see my results?',
+      a: 'Check your browser\'s download settings and popup blocker. Results might be blocked by security settings. Try right-clicking the download button and selecting "Save as". Ensure you have sufficient disk space for downloads.'
     }
   ]
 };
@@ -154,8 +190,10 @@ const FAQPage = () => {
   const categoryColors = {
     'Getting Started': 'text-blue-400',
     'Image Processing Tools': 'text-purple-400',
-    'Technical & Privacy': 'text-green-400',
-    'Troubleshooting': 'text-red-400'
+    'Video Tools': 'text-green-400',
+    '3D & Graphics Tools': 'text-red-400',
+    'Technical & Privacy': 'text-yellow-400',
+    'Troubleshooting': 'text-indigo-400'
   };
 
   const filteredData = () => {
@@ -281,8 +319,10 @@ const FAQPage = () => {
                       <div className={`w-1 h-8 rounded-full bg-gradient-to-b ${
                         category === 'Getting Started' ? 'from-blue-400 to-blue-600' :
                         category === 'Image Processing Tools' ? 'from-purple-400 to-purple-600' :
-                        category === 'Technical & Privacy' ? 'from-green-400 to-green-600' :
-                        'from-red-400 to-red-600'
+                        category === 'Video Tools' ? 'from-green-400 to-green-600' :
+                        category === '3D & Graphics Tools' ? 'from-red-400 to-red-600' :
+                        category === 'Technical & Privacy' ? 'from-yellow-400 to-yellow-600' :
+                        'from-indigo-400 to-indigo-600'
                       }`}></div>
                       <h2 className={`text-2xl font-bold ${categoryColors[category as keyof typeof categoryColors]}`}>
                         {category}

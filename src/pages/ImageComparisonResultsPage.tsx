@@ -41,38 +41,38 @@ const ImageComparisonResultsPage = () => {
             setIsProcessing(false);
           }, TIMEOUT_MS);
 
-          // Initialize the UI comparison worker
-          const UIComparisonWorker = Comlink.wrap<any>(
+        // Initialize the UI comparison worker
+        const UIComparisonWorker = Comlink.wrap<any>(
             new Worker(new URL('../workers/uicomparisonWorking.worker.ts', import.meta.url), {
-              type: 'module'
-            })
-          );
-          
+            type: 'module'
+          })
+        );
+        
           workerRef.current = UIComparisonWorker;
           
           setProgress({ step: 'Initializing comparison engine...', percent: 20 });
-          await workerRef.current.initialize();
+        await workerRef.current.initialize();
           
           setProgress({ step: 'Converting images...', percent: 30 });
 
-          // Convert images to ImageData
-          const [imageData1, imageData2] = await Promise.all([
-            createImageData(image1),
-            createImageData(image2)
-          ]);
+        // Convert images to ImageData
+        const [imageData1, imageData2] = await Promise.all([
+          createImageData(image1),
+          createImageData(image2)
+        ]);
 
           setProgress({ step: 'Analyzing UI elements and text...', percent: 50 });
 
-          // Run comprehensive comparison
-          const comparisonResults = await workerRef.current.compareScreenshots(
-            imageData1,
-            imageData2,
-            {
+        // Run comprehensive comparison
+        const comparisonResults = await workerRef.current.compareScreenshots(
+          imageData1,
+          imageData2,
+          {
               enableOCR: settings?.enableOcr ?? true,
               enableVisualAnalysis: settings?.enableAnnotations ?? true,
-              threshold: 0.1
-            }
-          );
+            threshold: 0.1
+          }
+        );
 
           setProgress({ step: 'Generating report...', percent: 90 });
           
@@ -100,7 +100,7 @@ const ImageComparisonResultsPage = () => {
             settings
           );
 
-          setResults(comparisonResults);
+        setResults(comparisonResults);
         }
       } catch (err) {
         console.error('Comparison error:', err);

@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>OpenCV.js Loader</title>
+    <script async src="https://docs.opencv.org/4.5.0/opencv.js" onload="onOpenCvReady();" type="text/javascript"></script>
+    <script type="text/javascript">
+        function onOpenCvReady() {
+            console.log('OpenCV.js is ready!');
+            window.parent.postMessage({ type: 'opencv-ready' }, '*');
+        }
+    </script>
+</head>
+<body>
+    <p>Loading OpenCV.js...</p>
+</body>
+</html> 

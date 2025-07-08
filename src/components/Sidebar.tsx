@@ -33,25 +33,14 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onToggle }) => {
     },
     {
       id: 'anime-gallery',
-      name: 'Anime Gallery',
-      description: 'Programming books held by anime girls collection',
-      icon: 'collections',
+      name: 'AGHPB Terminal',
+      description: 'Cyberpunk terminal interface for anime girls holding programming books',
+      icon: 'terminal',
       onClick: () => {
         navigate('/anime-gallery');
         onToggle();
       },
-      badge: 'Gallery'
-    },
-    {
-      id: 'aghpb-archive',
-      name: 'AGHPB Archive',
-      description: 'High-quality anime artwork gallery powered by AI',
-      icon: 'photo_library',
-      onClick: () => {
-        navigate('/aghpb-archive');
-        onToggle();
-      },
-      badge: 'New'
+      badge: 'TERMINAL'
     },
     {
       id: 'color-picker',
@@ -177,8 +166,6 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onToggle }) => {
                         ? 'bg-gradient-to-r from-red-50 to-orange-50 dark:from-red-900/20 dark:to-orange-900/20 border-red-200 dark:border-red-800 hover:border-red-400 dark:hover:border-red-600'
                         : tool.id === 'anime-gallery'
                         ? 'bg-gradient-to-r from-cyan-50 to-purple-50 dark:from-cyan-900/20 dark:to-purple-900/20 border-cyan-200 dark:border-cyan-800 hover:border-cyan-400 dark:hover:border-cyan-600'
-                        : tool.id === 'aghpb-archive'
-                        ? 'bg-gradient-to-r from-pink-50 to-purple-50 dark:from-pink-900/20 dark:to-purple-900/20 border-pink-200 dark:border-pink-800 hover:border-pink-400 dark:hover:border-pink-600'
                         : tool.id === 'color-picker'
                         ? 'bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 border-purple-200 dark:border-purple-800 hover:border-purple-400 dark:hover:border-purple-600'
                         : tool.id === 'metadata-viewer'
@@ -196,8 +183,8 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onToggle }) => {
                             ? 'bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-300'
                             : tool.id === 'anime-gallery'
                             ? 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/50 dark:text-cyan-300'
-                            : tool.id === 'aghpb-archive'
-                            ? 'bg-pink-100 text-pink-700 dark:bg-pink-900/50 dark:text-pink-300'
+                            : tool.id === 'color-picker'
+                            ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300'
                             : 'bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300'
                         }`}>
                           {tool.badge}
@@ -211,8 +198,6 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onToggle }) => {
                           ? 'bg-red-600 group-hover:bg-red-700'
                           : tool.id === 'anime-gallery'
                           ? 'bg-cyan-600 group-hover:bg-cyan-700'
-                          : tool.id === 'aghpb-archive'
-                          ? 'bg-pink-600 group-hover:bg-pink-700'
                           : tool.id === 'color-picker'
                           ? 'bg-purple-600 group-hover:bg-purple-700'
                           : tool.id === 'metadata-viewer'
@@ -235,9 +220,9 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onToggle }) => {
                     <div className="mt-3 flex items-center justify-between">
                       <div className="flex items-center space-x-2 text-xs text-gray-500 dark:text-gray-500">
                         <span className="material-symbols-outlined text-sm">
-                          {tool.id === 'doom' || tool.id === 'anime-gallery' || tool.id === 'aghpb-archive' ? 'launch' : 'build'}
+                          {tool.id === 'doom' || tool.id === 'anime-gallery' ? 'launch' : 'build'}
                         </span>
-                        <span>{tool.id === 'doom' || tool.id === 'anime-gallery' || tool.id === 'aghpb-archive' ? 'Ready to explore' : 'Coming soon'}</span>
+                        <span>{tool.id === 'doom' || tool.id === 'anime-gallery' ? 'Ready to explore' : 'Coming soon'}</span>
                       </div>
                       
                       <motion.div

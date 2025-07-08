@@ -53,7 +53,7 @@ const ImageComparisonPage: React.FC = () => {
         return;
       }
       
-      const previewUrl = URL.createObjectURL(file);
+       const previewUrl = URL.createObjectURL(file);
       if (imageNumber === 1) {
         setImage1(file);
         setImage1Preview(previewUrl);
@@ -82,9 +82,9 @@ const ImageComparisonPage: React.FC = () => {
           image1: image1Preview,
           image2: image2Preview,
           settings: {
-            enableAnnotations,
-            enableOcr,
-            enableClassification,
+          enableAnnotations,
+          enableOcr,
+          enableClassification,
             normalizeAspectRatio: normalizeRatio,
             isUIMode, // Pass UI mode flag
           }
@@ -193,10 +193,10 @@ const ImageComparisonPage: React.FC = () => {
                 </>
               ) : (
                 <>
-                  <Toggle label="Find & Annotate Differences" enabled={enableAnnotations} setEnabled={setEnableAnnotations} />
-                  <Toggle label="Extract Text (OCR)" enabled={enableOcr} setEnabled={setEnableOcr} description="Enhanced OCR with preprocessing for better text recognition in documents and images." />
-                  <Toggle label="Normalize Aspect Ratio" enabled={normalizeRatio} setEnabled={setNormalizeRatio} description="Prevents image distortion by padding the smaller image to match the other's aspect ratio." />
-                  <Toggle label="Enable AI Classification" enabled={enableClassification} setEnabled={setEnableClassification} description="COCO-SSD object detection for people, vehicles, animals, etc. with fallback feature analysis." />
+              <Toggle label="Find & Annotate Differences" enabled={enableAnnotations} setEnabled={setEnableAnnotations} />
+              <Toggle label="Extract Text (OCR)" enabled={enableOcr} setEnabled={setEnableOcr} description="Enhanced OCR with preprocessing for better text recognition in documents and images." />
+              <Toggle label="Normalize Aspect Ratio" enabled={normalizeRatio} setEnabled={setNormalizeRatio} description="Prevents image distortion by padding the smaller image to match the other's aspect ratio." />
+              <Toggle label="Enable AI Classification" enabled={enableClassification} setEnabled={setEnableClassification} description="COCO-SSD object detection for people, vehicles, animals, etc. with fallback feature analysis." />
                 </>
               )}
             </div>

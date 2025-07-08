@@ -46,9 +46,10 @@ export default defineConfig({
       '@tensorflow/tfjs-core',
       '@tensorflow/tfjs-layers',
       '@tensorflow-models/pose-detection',
-      'onnxruntime-web/dist/ort-wasm-simd-threaded.mjs'
+      'worker.js'
     ],
     include: [
+      'onnxruntime-web',
       'three',
       '@react-three/fiber',
       '@react-three/drei',
