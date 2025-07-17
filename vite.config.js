@@ -11,11 +11,15 @@ export default defineConfig({
             'onnxruntime-web',
             '@ffmpeg/ffmpeg',
             '@ffmpeg/util',
-            '@huggingface/transformers'
+            '@huggingface/transformers',
+            '@tensorflow/tfjs-backend-webgpu',
+            '@tensorflow/tfjs-backend-webgl',
+            '@mediapipe/tasks-vision'
         ],
         include: [
-            '@mediapipe/pose',
-            '@tensorflow-models/pose-detection'
+            '@tensorflow-models/pose-detection',
+            '@tensorflow/tfjs-core',
+            '@tensorflow/tfjs-backend-cpu'
         ]
     },
     worker: {
@@ -72,8 +76,11 @@ export default defineConfig({
         sourcemap: false,
         rollupOptions: {
             external: (id) => {
-                // Treat @mediapipe/pose as external to avoid resolution issues
-                if (id.includes('@mediapipe/pose')) {
+                // Treat optional dependencies as external to avoid resolution issues
+                if (id.includes('@mediapipe/pose') ||
+                    id.includes('@tensorflow/tfjs-backend-webgpu') ||
+                    id.includes('@tensorflow/tfjs-backend-webgl') ||
+                    id.includes('@mediapipe/tasks-vision')) {
                     return true;
                 }
                 return false;
@@ -88,7 +95,10 @@ export default defineConfig({
                     'pose': ['@tensorflow-models/pose-detection']
                 },
                 globals: {
-                    '@mediapipe/pose': 'mediapipe'
+                    '@mediapipe/pose': 'mediapipe',
+                    '@tensorflow/tfjs-backend-webgpu': 'tf',
+                    '@tensorflow/tfjs-backend-webgl': 'tf',
+                    '@mediapipe/tasks-vision': 'mediapipe'
                 }
             }
         },
