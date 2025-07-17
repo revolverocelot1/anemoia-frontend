@@ -11,15 +11,15 @@ export default defineConfig({
             'onnxruntime-web',
             '@ffmpeg/ffmpeg',
             '@ffmpeg/util',
-            '@huggingface/transformers',
-            '@tensorflow/tfjs-backend-webgpu',
-            '@tensorflow/tfjs-backend-webgl',
-            '@mediapipe/tasks-vision'
+            '@huggingface/transformers'
         ],
         include: [
-            '@tensorflow-models/pose-detection',
             '@tensorflow/tfjs-core',
-            '@tensorflow/tfjs-backend-cpu'
+            '@tensorflow/tfjs-backend-cpu',
+            '@tensorflow/tfjs-backend-webgl',
+            '@tensorflow/tfjs-backend-webgpu',
+            '@tensorflow-models/pose-detection',
+            '@mediapipe/pose'
         ]
     },
     worker: {
@@ -75,16 +75,6 @@ export default defineConfig({
         target: 'esnext',
         sourcemap: false,
         rollupOptions: {
-            external: (id) => {
-                // Treat optional dependencies as external to avoid resolution issues
-                if (id.includes('@mediapipe/pose') ||
-                    id.includes('@tensorflow/tfjs-backend-webgpu') ||
-                    id.includes('@tensorflow/tfjs-backend-webgl') ||
-                    id.includes('@mediapipe/tasks-vision')) {
-                    return true;
-                }
-                return false;
-            },
             output: {
                 manualChunks: {
                     'vendor': ['react', 'react-dom', 'react-router-dom'],
@@ -93,12 +83,6 @@ export default defineConfig({
                     'onnx': ['onnxruntime-web'],
                     'tensorflow': ['@tensorflow/tfjs', '@tensorflow/tfjs-core', '@tensorflow/tfjs-backend-cpu'],
                     'pose': ['@tensorflow-models/pose-detection']
-                },
-                globals: {
-                    '@mediapipe/pose': 'mediapipe',
-                    '@tensorflow/tfjs-backend-webgpu': 'tf',
-                    '@tensorflow/tfjs-backend-webgl': 'tf',
-                    '@mediapipe/tasks-vision': 'mediapipe'
                 }
             }
         },
