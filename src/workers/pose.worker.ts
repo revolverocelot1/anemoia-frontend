@@ -17,6 +17,7 @@ async function initModel() {
     // Use the multi-person lightning variant so we can detect several people in one image
     modelType: posedetection.movenet.modelType.MULTIPOSE_LIGHTNING,
     enableSmoothing: true,
+    modelUrl: undefined, // Let it use the default TensorFlow Hub URL
   });
   ready = true;
 }

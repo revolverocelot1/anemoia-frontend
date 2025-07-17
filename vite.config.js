@@ -13,7 +13,10 @@ export default defineConfig({
             '@ffmpeg/util',
             '@huggingface/transformers'
         ],
-        include: []
+        include: [
+            '@mediapipe/pose',
+            '@tensorflow-models/pose-detection'
+        ]
     },
     worker: {
         format: 'es'
@@ -68,14 +71,31 @@ export default defineConfig({
         target: 'esnext',
         sourcemap: false,
         rollupOptions: {
+            external: (id) => {
+                // Treat @mediapipe/pose as external to avoid resolution issues
+                if (id.includes('@mediapipe/pose')) {
+                    return true;
+                }
+                return false;
+            },
             output: {
                 manualChunks: {
                     'vendor': ['react', 'react-dom', 'react-router-dom'],
                     'ui': ['@radix-ui/react-dialog', '@radix-ui/react-dropdown-menu', '@radix-ui/react-slider'],
                     'transformers': ['@huggingface/transformers'],
-                    'onnx': ['onnxruntime-web']
+                    'onnx': ['onnxruntime-web'],
+                    'tensorflow': ['@tensorflow/tfjs', '@tensorflow/tfjs-core', '@tensorflow/tfjs-backend-cpu'],
+                    'pose': ['@tensorflow-models/pose-detection']
+                },
+                globals: {
+                    '@mediapipe/pose': 'mediapipe'
                 }
             }
+        },
+        commonjsOptions: {
+            include: [/node_modules/],
+            transformMixedEsModules: true,
+            ignoreDynamicRequires: true
         }
     },
     resolve: {
@@ -83,7 +103,8 @@ export default defineConfig({
             '@': resolve(__dirname, 'src'),
             'three': 'three',
             '@react-three/fiber': '@react-three/fiber',
-            '@react-three/drei': '@react-three/drei'
+            '@react-three/drei': '@react-three/drei',
+            '@mediapipe/pose': resolve(__dirname, 'node_modules/@mediapipe/pose/pose.js')
         },
     },
 });

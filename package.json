@@ -21,6 +21,7 @@
     "@ffmpeg/ffmpeg": "0.12.10",
     "@ffmpeg/util": "0.12.1",
     "@huggingface/transformers": "3.6.2",
+    "@mediapipe/pose": "0.5.1675469404",
     "@monaco-editor/react": "^4.6.0",
     "@mui/lab": "5.0.0-alpha.177",
     "@mui/material": "^6.2.0",
