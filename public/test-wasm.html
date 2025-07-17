@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WASM Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #1a1a1a;
+            color: white;
+        }
+        button {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #2563eb;
+        }
+        #log {
+            background: #000;
+            padding: 10px;
+            border-radius: 5px;
+            margin-top: 20px;
+            max-height: 600px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .error { color: #ef4444; }
+        .success { color: #10b981; }
+        .info { color: #3b82f6; }
+        .warning { color: #f59e0b; }
+    </style>
+</head>
+<body>
+    <h1>WASM Loading Test</h1>
+    
+    <button id="testWasm">Test WASM Loading</button>
+    <button id="testOnnx">Test ONNX Runtime</button>
+    <button id="testWorker">Test Whisper Worker</button>
+    
+    <div id="log"></div>
+    
+    <script type="module">
+        const log = (message, type = 'info') => {
+            const logDiv = document.getElementById('log');
+            const entry = document.createElement('div');
+            entry.className = type;
+            entry.textContent = `[${new Date().toISOString().split('T')[1].split('.')[0]}] ${message}`;
+            logDiv.appendChild(entry);
+            logDiv.scrollTop = logDiv.scrollHeight;
+            console.log(message);
+        };
+        
+        // Test 1: Check if WASM files are accessible
+        document.getElementById('testWasm').addEventListener('click', async () => {
+            log('Testing WASM file accessibility...');
+            
+            const wasmFiles = [
+                '/ort-wasm/ort-wasm.wasm',
+                '/ort-wasm/ort-wasm-simd.wasm', 
+                '/ort-wasm/ort-wasm-threaded.wasm',
+                '/ort-wasm/ort-wasm-simd-threaded.wasm'
+            ];
+            
+            for (const file of wasmFiles) {
+                try {
+                    log(`Fetching ${file}...`);
+                    const response = await fetch(file);
+                    
+                    if (!response.ok) {
+                        log(`✗ Failed to fetch ${file}: ${response.status} ${response.statusText}`, 'error');
+                        continue;
+                    }
+                    
+                    const contentType = response.headers.get('content-type');
+                    log(`Content-Type: ${contentType}`, 'info');
+                    
+                    // Check if it's actually a WASM file
+                    const buffer = await response.arrayBuffer();
+                    const bytes = new Uint8Array(buffer);
+                    const magic = Array.from(bytes.slice(0, 4)).map(b => b.toString(16).padStart(2, '0')).join(' ');
+                    
+                    log(`Magic bytes: ${magic}`, 'info');
+                    
+                    if (magic === '00 61 73 6d') {
+                        log(`✓ ${file} is a valid WASM file`, 'success');
+                    } else {
+                        log(`✗ ${file} is NOT a valid WASM file (expected: 00 61 73 6d, got: ${magic})`, 'error');
+                        
+                        // Try to decode as text to see what we got
+                        const text = new TextDecoder().decode(bytes.slice(0, 100));
+                        log(`First 100 bytes as text: ${text}`, 'warning');
+                    }
+                    
+                } catch (error) {
+                    log(`✗ Error fetching ${file}: ${error.message}`, 'error');
+                }
+            }
+        });
+        
+        // Test 2: Test ONNX Runtime directly
+        document.getElementById('testOnnx').addEventListener('click', async () => {
+            log('Testing ONNX Runtime loading...');
+            
+            try {
+                // Load ONNX Runtime
+                log('Loading ONNX Runtime script...');
+                const script = document.createElement('script');
+                script.src = '/ort-wasm/ort.min.js';
+                
+                await new Promise((resolve, reject) => {
+                    script.onload = resolve;
+                    script.onerror = reject;
+                    document.head.appendChild(script);
+                });
+                
+                log('✓ ONNX Runtime script loaded', 'success');
+                
+                // Check if ort is available
+                if (typeof window.ort !== 'undefined') {
+                    log('✓ ort global object exists', 'success');
+                    
+                    // Configure WASM paths
+                    window.ort.env.wasm.wasmPaths = window.location.origin + '/ort-wasm/';
+                    log('✓ Configured WASM paths', 'success');
+                    
+                    // Try to create a simple inference session
+                    log('Testing ONNX Runtime functionality...');
+                    
+                    // Create a minimal ONNX model for testing
+                    const modelBytes = new Uint8Array([
+                        0x08, 0x01, 0x12, 0x00, 0x18, 0x00, 0x22, 0x00,
+                        0x2a, 0x00, 0x32, 0x00, 0x3a, 0x00, 0x42, 0x00
+                    ]);
+                    
+                    try {
+                        const session = await window.ort.InferenceSession.create(modelBytes);
+                        log('✓ Successfully created inference session', 'success');
+                    } catch (err) {
+                        log(`⚠ Could not create test session (expected): ${err.message}`, 'warning');
+                        log('This is normal - we just verified ONNX Runtime is loaded', 'info');
+                    }
+                    
+                } else {
+                    log('✗ ort global object not found', 'error');
+                }
+                
+            } catch (error) {
+                log(`✗ Error loading ONNX Runtime: ${error.message}`, 'error');
+            }
+        });
+        
+        // Test 3: Test worker directly
+        document.getElementById('testWorker').addEventListener('click', async () => {
+            log('Testing Whisper worker...');
+            
+            try {
+                const worker = new Worker('/src/workers/whisper.worker.ts', { type: 'module' });
+                
+                worker.addEventListener('error', (event) => {
+                    log(`✗ Worker error: ${event.message}`, 'error');
+                });
+                
+                worker.addEventListener('message', (event) => {
+                    const { type, progress, status, error, details } = event.data;
+                    
+                    if (type === 'progress') {
+                        log(`Progress: ${progress}% - ${status}`, 'info');
+                    } else if (type === 'error') {
+                        log(`✗ Worker error: ${error}`, 'error');
+                        if (details) {
+                            log(`Details: ${JSON.stringify(details, null, 2)}`, 'error');
+                        }
+                    } else if (type === 'result') {
+                        log('✓ Worker completed successfully', 'success');
+                    }
+                });
+                
+                log('✓ Worker created, sending load-model message...', 'success');
+                
+                worker.postMessage({
+                    type: 'load-model',
+                    model: 'whisper-tiny'
+                });
+                
+            } catch (error) {
+                log(`✗ Failed to create worker: ${error.message}`, 'error');
+            }
+        });
+        
+        log('Test page ready. Click buttons to run tests.', 'info');
+    </script>
+</body>
+</html> 

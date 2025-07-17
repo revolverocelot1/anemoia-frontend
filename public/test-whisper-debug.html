@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Whisper Model Debug</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #1a1a1a;
+            color: #ffffff;
+            padding: 20px;
+            margin: 0;
+        }
+        pre {
+            background-color: #2a2a2a;
+            padding: 10px;
+            border-radius: 5px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+        }
+        button {
+            background-color: #06b6d4;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #0891b2;
+        }
+        .success {
+            color: #10b981;
+        }
+        .error {
+            color: #ef4444;
+        }
+        .warning {
+            color: #f59e0b;
+        }
+    </style>
+</head>
+<body>
+    <h1>Whisper Model Debug Test</h1>
+    
+    <div>
+        <button id="testTransformers">Test Transformers Import</button>
+        <button id="testWhisperDirect">Test Whisper Direct</button>
+        <button id="testWhisperWorker">Test Whisper Worker</button>
+        <button id="testAlternativeApproach">Test Alternative Approach</button>
+    </div>
+    
+    <h2>Output:</h2>
+    <pre id="output"></pre>
+
+    <script type="module">
+        const log = (msg, type = '') => {
+            const output = document.getElementById('output');
+            const timestamp = new Date().toLocaleTimeString();
+            const className = type ? ` class="${type}"` : '';
+            output.innerHTML += `<span${className}>[${timestamp}] ${msg}</span>\n`;
+            console.log(msg);
+        };
+
+        // Test 1: Basic Transformers.js import
+        document.getElementById('testTransformers').addEventListener('click', async () => {
+            log('--- Testing Transformers.js Import ---');
+            try {
+                const transformers = await import('@xenova/transformers');
+                log('Successfully imported @xenova/transformers', 'success');
+                log('Available exports: ' + Object.keys(transformers).join(', '));
+                
+                // Check specific pipeline types
+                const { pipeline, env, AutoModelForSequenceClassification, AutoModel } = transformers;
+                log('Pipeline function available: ' + (!!pipeline));
+                log('Environment object available: ' + (!!env));
+                
+                // Log model types available
+                const modelTypes = Object.keys(transformers).filter(key => key.startsWith('AutoModel'));
+                log('Available AutoModel types: ' + modelTypes.join(', '));
+                
+            } catch (error) {
+                log('Import error: ' + error.message, 'error');
+            }
+        });
+
+        // Test 2: Direct Whisper loading
+        document.getElementById('testWhisperDirect').addEventListener('click', async () => {
+            log('--- Testing Direct Whisper Loading ---');
+            try {
+                const { pipeline, env } = await import('@xenova/transformers');
+                
+                env.allowLocalModels = false;
+                env.useBrowserCache = true;
+                
+                log('Attempting to load Whisper tiny model...');
+                
+                const transcriber = await pipeline(
+                    'automatic-speech-recognition',
+                    'Xenova/whisper-tiny',
+                    {
+                        progress_callback: (progress) => {
+                            if (progress.status === 'progress' && progress.total) {
+                                const percent = Math.round((progress.loaded / progress.total) * 100);
+                                log(`Loading: ${percent}%`);
+                            }
+                        }
+                    }
+                );
+                
+                log('Whisper model loaded successfully!', 'success');
+                log('Transcriber type: ' + transcriber.constructor.name);
+                
+            } catch (error) {
+                log('Error loading Whisper: ' + error.message, 'error');
+                log('Error stack: ' + error.stack, 'error');
+            }
+        });
+
+        // Test 3: Worker-based loading
+        document.getElementById('testWhisperWorker').addEventListener('click', async () => {
+            log('--- Testing Whisper Worker ---');
+            
+            const worker = new Worker('/src/workers/whisper.worker.ts', { type: 'module' });
+            
+            worker.onmessage = (e) => {
+                const { type, progress, status, error } = e.data;
+                
+                switch (type) {
+                    case 'progress':
+                        log(`[Worker] Progress: ${progress}% - ${status}`);
+                        break;
+                    case 'error':
+                        log(`[Worker] Error: ${error}`, 'error');
+                        break;
+                    default:
+                        log(`[Worker] ${type}: ${JSON.stringify(e.data)}`);
+                }
+            };
+            
+            worker.onerror = (error) => {
+                log(`Worker error: ${error.message}`, 'error');
+            };
+            
+            log('Sending load-model message to worker...');
+            worker.postMessage({
+                type: 'load-model',
+                model: 'whisper-tiny'
+            });
+        });
+
+        // Test 4: Alternative approach
+        document.getElementById('testAlternativeApproach').addEventListener('click', async () => {
+            log('--- Testing Alternative Approach ---');
+            try {
+                // Try importing directly from CDN
+                log('Importing from CDN...');
+                const script = document.createElement('script');
+                script.type = 'module';
+                script.textContent = `
+                    import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2';
+                    
+                    window.testAlternative = async () => {
+                        env.allowLocalModels = false;
+                        env.useBrowserCache = true;
+                        
+                        try {
+                            const transcriber = await pipeline(
+                                'automatic-speech-recognition',
+                                'Xenova/whisper-tiny'
+                            );
+                            return { success: true, type: transcriber.constructor.name };
+                        } catch (error) {
+                            return { success: false, error: error.message, stack: error.stack };
+                        }
+                    };
+                `;
+                document.body.appendChild(script);
+                
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                
+                if (window.testAlternative) {
+                    const result = await window.testAlternative();
+                    if (result.success) {
+                        log('Alternative approach successful!', 'success');
+                        log('Model type: ' + result.type);
+                    } else {
+                        log('Alternative approach failed: ' + result.error, 'error');
+                        log('Stack: ' + result.stack, 'error');
+                    }
+                } else {
+                    log('Failed to load alternative approach', 'error');
+                }
+                
+            } catch (error) {
+                log('Alternative approach error: ' + error.message, 'error');
+            }
+        });
+    </script>
+</body>
+</html> 

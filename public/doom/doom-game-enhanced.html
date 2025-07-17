@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>DOOM - Anemoia</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            touch-action: none;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            -khtml-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+        }
+        
+        body {
+            background: #000;
+            color: #fff;
+            font-family: Arial, sans-serif;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            position: relative;
+        }
+        
+        #canvas {
+            display: block;
+            max-width: 100%;
+            max-height: 100%;
+            width: auto;
+            height: auto;
+            image-rendering: pixelated;
+            image-rendering: -moz-crisp-edges;
+            image-rendering: crisp-edges;
+            cursor: crosshair;
+        }
+        
+        #loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            font-size: 24px;
+            z-index: 10;
+        }
+        
+        #progress {
+            width: 300px;
+            height: 20px;
+            background: #222;
+            border: 2px solid #666;
+            margin: 20px auto;
+        }
+        
+        #progress-fill {
+            height: 100%;
+            background: #ff0000;
+            width: 0%;
+            transition: width 0.3s;
+        }
+        
+        /* Mobile Controls */
+        #mobile-controls {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            display: none;
+            z-index: 100;
+            pointer-events: none;
+        }
+        
+        .mobile-control {
+            position: absolute;
+            background: rgba(255, 0, 0, 0.3);
+            border: 2px solid rgba(255, 0, 0, 0.5);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+            font-weight: bold;
+            pointer-events: auto;
+            cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        .mobile-control:active {
+            background: rgba(255, 0, 0, 0.6);
+            transform: scale(0.95);
+        }
+        
+        /* D-Pad */
+        #dpad {
+            position: absolute;
+            left: 20px;
+            bottom: 20px;
+            width: 150px;
+            height: 150px;
+            pointer-events: auto;
+        }
+        
+        .dpad-button {
+            position: absolute;
+            width: 50px;
+            height: 50px;
+            background: rgba(255, 0, 0, 0.3);
+            border: 2px solid rgba(255, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+            font-size: 20px;
+            cursor: pointer;
+        }
+        
+        .dpad-button:active {
+            background: rgba(255, 0, 0, 0.6);
+        }
+        
+        #dpad-up { top: 0; left: 50px; }
+        #dpad-down { bottom: 0; left: 50px; }
+        #dpad-left { left: 0; top: 50px; }
+        #dpad-right { right: 0; top: 50px; }
+        
+        /* Action Buttons */
+        #action-buttons {
+            position: absolute;
+            right: 20px;
+            bottom: 20px;
+            pointer-events: auto;
+        }
+        
+        .action-button {
+            position: absolute;
+            width: 60px;
+            height: 60px;
+            background: rgba(255, 0, 0, 0.3);
+            border: 2px solid rgba(255, 0, 0, 0.5);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+            font-size: 12px;
+            cursor: pointer;
+        }
+        
+        .action-button:active {
+            background: rgba(255, 0, 0, 0.6);
+            transform: scale(0.95);
+        }
+        
+        #fire-button { right: 80px; bottom: 0; }
+        #use-button { right: 0; bottom: 0; }
+        #run-button { right: 40px; bottom: 70px; }
+        
+        /* Touch Look Area */
+        #touch-look {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 200px;
+            z-index: 50;
+            pointer-events: auto;
+            opacity: 0;
+        }
+        
+        /* Menu Button */
+        #menu-button {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            width: 40px;
+            height: 40px;
+            background: rgba(255, 0, 0, 0.5);
+            border: 2px solid #ff0000;
+            border-radius: 5px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+            font-size: 20px;
+            cursor: pointer;
+            z-index: 101;
+        }
+        
+        /* Keyboard Focus Indicator */
+        #keyboard-focus {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            padding: 5px 10px;
+            background: rgba(0, 255, 0, 0.2);
+            border: 1px solid rgba(0, 255, 0, 0.5);
+            border-radius: 5px;
+            font-size: 12px;
+            display: none;
+            z-index: 101;
+        }
+        
+        #keyboard-focus.active {
+            display: block;
+            background: rgba(0, 255, 0, 0.5);
+        }
+        
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+            #mobile-controls {
+                display: block;
+            }
+        }
+    </style>
+</head>
+<body>
+    <canvas id="canvas" tabindex="1"></canvas>
+    
+    <div id="loading">
+        <div>Loading DOOM...</div>
+        <div id="progress">
+            <div id="progress-fill"></div>
+        </div>
+        <div id="status">Initializing...</div>
+    </div>
+    
+    <div id="keyboard-focus">Keyboard Active</div>
+    
+    <!-- Mobile Controls -->
+    <div id="mobile-controls">
+        <!-- D-Pad for movement -->
+        <div id="dpad">
+            <div class="dpad-button" id="dpad-up" data-key="w">↑</div>
+            <div class="dpad-button" id="dpad-down" data-key="s">↓</div>
+            <div class="dpad-button" id="dpad-left" data-key="a">←</div>
+            <div class="dpad-button" id="dpad-right" data-key="d">→</div>
+        </div>
+        
+        <!-- Action Buttons -->
+        <div id="action-buttons">
+            <div class="action-button" id="fire-button" data-key="Control">FIRE</div>
+            <div class="action-button" id="use-button" data-key="e">USE</div>
+            <div class="action-button" id="run-button" data-key="Shift">RUN</div>
+        </div>
+        
+        <!-- Touch area for looking around -->
+        <div id="touch-look"></div>
+    </div>
+    
+    <!-- Menu Button -->
+    <div id="menu-button">☰</div>
+
+    <script src="doom-enhanced-controls.js"></script>
+</body>
+</html> 

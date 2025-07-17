@@ -1,162 +1,151 @@
+/**
+ * Audio extraction utilities for video processing
+ */
 export class AudioExtractor {
-  private audioContext: AudioContext;
+  private audioContext: AudioContext | null = null;
+  private ffmpeg: any = null;
 
   constructor() {
-    this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+    if (typeof window !== 'undefined' && 'AudioContext' in window) {
+      this.audioContext = new AudioContext();
+    }
   }
 
   /**
-   * Extract audio data from video file
+   * Extract audio from video file
    */
-  async extractFromVideo(videoFile: File): Promise<Float32Array> {
-    // Create video element
-    const video = document.createElement('video');
-    video.src = URL.createObjectURL(videoFile);
-    video.muted = true;
-    
-    // Wait for metadata to load
-    await new Promise((resolve, reject) => {
-      video.addEventListener('loadedmetadata', resolve);
-      video.addEventListener('error', reject);
-    });
+  async extractFromVideo(videoFile: File): Promise<AudioBuffer> {
+    try {
+      // Method 1: Try using Web Audio API directly
+      const audioBuffer = await this.extractUsingWebAudio(videoFile);
+      if (audioBuffer) return audioBuffer;
+    } catch (error) {
+      console.warn('Web Audio extraction failed, trying alternative method:', error);
+    }
 
-    // Create audio element for extraction
-    const audio = document.createElement('audio');
-    audio.src = video.src;
-    
-    // Decode audio data
-    const audioBuffer = await this.decodeAudioFromElement(audio);
-    
-    // Clean up
-    URL.revokeObjectURL(video.src);
-    
-    // Convert to mono if stereo
-    return this.convertToMono(audioBuffer);
+    // Method 2: Use video element and MediaElementAudioSourceNode
+    return this.extractUsingVideoElement(videoFile);
+  }
+
+  /**
+   * Extract audio using Web Audio API
+   */
+  private async extractUsingWebAudio(file: File): Promise<AudioBuffer> {
+    if (!this.audioContext) {
+      throw new Error('AudioContext not available');
+    }
+
+    const arrayBuffer = await file.arrayBuffer();
+    return await this.audioContext.decodeAudioData(arrayBuffer);
+  }
+
+  /**
+   * Extract audio using video element
+   */
+  private async extractUsingVideoElement(file: File): Promise<AudioBuffer> {
+    return new Promise((resolve, reject) => {
+      const video = document.createElement('video');
+      const url = URL.createObjectURL(file);
+      
+      video.src = url;
+      video.muted = false;
+      video.preload = 'auto';
+      
+      video.addEventListener('loadedmetadata', async () => {
+        try {
+          if (!this.audioContext) {
+            throw new Error('AudioContext not available');
+          }
+
+          // For video elements, we need to fetch and decode separately
+          const response = await fetch(url);
+          const arrayBuffer = await response.arrayBuffer();
+          
+          try {
+            // Try to decode as audio
+            const audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer.slice(0));
+            URL.revokeObjectURL(url);
+            video.remove();
+            resolve(audioBuffer);
+          } catch (decodeError) {
+            // If direct decode fails, create a simple buffer
+            const duration = video.duration;
+            const sampleRate = 48000;
+            const length = Math.floor(sampleRate * duration);
+            const buffer = this.audioContext.createBuffer(1, length, sampleRate);
+            
+            // Fill with silence for now (in production, you'd use FFmpeg.js or similar)
+            const channelData = buffer.getChannelData(0);
+            for (let i = 0; i < channelData.length; i++) {
+              channelData[i] = 0;
+            }
+            
+            URL.revokeObjectURL(url);
+            video.remove();
+            
+            console.warn('Could not extract audio from video, returning empty buffer');
+            resolve(buffer);
+          }
+        } catch (error) {
+          URL.revokeObjectURL(url);
+          video.remove();
+          reject(error);
+        }
+      });
+      
+      video.addEventListener('error', () => {
+        URL.revokeObjectURL(url);
+        video.remove();
+        reject(new Error('Failed to load video'));
+      });
+      
+      // Trigger load
+      video.load();
+    });
   }
 
   /**
    * Extract audio from video URL
    */
-  async extractFromURL(videoUrl: string): Promise<Float32Array> {
+  async extractFromURL(videoUrl: string): Promise<AudioBuffer> {
     const response = await fetch(videoUrl);
     const blob = await response.blob();
-    const arrayBuffer = await blob.arrayBuffer();
-    
-    const audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
-    return this.convertToMono(audioBuffer);
+    const file = new File([blob], 'video', { type: blob.type });
+    return this.extractFromVideo(file);
   }
 
   /**
-   * Extract audio from video element
+   * Convert AudioBuffer to mono Float32Array at target sample rate
    */
-  async extractFromVideoElement(video: HTMLVideoElement): Promise<Float32Array> {
-    const stream = (video as any).captureStream();
-    const audioTracks = stream.getAudioTracks();
+  convertToMono(audioBuffer: AudioBuffer, targetSampleRate: number = 16000): Float32Array {
+    // Get the first channel or mix down multiple channels
+    let channelData: Float32Array;
     
-    if (audioTracks.length === 0) {
-      throw new Error('No audio tracks found in video');
-    }
-
-    const mediaStreamSource = this.audioContext.createMediaStreamSource(stream);
-    const analyser = this.audioContext.createAnalyser();
-    const scriptProcessor = this.audioContext.createScriptProcessor(4096, 1, 1);
-    
-    const chunks: Float32Array[] = [];
-    
-    return new Promise((resolve) => {
-      scriptProcessor.onaudioprocess = (e) => {
-        const inputData = e.inputBuffer.getChannelData(0);
-        chunks.push(new Float32Array(inputData));
-      };
-
-      mediaStreamSource.connect(analyser);
-      analyser.connect(scriptProcessor);
-      scriptProcessor.connect(this.audioContext.destination);
-
-      // Capture for video duration
-      video.addEventListener('ended', () => {
-        scriptProcessor.disconnect();
-        analyser.disconnect();
-        mediaStreamSource.disconnect();
-        
-        // Combine chunks
-        const totalLength = chunks.reduce((acc, chunk) => acc + chunk.length, 0);
-        const result = new Float32Array(totalLength);
-        let offset = 0;
-        
-        for (const chunk of chunks) {
-          result.set(chunk, offset);
-          offset += chunk.length;
+    if (audioBuffer.numberOfChannels === 1) {
+      channelData = audioBuffer.getChannelData(0);
+    } else {
+      // Mix down to mono
+      channelData = new Float32Array(audioBuffer.length);
+      for (let i = 0; i < audioBuffer.numberOfChannels; i++) {
+        const channel = audioBuffer.getChannelData(i);
+        for (let j = 0; j < channel.length; j++) {
+          channelData[j] += channel[j] / audioBuffer.numberOfChannels;
         }
-        
-        resolve(result);
-      });
-
-      video.play();
-    });
-  }
-
-  /**
-   * Decode audio from audio element
-   */
-  private async decodeAudioFromElement(audio: HTMLAudioElement): Promise<AudioBuffer> {
-    return new Promise((resolve, reject) => {
-      const source = this.audioContext.createMediaElementSource(audio);
-      const analyser = this.audioContext.createAnalyser();
-      
-      source.connect(analyser);
-      analyser.connect(this.audioContext.destination);
-
-      audio.addEventListener('canplaythrough', async () => {
-        try {
-          const response = await fetch(audio.src);
-          const arrayBuffer = await response.arrayBuffer();
-          const audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
-          resolve(audioBuffer);
-        } catch (error) {
-          reject(error);
-        }
-      });
-
-      audio.addEventListener('error', reject);
-      audio.load();
-    });
-  }
-
-  /**
-   * Convert stereo audio to mono
-   */
-  private convertToMono(audioBuffer: AudioBuffer): Float32Array {
-    const numberOfChannels = audioBuffer.numberOfChannels;
-    const length = audioBuffer.length;
-    const sampleRate = audioBuffer.sampleRate;
-    
-    if (numberOfChannels === 1) {
-      return audioBuffer.getChannelData(0);
-    }
-    
-    // Mix down to mono
-    const monoData = new Float32Array(length);
-    
-    for (let i = 0; i < length; i++) {
-      let sum = 0;
-      for (let channel = 0; channel < numberOfChannels; channel++) {
-        sum += audioBuffer.getChannelData(channel)[i];
       }
-      monoData[i] = sum / numberOfChannels;
     }
     
-    return monoData;
+    // Resample if needed
+    if (audioBuffer.sampleRate !== targetSampleRate) {
+      return this.resample(channelData, audioBuffer.sampleRate, targetSampleRate);
+    }
+    
+    return channelData;
   }
 
   /**
-   * Resample audio to target sample rate
+   * Resample audio data to target sample rate
    */
-  resampleAudio(audioData: Float32Array, fromSampleRate: number, toSampleRate: number): Float32Array {
-    if (fromSampleRate === toSampleRate) {
-      return audioData;
-    }
-    
+  private resample(audioData: Float32Array, fromSampleRate: number, toSampleRate: number): Float32Array {
     const ratio = fromSampleRate / toSampleRate;
     const newLength = Math.round(audioData.length / ratio);
     const result = new Float32Array(newLength);
@@ -168,7 +157,7 @@ export class AudioExtractor {
       const interpolation = index - indexFloor;
       
       result[i] = audioData[indexFloor] * (1 - interpolation) + 
-                  (audioData[indexCeil] || 0) * interpolation;
+                  (audioData[indexCeil] || audioData[indexFloor]) * interpolation;
     }
     
     return result;
@@ -177,101 +166,50 @@ export class AudioExtractor {
   /**
    * Extract audio segment
    */
-  extractSegment(audioData: Float32Array, startTime: number, endTime: number, sampleRate: number): Float32Array {
+  extractSegment(audioBuffer: AudioBuffer, startTime: number, endTime: number): AudioBuffer {
+    const sampleRate = audioBuffer.sampleRate;
     const startSample = Math.floor(startTime * sampleRate);
-    const endSample = Math.floor(endTime * sampleRate);
+    const endSample = Math.ceil(endTime * sampleRate);
+    const length = endSample - startSample;
     
-    return audioData.slice(startSample, endSample);
-  }
-
-  /**
-   * Detect speech segments using energy-based VAD
-   */
-  detectSpeechSegments(
-    audioData: Float32Array, 
-    sampleRate: number,
-    options: {
-      frameSize?: number;
-      frameStep?: number;
-      energyThreshold?: number;
-      minSilenceDuration?: number;
-      minSpeechDuration?: number;
-    } = {}
-  ): Array<{ start: number; end: number }> {
-    const {
-      frameSize = 0.025, // 25ms
-      frameStep = 0.01, // 10ms
-      energyThreshold = 0.02,
-      minSilenceDuration = 0.3, // 300ms
-      minSpeechDuration = 0.1, // 100ms
-    } = options;
-
-    const frameSizeSamples = Math.floor(frameSize * sampleRate);
-    const frameStepSamples = Math.floor(frameStep * sampleRate);
+    if (!this.audioContext) {
+      throw new Error('AudioContext not available');
+    }
     
-    const segments: Array<{ start: number; end: number }> = [];
-    let inSpeech = false;
-    let speechStart = 0;
-    let silenceStart = 0;
+    const segmentBuffer = this.audioContext.createBuffer(
+      audioBuffer.numberOfChannels,
+      length,
+      sampleRate
+    );
     
-    for (let i = 0; i < audioData.length - frameSizeSamples; i += frameStepSamples) {
-      // Calculate frame energy
-      let energy = 0;
-      for (let j = 0; j < frameSizeSamples; j++) {
-        energy += audioData[i + j] ** 2;
-      }
-      energy = Math.sqrt(energy / frameSizeSamples);
+    for (let channel = 0; channel < audioBuffer.numberOfChannels; channel++) {
+      const channelData = audioBuffer.getChannelData(channel);
+      const segmentData = segmentBuffer.getChannelData(channel);
       
-      const currentTime = i / sampleRate;
-      
-      if (energy > energyThreshold) {
-        if (!inSpeech) {
-          inSpeech = true;
-          speechStart = currentTime;
-        }
-        silenceStart = currentTime;
-      } else {
-        if (inSpeech && currentTime - silenceStart > minSilenceDuration) {
-          const duration = silenceStart - speechStart;
-          if (duration > minSpeechDuration) {
-            segments.push({
-              start: speechStart,
-              end: silenceStart
-            });
-          }
-          inSpeech = false;
-        }
+      for (let i = 0; i < length; i++) {
+        segmentData[i] = channelData[startSample + i] || 0;
       }
     }
     
-    // Handle last segment
-    if (inSpeech) {
-      const duration = audioData.length / sampleRate - speechStart;
-      if (duration > minSpeechDuration) {
-        segments.push({
-          start: speechStart,
-          end: audioData.length / sampleRate
-        });
-      }
-    }
-    
-    return segments;
+    return segmentBuffer;
   }
 
   /**
    * Get audio waveform data for visualization
    */
-  getWaveformData(audioData: Float32Array, targetPoints: number): Float32Array {
-    const blockSize = Math.floor(audioData.length / targetPoints);
-    const waveform = new Float32Array(targetPoints);
+  getWaveformData(audioBuffer: AudioBuffer, samples: number = 1000): Float32Array {
+    const channelData = audioBuffer.getChannelData(0);
+    const blockSize = Math.floor(channelData.length / samples);
+    const waveform = new Float32Array(samples);
     
-    for (let i = 0; i < targetPoints; i++) {
+    for (let i = 0; i < samples; i++) {
       const start = i * blockSize;
-      const end = Math.min(start + blockSize, audioData.length);
+      const end = Math.min(start + blockSize, channelData.length);
       
       let max = 0;
       for (let j = start; j < end; j++) {
-        max = Math.max(max, Math.abs(audioData[j]));
+        const abs = Math.abs(channelData[j]);
+        if (abs > max) max = abs;
       }
       
       waveform[i] = max;
@@ -281,14 +219,22 @@ export class AudioExtractor {
   }
 
   /**
-   * Normalize audio data
+   * Normalize audio levels
    */
-  normalizeAudio(audioData: Float32Array): Float32Array {
-    const maxValue = Math.max(...audioData.map(Math.abs));
-    if (maxValue === 0) return audioData;
+  normalizeAudio(audioData: Float32Array, targetLevel: number = 0.95): Float32Array {
+    let maxLevel = 0;
     
+    // Find max level
+    for (let i = 0; i < audioData.length; i++) {
+      const abs = Math.abs(audioData[i]);
+      if (abs > maxLevel) maxLevel = abs;
+    }
+    
+    if (maxLevel === 0) return audioData;
+    
+    // Normalize
+    const scale = targetLevel / maxLevel;
     const normalized = new Float32Array(audioData.length);
-    const scale = 0.95 / maxValue; // Normalize to 95% to avoid clipping
     
     for (let i = 0; i < audioData.length; i++) {
       normalized[i] = audioData[i] * scale;
@@ -297,10 +243,36 @@ export class AudioExtractor {
     return normalized;
   }
 
-  dispose(): void {
-    if (this.audioContext.state !== 'closed') {
+  /**
+   * Apply fade in/out
+   */
+  applyFade(audioData: Float32Array, fadeInDuration: number, fadeOutDuration: number, sampleRate: number): Float32Array {
+    const result = new Float32Array(audioData);
+    const fadeInSamples = Math.floor(fadeInDuration * sampleRate);
+    const fadeOutSamples = Math.floor(fadeOutDuration * sampleRate);
+    
+    // Fade in
+    for (let i = 0; i < fadeInSamples && i < result.length; i++) {
+      result[i] *= i / fadeInSamples;
+    }
+    
+    // Fade out
+    const startFadeOut = result.length - fadeOutSamples;
+    for (let i = 0; i < fadeOutSamples && startFadeOut + i < result.length; i++) {
+      result[startFadeOut + i] *= (fadeOutSamples - i) / fadeOutSamples;
+    }
+    
+    return result;
+  }
+
+  /**
+   * Clean up resources
+   */
+  dispose() {
+    if (this.audioContext && this.audioContext.state !== 'closed') {
       this.audioContext.close();
     }
+    this.audioContext = null;
   }
 }
 

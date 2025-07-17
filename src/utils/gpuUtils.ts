@@ -218,7 +218,7 @@ export class GPUManager {
     }
 
     try {
-      const adapter = await navigator.gpu.requestAdapter({
+      const adapter = await (navigator as any).gpu.requestAdapter({
         powerPreference: 'high-performance'
       });
 

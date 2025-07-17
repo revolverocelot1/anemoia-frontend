@@ -1,6 +1,8 @@
-import { useState, useEffect, lazy, Suspense } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import AnimatedPage from './components/AnimatedPage';
+import ErrorBoundary from './components/ErrorBoundary';
+import LoadingFallback from './components/LoadingFallback';
 import HomePage from './pages/HomePage';
 import DepthMapPage from './pages/DepthMapPage';
 import AuthCallbackPage from './pages/AuthCallbackPage';
@@ -28,7 +30,15 @@ import { AuthProvider } from './context/AuthContext';
 import LoginPage from './pages/LoginPage';
 import { detectGPU, logDeploymentInfo } from './utils/gpuUtils';
 import FaceSwapPage from './pages/FaceSwapPage';
-import SubtitlePageEnhanced from './pages/SubtitlePageEnhanced';
+import SubtitlePage from './pages/SubtitlePage';
+import { AnimatePresence } from 'framer-motion';
+
+// Landing Pages
+import ImageComparisonLanding from './pages/landing/ImageComparisonLanding';
+import DepthMapLanding from './pages/landing/DepthMapLanding';
+import UpscalerLanding from './pages/landing/UpscalerLanding';
+import PoseEstimationLanding from './pages/landing/PoseEstimationLanding';
+import SplatViewerLanding from './pages/landing/SplatViewerLanding';
 
 // Lazy load R3FCanvas to ensure proper module loading
 const R3FCanvas = lazy(() => import('./three/R3FCanvas'));
@@ -164,7 +174,7 @@ function App() {
   }, []);
 
   return (
-    <>
+    <ErrorBoundary>
       {/* 3D Background with error handling and blur effect */}
       {show3DBackground && !backgroundError && modulesReady && (
         <div 
@@ -181,7 +191,9 @@ function App() {
               <div className="text-white">Loading 3D Background...</div>
             </div>
           }>
+            <ErrorBoundary fallback={null}>
             <R3FCanvas />
+            </ErrorBoundary>
           </Suspense>
         </div>
       )}
@@ -224,6 +236,50 @@ function App() {
                 </AnimatedPage>
               }
             />
+            
+            {/* Landing Pages for SEO */}
+            <Route
+              path="/compare/landing"
+              element={
+                <AnimatedPage>
+                  <ImageComparisonLanding />
+                </AnimatedPage>
+              }
+            />
+            <Route
+              path="/depth-map/landing"
+              element={
+                <AnimatedPage>
+                  <DepthMapLanding />
+                </AnimatedPage>
+              }
+            />
+            <Route
+              path="/upscaler/landing"
+              element={
+                <AnimatedPage>
+                  <UpscalerLanding />
+                </AnimatedPage>
+              }
+            />
+            <Route
+              path="/pose-estimation/landing"
+              element={
+                <AnimatedPage>
+                  <PoseEstimationLanding />
+                </AnimatedPage>
+              }
+            />
+            <Route
+              path="/splat-viewer/landing"
+              element={
+                <AnimatedPage>
+                  <SplatViewerLanding />
+                </AnimatedPage>
+              }
+            />
+
+            
             <Route
               path="/depth-map"
               element={
@@ -312,6 +368,7 @@ function App() {
                 </AnimatedPage>
               }
             />
+
             <Route
               path="/splat-viewer"
               element={
@@ -348,7 +405,7 @@ function App() {
               path="/subtitle"
               element={
                 <AnimatedPage>
-                  <SubtitlePageEnhanced />
+                  <SubtitlePage />
                 </AnimatedPage>
               }
             />
@@ -383,7 +440,7 @@ function App() {
         </AuthProvider>
         <CoffeeDonation />
       </div>
-    </>
+    </ErrorBoundary>
   );
 }
 

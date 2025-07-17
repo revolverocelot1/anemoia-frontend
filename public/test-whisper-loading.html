@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Whisper Model Loading Test</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0f0f0f;
+            color: #fff;
+            padding: 40px;
+            margin: 0;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: #00d9ff;
+            margin-bottom: 30px;
+        }
+        .status-box {
+            background: #1a1a1a;
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .progress-bar {
+            width: 100%;
+            height: 30px;
+            background: #333;
+            border-radius: 15px;
+            overflow: hidden;
+            margin: 20px 0;
+        }
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #00d9ff, #0099ff);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+        .btn {
+            background: #0099ff;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            font-size: 16px;
+            cursor: pointer;
+            margin-right: 10px;
+            transition: all 0.3s;
+        }
+        .btn:hover {
+            background: #0077cc;
+            transform: translateY(-1px);
+        }
+        .btn:disabled {
+            background: #444;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .error {
+            background: #ff3333;
+            color: white;
+            padding: 15px;
+            border-radius: 6px;
+            margin: 20px 0;
+        }
+        .success {
+            background: #00cc44;
+            color: white;
+            padding: 15px;
+            border-radius: 6px;
+            margin: 20px 0;
+        }
+        .log {
+            background: #000;
+            padding: 20px;
+            border-radius: 8px;
+            max-height: 400px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+        .log-entry {
+            margin-bottom: 5px;
+        }
+        .log-error { color: #ff6b6b; }
+        .log-success { color: #51cf66; }
+        .log-info { color: #74c0fc; }
+        .log-warning { color: #ffd43b; }
+        
+        /* Success Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.8);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+        .modal-overlay.show {
+            display: flex;
+        }
+        .modal {
+            background: #1a1a1a;
+            border: 2px solid #00cc44;
+            border-radius: 16px;
+            padding: 40px;
+            text-align: center;
+            animation: modalPop 0.3s ease;
+        }
+        @keyframes modalPop {
+            from {
+                transform: scale(0.8);
+                opacity: 0;
+            }
+            to {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+        .modal-icon {
+            font-size: 80px;
+            margin-bottom: 20px;
+        }
+        .modal h2 {
+            color: #00cc44;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎤 Whisper Model Loading Test</h1>
+        
+        <div class="status-box">
+            <h2>Status: <span id="status">Ready</span></h2>
+            <div class="progress-bar">
+                <div class="progress-fill" id="progress"></div>
+            </div>
+            <p>Progress: <span id="progress-text">0%</span></p>
+            <p>Model: <span id="model-name">whisper-tiny</span></p>
+        </div>
+        
+        <div id="error-box"></div>
+        <div id="success-box"></div>
+        
+        <div>
+            <button class="btn" id="load-direct">Load Model (Direct)</button>
+            <button class="btn" id="load-proxy">Load Model (Via Proxy)</button>
+            <button class="btn" id="clear-cache">Clear Cache</button>
+            <button class="btn" id="test-worker">Test Worker</button>
+        </div>
+        
+        <h3>Log:</h3>
+        <div class="log" id="log"></div>
+    </div>
+    
+    <!-- Success Modal -->
+    <div class="modal-overlay" id="success-modal">
+        <div class="modal">
+            <div class="modal-icon">✅</div>
+            <h2>Model Loaded Successfully!</h2>
+            <p>The Whisper model is ready for transcription</p>
+            <button class="btn" onclick="closeModal()">Close</button>
+        </div>
+    </div>
+    
+    <script type="module">
+        const log = (message, type = 'info') => {
+            const logDiv = document.getElementById('log');
+            const entry = document.createElement('div');
+            entry.className = `log-entry log-${type}`;
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            logDiv.appendChild(entry);
+            logDiv.scrollTop = logDiv.scrollHeight;
+            console.log(message);
+        };
+        
+        const updateProgress = (percent, status) => {
+            document.getElementById('progress').style.width = percent + '%';
+            document.getElementById('progress-text').textContent = percent + '%';
+            document.getElementById('status').textContent = status;
+        };
+        
+        const showError = (message) => {
+            document.getElementById('error-box').innerHTML = `<div class="error">${message}</div>`;
+        };
+        
+        const showSuccess = (message) => {
+            document.getElementById('success-box').innerHTML = `<div class="success">${message}</div>`;
+            // Show modal
+            document.getElementById('success-modal').classList.add('show');
+        };
+        
+        window.closeModal = () => {
+            document.getElementById('success-modal').classList.remove('show');
+        };
+        
+        let worker = null;
+        
+        const createWorker = () => {
+            if (worker) {
+                worker.terminate();
+            }
+            
+            worker = new Worker('/src/workers/whisper.worker.ts', { type: 'module' });
+            
+            worker.addEventListener('message', (event) => {
+                const { type, progress, status, error, details } = event.data;
+                
+                if (type === 'progress') {
+                    log(`Progress: ${progress}% - ${status}`, 'info');
+                    updateProgress(progress, status);
+                    
+                    if (progress === 100 && status.toLowerCase().includes('successfully')) {
+                        showSuccess('Model loaded successfully! ✅');
+                        log('MODEL LOADED SUCCESSFULLY! Visual confirmation displayed.', 'success');
+                    }
+                } else if (type === 'error') {
+                    log(`Error: ${error}`, 'error');
+                    if (details) {
+                        log(`Details: ${JSON.stringify(details, null, 2)}`, 'error');
+                    }
+                    showError(error);
+                    updateProgress(0, 'Error');
+                }
+            });
+            
+            worker.addEventListener('error', (event) => {
+                log(`Worker error: ${event.message}`, 'error');
+                showError(`Worker error: ${event.message}`);
+            });
+            
+            return worker;
+        };
+        
+        // Load model directly
+        document.getElementById('load-direct').addEventListener('click', async () => {
+            log('Loading model directly from Hugging Face...', 'info');
+            updateProgress(0, 'Initializing...');
+            document.getElementById('error-box').innerHTML = '';
+            document.getElementById('success-box').innerHTML = '';
+            
+            const worker = createWorker();
+            
+            // Configure for direct loading
+            log('Sending load-model message (direct)...', 'info');
+            worker.postMessage({
+                type: 'load-model',
+                model: 'whisper-tiny',
+                options: {
+                    cache: true,
+                    device: 'wasm',
+                    direct: true // Custom flag to bypass proxy
+                }
+            });
+        });
+        
+        // Load model via proxy
+        document.getElementById('load-proxy').addEventListener('click', async () => {
+            log('Loading model via development proxy...', 'info');
+            updateProgress(0, 'Initializing...');
+            document.getElementById('error-box').innerHTML = '';
+            document.getElementById('success-box').innerHTML = '';
+            
+            const worker = createWorker();
+            
+            // Configure for proxy loading
+            log('Sending load-model message (proxy)...', 'info');
+            worker.postMessage({
+                type: 'load-model',
+                model: 'whisper-tiny',
+                options: {
+                    cache: true,
+                    device: 'wasm',
+                    direct: false // Use proxy
+                }
+            });
+        });
+        
+        // Clear cache
+        document.getElementById('clear-cache').addEventListener('click', async () => {
+            log('Clearing cache...', 'warning');
+            try {
+                const cacheNames = await caches.keys();
+                for (const name of cacheNames) {
+                    await caches.delete(name);
+                    log(`Deleted cache: ${name}`, 'info');
+                }
+                log('Cache cleared successfully', 'success');
+                showSuccess('Cache cleared!');
+            } catch (error) {
+                log(`Failed to clear cache: ${error}`, 'error');
+                showError(`Failed to clear cache: ${error}`);
+            }
+        });
+        
+        // Test worker
+        document.getElementById('test-worker').addEventListener('click', () => {
+            log('Testing worker creation...', 'info');
+            try {
+                const testWorker = createWorker();
+                log('Worker created successfully', 'success');
+                setTimeout(() => {
+                    testWorker.terminate();
+                    log('Worker terminated', 'info');
+                }, 1000);
+            } catch (error) {
+                log(`Worker test failed: ${error}`, 'error');
+            }
+        });
+        
+        // Initial log
+        log('Whisper Model Loading Test Page Ready', 'success');
+        log(`Browser: ${navigator.userAgent}`, 'info');
+        log(`Origin: ${window.location.origin}`, 'info');
+    </script>
+</body>
+</html> 

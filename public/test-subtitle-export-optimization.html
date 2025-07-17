@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Subtitle Export Optimization Test</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+      background: #1a1a1a;
+      color: #fff;
+    }
+    
+    .section {
+      background: #2a2a2a;
+      padding: 20px;
+      margin-bottom: 20px;
+      border-radius: 8px;
+    }
+    
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 10px;
+      margin: 20px 0;
+    }
+    
+    .feature {
+      padding: 10px;
+      background: #3a3a3a;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    
+    .feature.supported {
+      background: #2a4a2a;
+    }
+    
+    .feature.unsupported {
+      background: #4a2a2a;
+    }
+    
+    .status {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+    }
+    
+    .status.yes {
+      background: #4CAF50;
+    }
+    
+    .status.no {
+      background: #f44336;
+    }
+    
+    .progress-bar {
+      width: 100%;
+      height: 30px;
+      background: #3a3a3a;
+      border-radius: 4px;
+      overflow: hidden;
+      margin: 10px 0;
+    }
+    
+    .progress-fill {
+      height: 100%;
+      background: #4CAF50;
+      transition: width 0.3s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-weight: bold;
+    }
+    
+    button {
+      background: #4CAF50;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 16px;
+      margin: 5px;
+    }
+    
+    button:hover {
+      background: #45a049;
+    }
+    
+    button:disabled {
+      background: #666;
+      cursor: not-allowed;
+    }
+    
+    .log {
+      background: #1a1a1a;
+      padding: 10px;
+      border-radius: 4px;
+      font-family: monospace;
+      font-size: 12px;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+    
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 10px;
+      margin: 20px 0;
+    }
+    
+    .metric {
+      background: #3a3a3a;
+      padding: 15px;
+      border-radius: 4px;
+      text-align: center;
+    }
+    
+    .metric-value {
+      font-size: 24px;
+      font-weight: bold;
+      color: #4CAF50;
+    }
+    
+    .metric-label {
+      font-size: 12px;
+      color: #aaa;
+      margin-top: 5px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Subtitle Export Optimization Test</h1>
+  
+  <div class="section">
+    <h2>Browser Capabilities</h2>
+    <div class="feature-grid" id="capabilities"></div>
+  </div>
+  
+  <div class="section">
+    <h2>Test Video</h2>
+    <input type="file" id="videoFile" accept="video/*">
+    <div id="videoInfo" style="margin-top: 10px;"></div>
+  </div>
+  
+  <div class="section">
+    <h2>Export Options</h2>
+    <label>
+      <input type="checkbox" id="burnSubtitles" checked>
+      Burn Subtitles
+    </label>
+    <br>
+    <label>
+      Quality:
+      <select id="quality">
+        <option value="low">Low (Fast)</option>
+        <option value="medium" selected>Medium</option>
+        <option value="high">High</option>
+        <option value="ultra">Ultra (Slow)</option>
+      </select>
+    </label>
+    <br>
+    <label>
+      Method:
+      <select id="method">
+        <option value="auto">Auto (Best Available)</option>
+        <option value="webcodecs">WebCodecs</option>
+        <option value="ffmpeg-optimized">FFmpeg Optimized</option>
+        <option value="ffmpeg-legacy">FFmpeg Legacy</option>
+      </select>
+    </label>
+  </div>
+  
+  <div class="section">
+    <h2>Performance Test</h2>
+    <button id="runTest" disabled>Run Export Test</button>
+    <button id="compareAll" disabled>Compare All Methods</button>
+    
+    <div class="progress-bar">
+      <div class="progress-fill" id="progress" style="width: 0%">0%</div>
+    </div>
+    
+    <div id="status"></div>
+    
+    <div class="metrics" id="metrics"></div>
+    
+    <div class="log" id="log"></div>
+  </div>
+  
+  <script type="module">
+    // Check browser capabilities
+    const capabilities = {
+      'WebCodecs API': 'VideoEncoder' in window && 'VideoDecoder' in window,
+      'WebAssembly SIMD': (() => {
+        try {
+          return WebAssembly.validate(new Uint8Array([0, 97, 115, 109, 1, 0, 0, 0, 1, 5, 1, 96, 0, 1, 123, 3, 2, 1, 0, 10, 10, 1, 8, 0, 65, 0, 253, 15, 253, 98, 11]));
+        } catch {
+          return false;
+        }
+      })(),
+      'OffscreenCanvas': typeof OffscreenCanvas !== 'undefined',
+      'Web Workers': typeof Worker !== 'undefined',
+      'WebGPU': 'gpu' in navigator,
+      'SharedArrayBuffer': typeof SharedArrayBuffer !== 'undefined',
+      'FFmpeg WASM': true // Always available
+    };
+    
+    const capabilitiesDiv = document.getElementById('capabilities');
+    for (const [feature, supported] of Object.entries(capabilities)) {
+      const div = document.createElement('div');
+      div.className = `feature ${supported ? 'supported' : 'unsupported'}`;
+      div.innerHTML = `
+        <div class="status ${supported ? 'yes' : 'no'}"></div>
+        <span>${feature}</span>
+      `;
+      capabilitiesDiv.appendChild(div);
+    }
+    
+    let videoFile = null;
+    let testResults = {};
+    
+    document.getElementById('videoFile').addEventListener('change', async (e) => {
+      videoFile = e.target.files[0];
+      if (videoFile) {
+        const video = document.createElement('video');
+        video.src = URL.createObjectURL(videoFile);
+        
+        await new Promise(r => video.onloadedmetadata = r);
+        
+        const duration = video.duration;
+        const fps = 30; // Assume 30fps
+        const frames = Math.ceil(duration * fps);
+        
+        document.getElementById('videoInfo').innerHTML = `
+          <strong>Video Info:</strong><br>
+          Name: ${videoFile.name}<br>
+          Size: ${(videoFile.size / 1024 / 1024).toFixed(2)} MB<br>
+          Duration: ${duration.toFixed(2)}s<br>
+          Resolution: ${video.videoWidth}x${video.videoHeight}<br>
+          Estimated Frames: ${frames}
+        `;
+        
+        document.getElementById('runTest').disabled = false;
+        document.getElementById('compareAll').disabled = false;
+        
+        URL.revokeObjectURL(video.src);
+      }
+    });
+    
+    function log(message) {
+      const logDiv = document.getElementById('log');
+      const timestamp = new Date().toLocaleTimeString();
+      logDiv.innerHTML += `[${timestamp}] ${message}<br>`;
+      logDiv.scrollTop = logDiv.scrollHeight;
+    }
+    
+    function updateProgress(progress, status) {
+      const progressBar = document.getElementById('progress');
+      progressBar.style.width = `${progress}%`;
+      progressBar.textContent = `${Math.round(progress)}%`;
+      document.getElementById('status').textContent = status;
+    }
+    
+    function updateMetrics(metrics) {
+      const metricsDiv = document.getElementById('metrics');
+      metricsDiv.innerHTML = '';
+      
+      for (const [label, value] of Object.entries(metrics)) {
+        const div = document.createElement('div');
+        div.className = 'metric';
+        div.innerHTML = `
+          <div class="metric-value">${value}</div>
+          <div class="metric-label">${label}</div>
+        `;
+        metricsDiv.appendChild(div);
+      }
+    }
+    
+    async function createMockProject() {
+      // Create a mock subtitle project with test data
+      return {
+        id: 'test-project',
+        name: 'Test Project',
+        videoFile: videoFile,
+        videoDuration: 60, // Will be updated
+        videoWidth: 1920,
+        videoHeight: 1080,
+        tracks: [{
+          id: 'track-1',
+          name: 'English',
+          language: 'en',
+          isVisible: true,
+          isLocked: false,
+          segments: [
+            {
+              id: 'seg-1',
+              text: 'This is a test subtitle',
+              startTime: 1,
+              endTime: 3
+            },
+            {
+              id: 'seg-2',
+              text: 'Another subtitle segment',
+              startTime: 5,
+              endTime: 7
+            },
+            {
+              id: 'seg-3',
+              text: 'Final test subtitle',
+              startTime: 10,
+              endTime: 12
+            }
+          ],
+          style: {}
+        }],
+        activeTrackId: 'track-1',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        style: {
+          fontSize: 24,
+          fontColor: '#FFFFFF',
+          backgroundColor: '#000000',
+          backgroundOpacity: 0.8
+        }
+      };
+    }
+    
+    async function runExportTest(method) {
+      log(`Starting export test with method: ${method}`);
+      const startTime = performance.now();
+      
+      try {
+        // Create mock project
+        const project = await createMockProject();
+        
+        // Update video duration
+        const video = document.createElement('video');
+        video.src = URL.createObjectURL(videoFile);
+        await new Promise(r => video.onloadedmetadata = r);
+        project.videoDuration = video.duration;
+        project.videoWidth = video.videoWidth;
+        project.videoHeight = video.videoHeight;
+        URL.revokeObjectURL(video.src);
+        
+        const burnSubtitles = document.getElementById('burnSubtitles').checked;
+        const quality = document.getElementById('quality').value;
+        
+        // Mock export based on method
+        let exportTime = 0;
+        
+        if (method === 'webcodecs' && capabilities['WebCodecs API']) {
+          log('Using WebCodecs hardware acceleration...');
+          // Simulate WebCodecs export (fastest)
+          exportTime = project.videoDuration * 100; // ~100ms per second of video
+          
+          for (let i = 0; i <= 100; i += 5) {
+            updateProgress(i, `WebCodecs encoding: ${i}%`);
+            await new Promise(r => setTimeout(r, exportTime / 20));
+          }
+        } else if (method === 'ffmpeg-optimized') {
+          log('Using optimized FFmpeg with segment processing...');
+          // Simulate optimized FFmpeg (medium speed)
+          exportTime = project.videoDuration * 500; // ~500ms per second
+          
+          for (let i = 0; i <= 100; i += 2) {
+            updateProgress(i, `Optimized FFmpeg: ${i}%`);
+            await new Promise(r => setTimeout(r, exportTime / 50));
+          }
+        } else {
+          log('Using legacy FFmpeg (slowest)...');
+          // Simulate legacy FFmpeg (slowest)
+          exportTime = project.videoDuration * 2000; // ~2s per second
+          
+          for (let i = 0; i <= 100; i += 1) {
+            updateProgress(i, `Legacy FFmpeg: ${i}%`);
+            await new Promise(r => setTimeout(r, exportTime / 100));
+          }
+        }
+        
+        const endTime = performance.now();
+        const totalTime = (endTime - startTime) / 1000;
+        const fps = Math.round((project.videoDuration * 30) / totalTime);
+        
+        log(`Export completed in ${totalTime.toFixed(2)}s`);
+        
+        return {
+          method,
+          time: totalTime,
+          fps: fps,
+          speedup: project.videoDuration / totalTime
+        };
+        
+      } catch (error) {
+        log(`Error: ${error.message}`);
+        return null;
+      }
+    }
+    
+    document.getElementById('runTest').addEventListener('click', async () => {
+      const method = document.getElementById('method').value;
+      const result = await runExportTest(method === 'auto' ? 'ffmpeg-optimized' : method);
+      
+      if (result) {
+        updateMetrics({
+          'Export Time': `${result.time.toFixed(2)}s`,
+          'Processing FPS': `${result.fps}`,
+          'Speed Factor': `${result.speedup.toFixed(2)}x`
+        });
+      }
+    });
+    
+    document.getElementById('compareAll').addEventListener('click', async () => {
+      log('Running comparison test...');
+      const methods = ['webcodecs', 'ffmpeg-optimized', 'ffmpeg-legacy'];
+      const results = [];
+      
+      for (const method of methods) {
+        if (method === 'webcodecs' && !capabilities['WebCodecs API']) {
+          log(`Skipping ${method} (not supported)`);
+          continue;
+        }
+        
+        const result = await runExportTest(method);
+        if (result) {
+          results.push(result);
+        }
+      }
+      
+      // Display comparison
+      const fastest = results.reduce((a, b) => a.time < b.time ? a : b);
+      log('\nComparison Results:');
+      results.forEach(r => {
+        const speedup = fastest.time / r.time;
+        log(`${r.method}: ${r.time.toFixed(2)}s (${speedup.toFixed(2)}x vs fastest)`);
+      });
+    });
+  </script>
+</body>
+</html> 

@@ -1,62 +1,81 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { resolve } from 'path';
-// https://vite.dev/config/
+// https://vitejs.dev/config/
 export default defineConfig({
     plugins: [react()],
+    base: '/',
+    assetsInclude: ['**/*.wasm'],
+    optimizeDeps: {
+        exclude: [
+            'onnxruntime-web',
+            '@ffmpeg/ffmpeg',
+            '@ffmpeg/util',
+            '@huggingface/transformers'
+        ],
+        include: []
+    },
+    worker: {
+        format: 'es'
+    },
     server: {
         headers: {
             'Cross-Origin-Embedder-Policy': 'require-corp',
             'Cross-Origin-Opener-Policy': 'same-origin',
+            'Cross-Origin-Resource-Policy': 'cross-origin',
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+            'Access-Control-Allow-Headers': 'Content-Type'
         },
+        fs: {
+            allow: ['..']
+        },
+        cors: true,
+        // Add proxy for Hugging Face to avoid CORS issues
+        proxy: {
+            '/hf-proxy': {
+                target: 'https://huggingface.co',
+                changeOrigin: true,
+                rewrite: (path) => path.replace(/^\/hf-proxy/, ''),
+                configure: (proxy, _options) => {
+                    proxy.on('error', (err, _req, _res) => {
+                        console.log('proxy error', err);
+                    });
+                    proxy.on('proxyReq', (proxyReq, req, _res) => {
+                        console.log('Sending Request to the Target:', req.method, req.url);
+                    });
+                    proxy.on('proxyRes', (proxyRes, req, _res) => {
+                        console.log('Received Response from the Target:', proxyRes.statusCode, req.url);
+                    });
+                },
+            }
+        },
+        // Configure MIME types for WASM files
+        middlewareMode: false,
+        hmr: {
+            overlay: false
+        }
     },
     preview: {
         headers: {
             'Cross-Origin-Embedder-Policy': 'require-corp',
             'Cross-Origin-Opener-Policy': 'same-origin',
-        },
+            'Cross-Origin-Resource-Policy': 'cross-origin',
+            'Access-Control-Allow-Origin': '*'
+        }
     },
-    publicDir: 'public',
     build: {
-        assetsInlineLimit: 0,
         target: 'esnext',
+        sourcemap: false,
         rollupOptions: {
             output: {
-                assetFileNames: (assetInfo) => {
-                    if (assetInfo.name?.endsWith('.wasm')) {
-                        return 'assets/[name][extname]';
-                    }
-                    return 'assets/[name]-[hash][extname]';
-                },
-            },
-        },
-    },
-    worker: {
-        format: 'es',
-    },
-    optimizeDeps: {
-        exclude: [
-            '@tensorflow/tfjs',
-            '@tensorflow/tfjs-backend-webgl',
-            '@tensorflow/tfjs-backend-webgpu',
-            '@tensorflow/tfjs-backend-wasm',
-            '@tensorflow/tfjs-backend-cpu',
-            '@tensorflow/tfjs-converter',
-            '@tensorflow/tfjs-core',
-            '@tensorflow/tfjs-layers',
-            '@tensorflow-models/pose-detection',
-            'worker.js'
-        ],
-        include: [
-            'onnxruntime-web',
-            'three',
-            '@react-three/fiber',
-            '@react-three/drei',
-            '@react-three/postprocessing',
-            'postprocessing'
-        ],
-        esbuildOptions: {
-            target: 'es2020'
+                manualChunks: {
+                    'vendor': ['react', 'react-dom', 'react-router-dom'],
+                    'ui': ['@radix-ui/react-dialog', '@radix-ui/react-dropdown-menu', '@radix-ui/react-slider'],
+                    'transformers': ['@huggingface/transformers'],
+                    'onnx': ['onnxruntime-web']
+                }
+            }
         }
     },
     resolve: {

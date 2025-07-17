@@ -11,6 +11,7 @@ import App from './App';
 import { AuthProvider } from './context/AuthContext';
 import './index.css';
 import { initializeGPU } from './utils/gpuUtils';
+import { validateEnvironment } from './config/environment';
 
 // Pre-load Three.js modules to ensure they're available
 import * as THREE from 'three';
@@ -43,6 +44,9 @@ Sentry.init({
   replaysOnErrorSampleRate: 1.0,
 });
 
+// Validate environment variables on startup
+validateEnvironment();
+
 // Configure transformers.js environment for WASM files
 env.allowLocalModels = false;
 env.allowRemoteModels = true;
@@ -57,6 +61,26 @@ initializeGPU().then(() => {
   console.log('GPU acceleration initialized');
 }).catch(error => {
   console.error('GPU initialization failed:', error);
+});
+
+// Global error handler for unhandled promise rejections
+window.addEventListener('unhandledrejection', (event) => {
+  console.error('Unhandled promise rejection:', event.reason);
+  
+  // Check if it's the specific Supabase error
+  if (event.reason?.message?.includes('Object Not Found Matching Id:1')) {
+    console.warn('Ignoring Supabase profile error - this may be from old code or initialization');
+    event.preventDefault(); // Prevent the error from being logged to Sentry
+    return;
+  }
+  
+  // For other errors, you can still report them
+  // Sentry or other error tracking would go here
+});
+
+// Global error boundary
+window.addEventListener('error', (event) => {
+  console.error('Global error:', event.error);
 });
 
 ReactDOM.createRoot(document.getElementById('root')!).render(

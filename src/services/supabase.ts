@@ -78,29 +78,67 @@ export const authService = {
   }
 };
 
-// User profile helpers
+// User profile helpers with better error handling
 export const userService = {
   async getProfile(userId: string) {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .single();
-    return { data, error };
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
+      
+      if (error && error.code === 'PGRST116') {
+        // Profile not found - this is expected for new users
+        console.log('Profile not found for user:', userId);
+        return { data: null, error: null };
+      }
+      
+      return { data, error };
+    } catch (err) {
+      console.error('Error fetching profile:', err);
+      return { data: null, error: err };
+    }
   },
 
   async updateProfile(userId: string, updates: Partial<User>) {
-    const { data, error } = await supabase
-      .from('profiles')
-      .update(updates)
-      .eq('id', userId);
-    return { data, error };
+    try {
+      // First check if profile exists
+      const { data: existingProfile } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('id', userId)
+        .single();
+      
+      if (!existingProfile) {
+        // Create profile if it doesn't exist
+        return await this.createProfile({ ...updates, id: userId });
+      }
+      
+      const { data, error } = await supabase
+        .from('profiles')
+        .update(updates)
+        .eq('id', userId)
+        .select();
+      
+      return { data, error };
+    } catch (err) {
+      console.error('Error updating profile:', err);
+      return { data: null, error: err };
+    }
   },
 
   async createProfile(user: Partial<User>) {
-    const { data, error } = await supabase
-      .from('profiles')
-      .insert([user]);
-    return { data, error };
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .insert([user])
+        .select();
+      
+      return { data, error };
+    } catch (err) {
+      console.error('Error creating profile:', err);
+      return { data: null, error: err };
+    }
   }
 }; 

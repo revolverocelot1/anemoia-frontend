@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Whisper Worker</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #1a1a1a;
+            color: white;
+        }
+        button {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #2563eb;
+        }
+        button:disabled {
+            background: #6b7280;
+            cursor: not-allowed;
+        }
+        #log {
+            background: #000;
+            padding: 10px;
+            border-radius: 5px;
+            margin-top: 20px;
+            max-height: 400px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .error {
+            color: #ef4444;
+        }
+        .success {
+            color: #10b981;
+        }
+        .info {
+            color: #3b82f6;
+        }
+    </style>
+</head>
+<body>
+    <h1>Test Whisper Worker</h1>
+    
+    <div>
+        <button id="loadModel">Load Whisper Model</button>
+        <button id="transcribe" disabled>Test Transcription</button>
+        <button id="loadFFmpeg">Test FFmpeg</button>
+    </div>
+    
+    <div id="log"></div>
+    
+    <script type="module">
+        const log = (message, type = 'info') => {
+            const logDiv = document.getElementById('log');
+            const entry = document.createElement('div');
+            entry.className = type;
+            entry.textContent = `[${new Date().toISOString().split('T')[1].split('.')[0]}] ${message}`;
+            logDiv.appendChild(entry);
+            logDiv.scrollTop = logDiv.scrollHeight;
+            console.log(message);
+        };
+        
+        // Test Whisper Worker
+        document.getElementById('loadModel').addEventListener('click', async () => {
+            log('Creating worker...');
+            
+            try {
+                const worker = new Worker('/src/workers/whisper.worker.ts', { type: 'module' });
+                
+                worker.addEventListener('message', (event) => {
+                    const { type, progress, status, error } = event.data;
+                    
+                    if (type === 'progress') {
+                        log(`Progress: ${progress}% - ${status}`, 'info');
+                        
+                        if (progress === 100) {
+                            log('Model loaded successfully!', 'success');
+                            document.getElementById('transcribe').disabled = false;
+                        }
+                    } else if (type === 'error') {
+                        log(`Error: ${error}`, 'error');
+                    }
+                });
+                
+                log('Sending load-model message...');
+                worker.postMessage({
+                    type: 'load-model',
+                    model: 'whisper-base',
+                    options: {
+                        cache: true,
+                        device: 'wasm'
+                    }
+                });
+                
+            } catch (error) {
+                log(`Failed to create worker: ${error.message}`, 'error');
+            }
+        });
+        
+        // Test FFmpeg
+        document.getElementById('loadFFmpeg').addEventListener('click', async () => {
+            log('Testing FFmpeg loading...');
+            
+            try {
+                const { FFmpeg } = await import('@ffmpeg/ffmpeg');
+                const ffmpeg = new FFmpeg();
+                
+                ffmpeg.on('log', ({ message }) => {
+                    log(`FFmpeg: ${message}`, 'info');
+                });
+                
+                const baseURL = window.location.origin;
+                log(`Attempting to load FFmpeg from ${baseURL}/ffmpeg/...`);
+                
+                await ffmpeg.load({
+                    coreURL: `${baseURL}/ffmpeg/ffmpeg-core.js`,
+                    wasmURL: `${baseURL}/ffmpeg/ffmpeg-core.wasm`,
+                });
+                
+                log('FFmpeg loaded successfully!', 'success');
+                
+            } catch (error) {
+                log(`FFmpeg error: ${error.message}`, 'error');
+                log('Trying CDN fallback...', 'info');
+                
+                try {
+                    const { FFmpeg } = await import('@ffmpeg/ffmpeg');
+                    const ffmpeg = new FFmpeg();
+                    await ffmpeg.load();
+                    log('FFmpeg loaded from CDN!', 'success');
+                } catch (cdnError) {
+                    log(`CDN error: ${cdnError.message}`, 'error');
+                }
+            }
+        });
+    </script>
+</body>
+</html> 

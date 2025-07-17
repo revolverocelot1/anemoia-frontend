@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Fixes</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #1a1a1a;
+            color: white;
+        }
+        button {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #2563eb;
+        }
+        button:disabled {
+            background: #6b7280;
+            cursor: not-allowed;
+        }
+        #log {
+            background: #000;
+            padding: 10px;
+            border-radius: 5px;
+            margin-top: 20px;
+            max-height: 400px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .error { color: #ef4444; }
+        .success { color: #10b981; }
+        .info { color: #3b82f6; }
+        .warning { color: #f59e0b; }
+    </style>
+</head>
+<body>
+    <h1>Test Fixes</h1>
+    
+    <div>
+        <h2>Test 1: Subtitle Export (position.includes fix)</h2>
+        <button id="testExport">Test Subtitle Export</button>
+    </div>
+    
+    <div>
+        <h2>Test 2: Whisper Model Loading</h2>
+        <button id="testWhisper">Test Whisper Loading</button>
+    </div>
+    
+    <div id="log"></div>
+    
+    <script type="module">
+        const log = (message, type = 'info') => {
+            const logDiv = document.getElementById('log');
+            const entry = document.createElement('div');
+            entry.className = type;
+            entry.textContent = `[${new Date().toISOString().split('T')[1].split('.')[0]}] ${message}`;
+            logDiv.appendChild(entry);
+            logDiv.scrollTop = logDiv.scrollHeight;
+            console.log(message);
+        };
+        
+        // Test 1: Subtitle Export
+        document.getElementById('testExport').addEventListener('click', async () => {
+            log('Testing subtitle export...');
+            
+            try {
+                // Import the subtitle utils
+                const module = await import('/src/lib/subtitle-utils.ts');
+                
+                // Create test segments with various positions
+                const testSegments = [
+                    {
+                        id: 'test1',
+                        text: 'Test subtitle 1',
+                        startTime: 0,
+                        endTime: 2,
+                        style: {
+                            position: 'top-left',
+                            alignment: 'left'
+                        }
+                    },
+                    {
+                        id: 'test2',
+                        text: 'Test subtitle 2',
+                        startTime: 2,
+                        endTime: 4,
+                        style: {
+                            position: 'bottom-center',
+                            alignment: 'center'
+                        }
+                    },
+                    {
+                        id: 'test3',
+                        text: 'Test subtitle 3',
+                        startTime: 4,
+                        endTime: 6,
+                        style: {
+                            position: 'middle-right',
+                            alignment: 'right'
+                        }
+                    }
+                ];
+                
+                log('Testing exportToASS function...');
+                const assOutput = module.exportToASS(testSegments, {
+                    fontSize: 24,
+                    fontColor: '#FFFFFF',
+                    position: 'bottom-center'
+                });
+                
+                if (assOutput && assOutput.includes('[Script Info]')) {
+                    log('✓ Export successful! ASS output generated', 'success');
+                    log(`Output length: ${assOutput.length} characters`, 'info');
+                    
+                    // Check if positions were handled correctly
+                    if (assOutput.includes('Alignment')) {
+                        log('✓ Position handling works correctly', 'success');
+                    }
+                } else {
+                    log('✗ Export failed', 'error');
+                }
+                
+            } catch (error) {
+                log(`✗ Export error: ${error.message}`, 'error');
+                log(`Stack: ${error.stack}`, 'error');
+            }
+        });
+        
+        // Test 2: Whisper Loading
+        document.getElementById('testWhisper').addEventListener('click', async () => {
+            log('Testing Whisper model loading...');
+            
+            try {
+                // Test if we can import transformers
+                log('Importing @huggingface/transformers...');
+                const { pipeline, env } = await import('@huggingface/transformers');
+                log('✓ Successfully imported transformers library', 'success');
+                
+                // Configure environment
+                env.allowLocalModels = false;
+                env.useBrowserCache = true;
+                env.allowRemoteModels = true;
+                
+                log('Environment configured', 'info');
+                
+                // Try to create a pipeline (but don't actually load the model)
+                log('Testing pipeline creation...');
+                
+                // Just test that the API exists
+                if (typeof pipeline === 'function') {
+                    log('✓ Pipeline function exists', 'success');
+                } else {
+                    log('✗ Pipeline function not found', 'error');
+                }
+                
+                // Test worker creation
+                log('Testing worker creation...');
+                const worker = new Worker('/src/workers/whisper.worker.ts', { type: 'module' });
+                
+                worker.addEventListener('error', (event) => {
+                    log(`Worker error: ${event.message}`, 'error');
+                });
+                
+                worker.addEventListener('message', (event) => {
+                    const { type, progress, status, error } = event.data;
+                    
+                    if (type === 'progress') {
+                        log(`Worker progress: ${progress}% - ${status}`, 'info');
+                    } else if (type === 'error') {
+                        log(`Worker error: ${error}`, 'error');
+                    }
+                });
+                
+                log('✓ Worker created successfully', 'success');
+                
+                // Don't actually load the model to save time, just test the setup
+                log('Setup test complete. To fully test model loading, use the main app.', 'warning');
+                
+            } catch (error) {
+                log(`✗ Whisper test error: ${error.message}`, 'error');
+                log(`Stack: ${error.stack}`, 'error');
+            }
+        });
+        
+        log('Test page ready. Click buttons to test fixes.', 'info');
+    </script>
+</body>
+</html> 

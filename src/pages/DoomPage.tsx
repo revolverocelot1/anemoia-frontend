@@ -8,6 +8,17 @@ const DoomPage: React.FC = () => {
   const [gameState, setGameState] = useState<'menu' | 'loading' | 'playing'>('menu');
   const [progress, setProgress] = useState(0);
   const [isIframeLoaded, setIsIframeLoaded] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    // Detect mobile device
+    const checkMobile = () => {
+      setIsMobile(/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent));
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   useEffect(() => {
     // Simulate initial loading progress
@@ -90,6 +101,11 @@ const DoomPage: React.FC = () => {
               <p className="text-lg text-gray-300 max-w-2xl mx-auto">
                 The legendary first-person shooter running in your browser via WebAssembly
               </p>
+              {isMobile && (
+                <p className="text-sm text-cyan-400 mt-2">
+                  🎮 Mobile controls available!
+                </p>
+              )}
             </motion.div>
 
             {/* Game Container */}
@@ -127,9 +143,19 @@ const DoomPage: React.FC = () => {
                         </motion.button>
                       </div>
                       
-                      <p className="text-sm text-gray-500 mt-8">
-                        Press F11 for fullscreen • Use WASD to move • Mouse to look
-                      </p>
+                      <div className="mt-8 text-sm text-gray-500">
+                        {isMobile ? (
+                          <div className="space-y-1">
+                            <p>📱 Touch controls enabled</p>
+                            <p>Use on-screen D-pad and buttons</p>
+                          </div>
+                        ) : (
+                          <div className="space-y-1">
+                            <p>🖱️ Click game to capture mouse</p>
+                            <p>Press F11 for fullscreen • Use WASD to move</p>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </motion.div>
                 )}
@@ -152,20 +178,20 @@ const DoomPage: React.FC = () => {
                   </div>
                 )}
 
-                {/* Playing State - Embedded DOOM */}
+                {/* Playing State - Enhanced DOOM */}
                 {(gameState === 'playing' || gameState === 'loading') && (
                   <iframe
-                    src="/doom/doom-game.html"  // Using webDOOM implementation
+                    src="/doom/doom-game-enhanced.html"  // Using enhanced version
                     className={`w-full h-full border-0 ${gameState === 'loading' ? 'invisible' : 'visible'}`}
                     onLoad={handleIframeLoad}
-                    allow="fullscreen; autoplay; gamepad; keyboard-lock"
+                    allow="fullscreen; autoplay; gamepad; keyboard-lock; pointer-lock"
                     title="DOOM Game"
                   />
                 )}
 
                 {/* Game Controls Overlay */}
                 <div className="absolute bottom-4 right-4 flex gap-2">
-                  {gameState === 'playing' && (
+                  {gameState === 'playing' && !isMobile && (
                     <>
                       <button
                         onClick={() => {
@@ -207,21 +233,21 @@ const DoomPage: React.FC = () => {
                 
                 <div className="bg-gray-800/50 p-6 rounded-lg backdrop-blur">
                   <div className="flex items-center gap-3 mb-3">
-                    <span className="material-symbols-outlined text-green-500">security</span>
-                    <h3 className="font-bold text-white">Self-Hosted</h3>
+                    <span className="material-symbols-outlined text-green-500">phone_android</span>
+                    <h3 className="font-bold text-white">Mobile Support</h3>
                   </div>
                   <p className="text-sm text-gray-300">
-                    Play directly on this site without external dependencies
+                    Full touch controls for mobile devices with on-screen D-pad and buttons
                   </p>
                 </div>
                 
                 <div className="bg-gray-800/50 p-6 rounded-lg backdrop-blur">
                   <div className="flex items-center gap-3 mb-3">
                     <span className="material-symbols-outlined text-blue-500">videogame_asset</span>
-                    <h3 className="font-bold text-white">Classic Experience</h3>
+                    <h3 className="font-bold text-white">Enhanced Controls</h3>
                   </div>
                   <p className="text-sm text-gray-300">
-                    The authentic DOOM experience with all original levels and gameplay
+                    Improved keyboard handling and mouse capture for better gameplay
                   </p>
                 </div>
               </motion.div>
@@ -234,25 +260,52 @@ const DoomPage: React.FC = () => {
                   transition={{ delay: 0.5 }}
                   className="mt-6 p-4 bg-gray-800/30 rounded-lg"
                 >
-                  <h3 className="font-bold text-white mb-2">Quick Controls:</h3>
+                  <h3 className="font-bold text-white mb-2">Controls:</h3>
+                  {isMobile ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm text-gray-300">
+                      <div>
+                        <strong className="text-cyan-400">Movement:</strong> On-screen D-pad
+                      </div>
+                      <div>
+                        <strong className="text-cyan-400">Look:</strong> Swipe on upper screen
+                      </div>
+                      <div>
+                        <strong className="text-cyan-400">Fire:</strong> Red button (bottom right)
+                      </div>
+                      <div>
+                        <strong className="text-cyan-400">Use/Open:</strong> USE button
+                      </div>
+                      <div>
+                        <strong className="text-cyan-400">Run:</strong> RUN button
+                      </div>
+                      <div>
+                        <strong className="text-cyan-400">Menu:</strong> ☰ button (top right)
+                      </div>
+                    </div>
+                  ) : (
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm text-gray-300">
                     <div><kbd className="px-2 py-1 bg-gray-700 rounded text-xs">W/A/S/D</kbd> Movement</div>
                     <div><kbd className="px-2 py-1 bg-gray-700 rounded text-xs">Mouse</kbd> Look/Aim</div>
-                    <div><kbd className="px-2 py-1 bg-gray-700 rounded text-xs">Click</kbd> Fire</div>
+                      <div><kbd className="px-2 py-1 bg-gray-700 rounded text-xs">Left Click</kbd> Fire</div>
                     <div><kbd className="px-2 py-1 bg-gray-700 rounded text-xs">E</kbd> Use/Open</div>
                     <div><kbd className="px-2 py-1 bg-gray-700 rounded text-xs">Shift</kbd> Run</div>
                     <div><kbd className="px-2 py-1 bg-gray-700 rounded text-xs">1-7</kbd> Weapons</div>
                     <div><kbd className="px-2 py-1 bg-gray-700 rounded text-xs">Tab</kbd> Map</div>
                     <div><kbd className="px-2 py-1 bg-gray-700 rounded text-xs">Esc</kbd> Menu</div>
                   </div>
+                  )}
                 </motion.div>
               )}
 
-              {/* WebAssembly Notice */}
+              {/* Tips */}
               <div className="mt-6 p-4 bg-yellow-900/20 border border-yellow-700/30 rounded-lg">
                 <p className="text-sm text-yellow-200">
-                  <strong>Note:</strong> This is a WebAssembly port of DOOM running entirely in your browser. 
-                  First load may take a moment while downloading game assets (~11MB).
+                  <strong>💡 Tips:</strong> 
+                  {isMobile ? (
+                    " For best experience on mobile, use landscape orientation and enable fullscreen mode."
+                  ) : (
+                    " Click on the game area to capture your mouse for better control. Press Esc to release."
+                  )}
                 </p>
               </div>
             </div>

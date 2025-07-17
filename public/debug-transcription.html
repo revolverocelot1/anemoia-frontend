@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Transcription</title>
+    <style>
+        body {
+            font-family: monospace;
+            background: #000;
+            color: #0f0;
+            padding: 20px;
+        }
+        #logs {
+            background: #111;
+            padding: 10px;
+            height: 400px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            border: 1px solid #0f0;
+        }
+        button {
+            background: #0f0;
+            color: #000;
+            border: none;
+            padding: 10px;
+            margin: 5px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <h1>Transcription Debug Console</h1>
+    
+    <button id="testWorker">Test Worker</button>
+    <button id="testTransformers">Test Transformers.js</button>
+    <button id="testOnnx">Test ONNX Runtime</button>
+    <button id="clearLogs">Clear Logs</button>
+    
+    <div id="logs"></div>
+    
+    <script type="module">
+        const logs = document.getElementById('logs');
+        
+        function log(message, type = 'info') {
+            const timestamp = new Date().toISOString().split('T')[1].split('.')[0];
+            const color = type === 'error' ? 'red' : type === 'success' ? 'lime' : '#0f0';
+            logs.innerHTML += `<span style="color: ${color}">[${timestamp}] ${message}</span>\n`;
+            logs.scrollTop = logs.scrollHeight;
+            console.log(message);
+        }
+        
+        // Test Worker
+        document.getElementById('testWorker').onclick = async () => {
+            log('Testing Web Worker...');
+            
+            try {
+                const worker = new Worker('/src/workers/whisper.worker.ts', { type: 'module' });
+                
+                worker.onmessage = (e) => {
+                    log(`Worker message: ${JSON.stringify(e.data)}`, 'success');
+                };
+                
+                worker.onerror = (e) => {
+                    log(`Worker error: ${e.message}`, 'error');
+                };
+                
+                // Test basic communication
+                worker.postMessage({ type: 'test', data: 'ping' });
+                
+                log('Worker created successfully', 'success');
+                
+                // Test model loading
+                setTimeout(() => {
+                    log('Attempting to load Whisper model...');
+                    worker.postMessage({
+                        type: 'load-model',
+                        data: { 
+                            modelName: 'whisper-tiny',
+                            quantized: true,
+                            progressCallback: true
+                        }
+                    });
+                }, 1000);
+                
+            } catch (error) {
+                log(`Failed to create worker: ${error.message}`, 'error');
+            }
+        };
+        
+        // Test Transformers.js directly
+        document.getElementById('testTransformers').onclick = async () => {
+            log('Testing Transformers.js import...');
+            
+            try {
+                const { pipeline, env } = await import('https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.0.0-alpha.8');
+                log('Transformers.js imported successfully', 'success');
+                
+                // Set environment
+                env.allowLocalModels = false;
+                env.remoteURL = 'https://huggingface.co/';
+                
+                log(`Environment: ${JSON.stringify({
+                    allowLocalModels: env.allowLocalModels,
+                    remoteURL: env.remoteURL
+                })}`);
+                
+                // Try to create a simple pipeline
+                log('Creating test pipeline...');
+                const classifier = await pipeline('sentiment-analysis');
+                log('Pipeline created successfully!', 'success');
+                
+                // Test it
+                const result = await classifier('I love transformers!');
+                log(`Test result: ${JSON.stringify(result)}`, 'success');
+                
+            } catch (error) {
+                log(`Transformers.js error: ${error.message}`, 'error');
+                log(`Stack: ${error.stack}`, 'error');
+            }
+        };
+        
+        // Test ONNX Runtime
+        document.getElementById('testOnnx').onclick = async () => {
+            log('Testing ONNX Runtime...');
+            
+            try {
+                // Test different import methods
+                log('Trying dynamic import...');
+                const ort = await import('onnxruntime-web');
+                log('ONNX imported via dynamic import', 'success');
+                
+                // Check version
+                log(`ONNX Runtime version: ${ort.env.versions?.onnxruntime || 'unknown'}`);
+                
+                // Test tensor creation
+                const tensor = new ort.Tensor('float32', new Float32Array([1, 2, 3, 4]), [2, 2]);
+                log(`Tensor created: shape=${tensor.dims}, type=${tensor.type}`, 'success');
+                
+                // Test WebAssembly SIMD
+                const simdSupported = await ort.env.wasm.simd;
+                log(`WebAssembly SIMD supported: ${simdSupported}`, simdSupported ? 'success' : 'info');
+                
+                // List available execution providers
+                log(`Available providers: ${JSON.stringify(ort.env.wasm.wasmPaths)}`);
+                
+            } catch (error) {
+                log(`ONNX Runtime error: ${error.message}`, 'error');
+                log(`Stack: ${error.stack}`, 'error');
+            }
+        };
+        
+        // Clear logs
+        document.getElementById('clearLogs').onclick = () => {
+            logs.innerHTML = '';
+        };
+        
+        // Initial log
+        log('Debug console ready. Click buttons to test components.');
+        
+        // Log browser capabilities
+        log(`Browser: ${navigator.userAgent}`);
+        log(`WebAssembly: ${typeof WebAssembly !== 'undefined' ? 'Supported' : 'Not supported'}`);
+        log(`Workers: ${typeof Worker !== 'undefined' ? 'Supported' : 'Not supported'}`);
+        
+        // Check for WebAssembly SIMD
+        (async () => {
+            try {
+                const simdTest = await WebAssembly.validate(new Uint8Array([0, 97, 115, 109, 1, 0, 0, 0, 1, 5, 1, 96, 0, 1, 123, 3, 2, 1, 0, 10, 10, 1, 8, 0, 65, 0, 253, 15, 253, 98, 11]));
+                log(`WebAssembly SIMD: ${simdTest ? 'Supported' : 'Not supported'}`);
+            } catch {
+                log('WebAssembly SIMD: Not supported');
+            }
+        })();
+    </script>
+</body>
+</html> 

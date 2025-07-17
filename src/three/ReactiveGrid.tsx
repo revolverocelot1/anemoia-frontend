@@ -36,13 +36,7 @@ const GridMaterial = shaderMaterial(
 
 extend({ GridMaterial });
 
-declare global {
-  namespace JSX {
-    interface IntrinsicElements {
-      gridMaterial: any;
-    }
-  }
-}
+// GridMaterial is already declared by @react-three/drei
 
 const ReactiveGrid = () => {
   const mesh = useRef<THREE.Mesh>(null!);

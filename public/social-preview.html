@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Anemoia Social Preview</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            width: 1200px;
+            height: 630px;
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 50%, #0f3460 100%);
+            color: white;
+            font-family: 'Space Grotesk', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            position: relative;
+        }
+        
+        .container {
+            text-align: center;
+            z-index: 10;
+            padding: 60px;
+        }
+        
+        .logo {
+            width: 180px;
+            height: 180px;
+            margin-bottom: 40px;
+            filter: drop-shadow(0 0 30px rgba(12, 127, 242, 0.8));
+        }
+        
+        h1 {
+            font-size: 72px;
+            margin: 0 0 20px 0;
+            font-weight: 700;
+            background: linear-gradient(135deg, #0c7ff2 0%, #00ff88 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .tagline {
+            font-size: 28px;
+            color: #a0a0a0;
+            margin-bottom: 40px;
+            font-weight: 400;
+        }
+        
+        .features {
+            display: flex;
+            gap: 30px;
+            justify-content: center;
+            flex-wrap: wrap;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        
+        .feature {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 15px 25px;
+            font-size: 18px;
+            backdrop-filter: blur(10px);
+        }
+        
+        .background-effects {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            opacity: 0.3;
+            pointer-events: none;
+        }
+        
+        .grid {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background-image: 
+                linear-gradient(rgba(12, 127, 242, 0.1) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(12, 127, 242, 0.1) 1px, transparent 1px);
+            background-size: 50px 50px;
+        }
+        
+        .glow {
+            position: absolute;
+            width: 600px;
+            height: 600px;
+            background: radial-gradient(circle, rgba(12, 127, 242, 0.3) 0%, transparent 70%);
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+        
+        .webgl-badge {
+            position: absolute;
+            top: 40px;
+            right: 40px;
+            background: rgba(0, 255, 136, 0.2);
+            border: 2px solid #00ff88;
+            padding: 10px 20px;
+            border-radius: 30px;
+            font-weight: 600;
+            font-size: 16px;
+            color: #00ff88;
+        }
+    </style>
+</head>
+<body>
+    <div class="background-effects">
+        <div class="grid"></div>
+        <div class="glow"></div>
+    </div>
+    
+    <div class="webgl-badge">GPU ACCELERATED</div>
+    
+    <div class="container">
+        <img src="/A_logo.png" alt="Anemoia Logo" class="logo">
+        <h1>Anemoia</h1>
+        <p class="tagline">Advanced WebGL Tools for Everyone</p>
+        <div class="features">
+            <div class="feature">🔄 Image Compare</div>
+            <div class="feature">🎯 Depth Mapping</div>
+            <div class="feature">🏃 Pose Detection</div>
+            <div class="feature">🔍 AI Upscaling</div>
+            <div class="feature">🌐 3D Viewer</div>
+        </div>
+    </div>
+</body>
+</html> 

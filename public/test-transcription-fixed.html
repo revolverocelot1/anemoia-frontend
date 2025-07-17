@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Transcription - Fixed</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #1a1a1a;
+            color: #fff;
+        }
+        .container {
+            background: #2a2a2a;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        button {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #2563eb;
+        }
+        button:disabled {
+            background: #666;
+            cursor: not-allowed;
+        }
+        #status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            background: #333;
+        }
+        #results {
+            background: #1a1a1a;
+            padding: 15px;
+            border-radius: 5px;
+            white-space: pre-wrap;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .progress {
+            background: #333;
+            height: 20px;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        .progress-bar {
+            background: #3b82f6;
+            height: 100%;
+            width: 0%;
+            transition: width 0.3s;
+        }
+        video {
+            width: 100%;
+            max-width: 600px;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>Transcription Test - Fixed Version</h1>
+    
+    <div class="container">
+        <h2>1. Select Video File</h2>
+        <input type="file" id="fileInput" accept="video/*">
+        <div id="videoContainer"></div>
+    </div>
+
+    <div class="container">
+        <h2>2. Model Selection</h2>
+        <select id="modelSelect">
+            <option value="whisper-tiny">Whisper Tiny (39MB - Fastest)</option>
+            <option value="whisper-base" selected>Whisper Base (74MB - Recommended)</option>
+            <option value="whisper-small">Whisper Small (242MB - Better accuracy)</option>
+            <option value="whisper-tiny-en">Whisper Tiny English (39MB)</option>
+            <option value="whisper-base-en">Whisper Base English (74MB)</option>
+        </select>
+        <button id="loadModelBtn">Load Model</button>
+    </div>
+
+    <div class="container">
+        <h2>3. Transcription Controls</h2>
+        <button id="transcribeBtn" disabled>Start Transcription</button>
+        <button id="stopBtn" disabled>Stop</button>
+        
+        <div id="status">Ready</div>
+        <div class="progress">
+            <div class="progress-bar" id="progressBar"></div>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>Results</h2>
+        <div id="results">No results yet...</div>
+    </div>
+
+    <script type="module">
+        // Initialize elements
+        const fileInput = document.getElementById('fileInput');
+        const videoContainer = document.getElementById('videoContainer');
+        const modelSelect = document.getElementById('modelSelect');
+        const loadModelBtn = document.getElementById('loadModelBtn');
+        const transcribeBtn = document.getElementById('transcribeBtn');
+        const stopBtn = document.getElementById('stopBtn');
+        const status = document.getElementById('status');
+        const progressBar = document.getElementById('progressBar');
+        const results = document.getElementById('results');
+        
+        let whisperWorker = null;
+        let audioBuffer = null;
+        let isModelLoaded = false;
+        
+        // Update status
+        function updateStatus(message, type = 'info') {
+            status.textContent = message;
+            status.style.background = type === 'error' ? '#f44336' : 
+                                     type === 'success' ? '#4caf50' : '#333';
+            console.log(`[${type}] ${message}`);
+        }
+        
+        // Update progress
+        function updateProgress(percent) {
+            progressBar.style.width = percent + '%';
+        }
+        
+        // Initialize worker
+        function initializeWorker() {
+            if (whisperWorker) {
+                whisperWorker.terminate();
+            }
+            
+            whisperWorker = new Worker('/src/workers/whisper.worker.ts', { type: 'module' });
+            
+            whisperWorker.onmessage = (event) => {
+                const { type, data } = event.data;
+                console.log('Worker message:', type, data);
+                
+                switch (type) {
+                    case 'progress':
+                        updateStatus(data.status || 'Processing...', 'info');
+                        if (data.progress !== undefined) {
+                            updateProgress(data.progress);
+                        }
+                        break;
+                        
+                    case 'result':
+                        updateStatus('Transcription complete!', 'success');
+                        updateProgress(100);
+                        displayResults(data.segments);
+                        transcribeBtn.disabled = false;
+                        stopBtn.disabled = true;
+                        break;
+                        
+                    case 'error':
+                        updateStatus(`Error: ${data.error}`, 'error');
+                        updateProgress(0);
+                        transcribeBtn.disabled = !isModelLoaded;
+                        stopBtn.disabled = true;
+                        break;
+                        
+                    case 'model-loaded':
+                        updateStatus('Model loaded successfully!', 'success');
+                        isModelLoaded = true;
+                        loadModelBtn.textContent = 'Model Loaded';
+                        loadModelBtn.disabled = true;
+                        if (audioBuffer) {
+                            transcribeBtn.disabled = false;
+                        }
+                        break;
+                }
+            };
+            
+            whisperWorker.onerror = (error) => {
+                console.error('Worker error:', error);
+                updateStatus(`Worker error: ${error.message}`, 'error');
+            };
+        }
+        
+        // Handle file selection
+        fileInput.addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            updateStatus('Loading video...', 'info');
+            
+            // Create video element
+            const video = document.createElement('video');
+            video.controls = true;
+            video.src = URL.createObjectURL(file);
+            videoContainer.innerHTML = '';
+            videoContainer.appendChild(video);
+            
+            // Extract audio
+            try {
+                const audioContext = new AudioContext({ sampleRate: 16000 });
+                const response = await fetch(video.src);
+                const arrayBuffer = await response.arrayBuffer();
+                
+                audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+                updateStatus('Audio extracted successfully', 'success');
+                
+                if (isModelLoaded) {
+                    transcribeBtn.disabled = false;
+                }
+            } catch (error) {
+                updateStatus(`Error extracting audio: ${error.message}`, 'error');
+                console.error('Audio extraction error:', error);
+            }
+        });
+        
+        // Load model
+        loadModelBtn.addEventListener('click', () => {
+            if (!whisperWorker) {
+                initializeWorker();
+            }
+            
+            updateStatus('Loading model...', 'info');
+            loadModelBtn.disabled = true;
+            
+            whisperWorker.postMessage({
+                type: 'load-model',
+                data: { 
+                    modelName: modelSelect.value,
+                    quantized: true,
+                    progressCallback: true
+                }
+            });
+        });
+        
+        // Start transcription
+        transcribeBtn.addEventListener('click', () => {
+            if (!audioBuffer || !isModelLoaded) return;
+            
+            updateStatus('Starting transcription...', 'info');
+            transcribeBtn.disabled = true;
+            stopBtn.disabled = false;
+            updateProgress(0);
+            
+            // Convert audio buffer to Float32Array
+            const audioData = audioBuffer.getChannelData(0);
+            
+            whisperWorker.postMessage({
+                type: 'transcribe',
+                audio: audioData,
+                options: {
+                    language: 'auto',
+                    task: 'transcribe',
+                    chunk_length_s: 30,
+                    stride_length_s: 5
+                }
+            });
+        });
+        
+        // Stop transcription
+        stopBtn.addEventListener('click', () => {
+            if (whisperWorker) {
+                whisperWorker.terminate();
+                initializeWorker();
+            }
+            updateStatus('Transcription stopped', 'info');
+            transcribeBtn.disabled = !isModelLoaded;
+            stopBtn.disabled = true;
+            updateProgress(0);
+        });
+        
+        // Display results
+        function displayResults(segments) {
+            if (!segments || segments.length === 0) {
+                results.textContent = 'No transcription results';
+                return;
+            }
+            
+            let output = `Found ${segments.length} segments:\n\n`;
+            
+            segments.forEach((segment, index) => {
+                const start = formatTime(segment.startTime);
+                const end = formatTime(segment.endTime);
+                output += `[${start} -> ${end}]\n${segment.text}\n\n`;
+            });
+            
+            results.textContent = output;
+        }
+        
+        // Format time
+        function formatTime(seconds) {
+            const mins = Math.floor(seconds / 60);
+            const secs = (seconds % 60).toFixed(1);
+            return `${mins}:${secs.padStart(4, '0')}`;
+        }
+        
+        // Initialize
+        initializeWorker();
+        updateStatus('Ready - Please select a video file', 'info');
+    </script>
+</body>
+</html> 

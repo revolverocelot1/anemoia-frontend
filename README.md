@@ -44,7 +44,7 @@
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/anemoia-webgl-studio.git
+git clone <repository-url>
 cd anemoia-webgl-studio
 
 # Install dependencies
@@ -198,8 +198,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 📞 Support
 
-- **Issues**: [GitHub Issues](https://github.com/yourusername/anemoia-webgl-studio/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/yourusername/anemoia-webgl-studio/discussions)
+- **Website**: [anemoias.me](https://anemoias.me)
 - **Email**: support@anemoia.dev
 
 ---
