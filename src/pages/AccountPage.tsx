@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { useAuth } from '../context/AuthContext';
+import { useSupabaseAuth } from '../context/SupabaseAuthContext';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import AnimatedPage from '../components/AnimatedPage';
@@ -8,7 +8,7 @@ import { useNavigate } from 'react-router-dom';
 
 export default function AccountPage() {
   const navigate = useNavigate();
-  const { isAuthenticated, user, logout, isLoading: authLoading } = useAuth();
+  const { isAuthenticated, user, signOut, isLoading: authLoading } = useSupabaseAuth();
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -86,7 +86,7 @@ export default function AccountPage() {
               >
                 <div className="w-24 h-24 rounded-full bg-gradient-to-r from-cyan-500 to-blue-500 p-1">
                   <div className="w-full h-full rounded-full bg-gray-900 flex items-center justify-center text-3xl font-bold">
-                    {user.name?.charAt(0).toUpperCase() || 'U'}
+                    {user.user_metadata?.name?.charAt(0).toUpperCase() || user.user_metadata?.full_name?.charAt(0).toUpperCase() || user.email?.charAt(0).toUpperCase() || 'U'}
                   </div>
                 </div>
                 <div className="absolute -bottom-2 -right-2 w-8 h-8 bg-green-500 rounded-full border-4 border-gray-900 flex items-center justify-center">
@@ -97,15 +97,15 @@ export default function AccountPage() {
               </motion.div>
               
               <div className="flex-1 text-center md:text-left">
-                <h2 className="text-2xl font-bold text-white mb-2">{user.name}</h2>
-                <p className="text-gray-400 mb-4">{user.email}</p>
+                <h2 className="text-2xl font-bold text-white mb-2">{user.user_metadata?.name || user.user_metadata?.full_name || user.email?.split('@')[0] || 'User'}</h2>
+                <p className="text-gray-400 mb-4">{user.email || 'No email'}</p>
                 
                 <div className="flex flex-col sm:flex-row items-center space-y-2 sm:space-y-0 sm:space-x-6">
                   <div className="flex items-center space-x-2 text-cyan-400">
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
                     </svg>
-                    <span className="font-mono font-semibold">ANEMO-{user.email.slice(0, 4).toUpperCase()}</span>
+                    <span className="font-mono font-semibold">ANEMO-{user.email?.slice(0, 4).toUpperCase() || 'USER'}</span>
                   </div>
 
                   <div className="flex items-center space-x-2 text-green-400">
@@ -197,7 +197,7 @@ export default function AccountPage() {
           {/* Account Actions */}
           <motion.div variants={itemVariants} className="flex flex-col md:flex-row gap-4">
             <motion.button
-              onClick={logout}
+              onClick={signOut}
               className="flex-1 flex items-center justify-center space-x-3 px-6 py-3 bg-red-600/20 text-red-400 border border-red-600/30 rounded-xl font-semibold hover:bg-red-600/30 transition-colors duration-300"
               whileHover={{ scale: 1.02, y: -2 }}
               whileTap={{ scale: 0.98 }}

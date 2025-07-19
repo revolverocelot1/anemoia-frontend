@@ -26,12 +26,13 @@ import SplatViewerPage from './pages/SplatViewerPage';
 import TestPage from './pages/TestPage';
 import CoffeeDonation from './components/CoffeeDonation';
 // import FileUploadFix from './components/FileUploadFix';
-import { AuthProvider } from './context/AuthContext';
-import LoginPage from './pages/LoginPage';
+import { SupabaseAuthProvider } from './context/SupabaseAuthContext';
+import SupabaseLoginPage from './pages/SupabaseLoginPage';
 import { detectGPU, logDeploymentInfo } from './utils/gpuUtils';
 import FaceSwapPage from './pages/FaceSwapPage';
 import SubtitlePage from './pages/SubtitlePage';
 import { AnimatePresence } from 'framer-motion';
+import ASCIIVideoConverter from './pages/ASCIIVideoConverter'
 
 // Landing Pages
 import ImageComparisonLanding from './pages/landing/ImageComparisonLanding';
@@ -226,7 +227,7 @@ function App() {
       {/* Temporarily disabled FileUploadFix to test video editor */}
       {/* <FileUploadFix /> */}
       <div style={{ position: 'relative', zIndex: 10 }}>
-        <AuthProvider>
+        <SupabaseAuthProvider>
           <Routes>
             <Route
               path="/"
@@ -292,7 +293,7 @@ function App() {
               path="/login"
               element={
                 <AnimatedPage>
-                  <LoginPage />
+                  <SupabaseLoginPage />
                 </AnimatedPage>
               }
             />
@@ -433,11 +434,12 @@ function App() {
                 </AnimatedPage>
               }
             />
+            <Route path="/ascii-video-converter" element={<ASCIIVideoConverter />} />
             <Route path="/misc" element={<Navigate to="/" />} />
             {/* Catch-all route for non-existent pages */}
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
-        </AuthProvider>
+        </SupabaseAuthProvider>
         <CoffeeDonation />
       </div>
     </ErrorBoundary>

@@ -207,6 +207,15 @@ const HomePage = () => {
                   path="/compare"
                 />
                 
+                <ToolCard
+                  variants={itemVariants}
+                  title="ASCII Video Art"
+                  description="Transform videos into animated ASCII art with parallel WebWorker processing. Real-time conversion with multiple retro color themes."
+                  icon="text_fields"
+                  accent="8"
+                  path="/ascii-video-converter"
+                />
+                
                 {/* Miscellaneous Tools Card - Enhanced with Star Wars styling */}
                 <motion.div
                   variants={itemVariants}

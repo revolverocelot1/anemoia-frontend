@@ -18,8 +18,8 @@
   "dependencies": {
     "@emotion/react": "^11.13.5",
     "@emotion/styled": "^11.13.5",
-    "@ffmpeg/ffmpeg": "0.12.10",
-    "@ffmpeg/util": "0.12.1",
+    "@ffmpeg/ffmpeg": "0.12.15",
+    "@ffmpeg/util": "0.12.2",
     "@huggingface/transformers": "3.6.2",
     "@mediapipe/pose": "0.5.1675469404",
     "@mediapipe/tasks-vision": "0.10.22-rc.20250304",
@@ -47,6 +47,7 @@
     "date-fns": "^4.1.0",
     "fflate": "0.8.2",
     "framer-motion": "12.23.3",
+    "gif.js": "0.2.0",
     "gsplat": "^1.2.4",
     "idb": "^8.0.3",
     "immer": "^10.1.1",

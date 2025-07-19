@@ -1,15 +1,15 @@
 import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { useSupabaseAuth } from '../context/SupabaseAuthContext';
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const Header = () => {
-  const { user, logout, isAuthenticated } = useAuth();
+  const { user, signOut, isAuthenticated } = useSupabaseAuth();
   const navigate = useNavigate();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
-  const handleSignOut = () => {
-    logout();
+  const handleSignOut = async () => {
+    await signOut();
     navigate('/');
   };
 
@@ -45,7 +45,7 @@ const Header = () => {
               to="/account"
               className="text-sm font-medium text-gray-300 hover:text-white transition-colors"
             >
-              {user.name || user.email?.split('@')[0]}
+              {user.user_metadata?.name || user.user_metadata?.full_name || user.email?.split('@')[0]}
             </Link>
             <button
               onClick={handleSignOut}

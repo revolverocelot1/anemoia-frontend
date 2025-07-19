@@ -1,9 +1,9 @@
-import { useAuth } from '../context/AuthContext';
+import { useSupabaseAuth } from '../context/SupabaseAuthContext';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 
 const SettingsPage = () => {
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated, user } = useSupabaseAuth();
   const navigate = useNavigate();
 
   if (!isAuthenticated) {
@@ -43,14 +43,14 @@ const SettingsPage = () => {
           <div className="space-y-2">
             <p className="text-sm text-gray-400">Display Name:</p>
             <p className="text-lg font-mono text-cyan-400 break-all bg-gray-900/50 rounded px-3 py-2 border border-gray-700">
-              {user?.name || 'N/A'}
+              {user?.user_metadata?.name || user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'N/A'}
             </p>
           </div>
           
           <div className="space-y-2">
             <p className="text-sm text-gray-400">ANEMO User ID:</p>
             <p className="text-lg font-mono text-cyan-400 break-all bg-gray-900/50 rounded px-3 py-2 border border-gray-700">
-              ANEMO-{user?.email.slice(0, 4).toUpperCase() || 'N/A'}
+              ANEMO-{user?.email?.slice(0, 4).toUpperCase() || 'N/A'}
             </p>
           </div>
         </div>

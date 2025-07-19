@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ASCII Video Art - Transform Videos into Terminal Art | Anemoia Studio</title>
+    <meta name="description" content="Convert videos to animated ASCII art with real-time processing, multiple presets, and stunning visual themes. Transform your videos into mesmerizing terminal art.">
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap');
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        :root {
+            --primary: #00ff41;
+            --secondary: #00ffff;
+            --accent: #ff00ff;
+            --bg-dark: #0a0014;
+            --bg-darker: #050008;
+        }
+        
+        body {
+            background: var(--bg-darker);
+            color: #ffffff;
+            font-family: 'Space Mono', monospace;
+            overflow-x: hidden;
+            position: relative;
+            min-height: 100vh;
+        }
+        
+        /* Animated gradient background */
+        .bg-gradient {
+            position: fixed;
+            inset: 0;
+            background: 
+                radial-gradient(circle at 20% 50%, rgba(0, 255, 65, 0.15) 0%, transparent 50%),
+                radial-gradient(circle at 80% 80%, rgba(0, 255, 255, 0.15) 0%, transparent 50%),
+                radial-gradient(circle at 40% 20%, rgba(255, 0, 255, 0.1) 0%, transparent 50%);
+            animation: gradientShift 20s ease-in-out infinite;
+        }
+        
+        @keyframes gradientShift {
+            0%, 100% { transform: rotate(0deg) scale(1); }
+            50% { transform: rotate(180deg) scale(1.2); }
+        }
+        
+        /* Floating particles */
+        .particle {
+            position: fixed;
+            width: 2px;
+            height: 2px;
+            background: var(--primary);
+            border-radius: 50%;
+            pointer-events: none;
+            opacity: 0;
+            animation: float 10s infinite;
+        }
+        
+        @keyframes float {
+            0% {
+                transform: translateY(100vh) translateX(0);
+                opacity: 0;
+            }
+            10% {
+                opacity: 1;
+            }
+            90% {
+                opacity: 1;
+            }
+            100% {
+                transform: translateY(-100vh) translateX(100px);
+                opacity: 0;
+            }
+        }
+        
+        .container {
+            position: relative;
+            z-index: 10;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+        
+        /* Hero Section */
+        .hero {
+            text-align: center;
+            padding: 4rem 0;
+            position: relative;
+        }
+        
+        .hero h1 {
+            font-size: clamp(3rem, 8vw, 6rem);
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 50%, var(--accent) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            filter: drop-shadow(0 0 30px rgba(0, 255, 65, 0.5));
+            margin-bottom: 1rem;
+            animation: glow 3s ease-in-out infinite alternate;
+        }
+        
+        @keyframes glow {
+            from { filter: drop-shadow(0 0 30px rgba(0, 255, 65, 0.5)); }
+            to { filter: drop-shadow(0 0 50px rgba(0, 255, 65, 0.8)); }
+        }
+        
+        .hero p {
+            font-size: 1.25rem;
+            color: rgba(255, 255, 255, 0.7);
+            margin-bottom: 3rem;
+        }
+        
+        /* ASCII Demo */
+        .ascii-demo {
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(0, 255, 65, 0.3);
+            border-radius: 20px;
+            padding: 3rem;
+            margin: 3rem 0;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .ascii-demo::before {
+            content: '';
+            position: absolute;
+            inset: -2px;
+            background: linear-gradient(45deg, var(--primary), var(--secondary), var(--accent));
+            border-radius: 20px;
+            opacity: 0.5;
+            z-index: -1;
+            filter: blur(10px);
+            animation: borderRotate 4s linear infinite;
+        }
+        
+        @keyframes borderRotate {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .ascii-frames {
+            position: relative;
+            height: 400px;
+            font-family: monospace;
+            font-size: 0.7rem;
+            line-height: 1;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .ascii-frame {
+            position: absolute;
+            white-space: pre;
+            opacity: 0;
+            animation: frameSlide 9s infinite;
+        }
+        
+        .ascii-frame:nth-child(1) { animation-delay: 0s; color: var(--primary); }
+        .ascii-frame:nth-child(2) { animation-delay: 3s; color: var(--secondary); }
+        .ascii-frame:nth-child(3) { animation-delay: 6s; color: var(--accent); }
+        
+        @keyframes frameSlide {
+            0% { opacity: 0; transform: translateY(20px); }
+            10%, 23% { opacity: 1; transform: translateY(0); }
+            33% { opacity: 0; transform: translateY(-20px); }
+            100% { opacity: 0; }
+        }
+        
+        /* Features Grid */
+        .features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 2rem;
+            margin: 4rem 0;
+        }
+        
+        .feature-card {
+            background: rgba(255, 255, 255, 0.02);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            padding: 2rem;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+        
+        .feature-card:hover {
+            transform: translateY(-5px);
+            border-color: var(--primary);
+            background: rgba(0, 255, 65, 0.05);
+            box-shadow: 0 10px 40px rgba(0, 255, 65, 0.2);
+        }
+        
+        .feature-icon {
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+        }
+        
+        .feature-card h3 {
+            font-size: 1.25rem;
+            margin-bottom: 0.5rem;
+            color: var(--primary);
+        }
+        
+        .feature-card p {
+            color: rgba(255, 255, 255, 0.7);
+            line-height: 1.6;
+        }
+        
+        /* Presets Showcase */
+        .presets-showcase {
+            background: rgba(0, 0, 0, 0.4);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 3rem;
+            margin: 4rem 0;
+        }
+        
+        .preset-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-top: 2rem;
+        }
+        
+        .preset-item {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 1.5rem;
+            text-align: center;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        
+        .preset-item:hover {
+            background: rgba(0, 255, 65, 0.1);
+            border-color: var(--primary);
+            transform: scale(1.05);
+        }
+        
+        .preset-chars {
+            font-family: monospace;
+            font-size: 1.5rem;
+            color: var(--primary);
+            margin-bottom: 0.5rem;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        
+        /* CTA Section */
+        .cta-section {
+            text-align: center;
+            padding: 4rem 0;
+        }
+        
+        .cta-button {
+            display: inline-flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 1.25rem 3rem;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            color: var(--bg-darker);
+            font-weight: 700;
+            font-size: 1.125rem;
+            border-radius: 50px;
+            text-decoration: none;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .cta-button::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(135deg, var(--secondary), var(--accent));
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        
+        .cta-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 40px rgba(0, 255, 65, 0.4);
+        }
+        
+        .cta-button:hover::before {
+            opacity: 1;
+        }
+        
+        .cta-button span {
+            position: relative;
+            z-index: 1;
+        }
+        
+        /* Responsive */
+        @media (max-width: 768px) {
+            .hero h1 { font-size: 3rem; }
+            .features { grid-template-columns: 1fr; }
+            .ascii-frames { font-size: 0.5rem; height: 300px; }
+            .container { padding: 1rem; }
+        }
+    </style>
+</head>
+<body>
+    <div class="bg-gradient"></div>
+    
+    <!-- Floating particles -->
+    <script>
+        for (let i = 0; i < 50; i++) {
+            const particle = document.createElement('div');
+            particle.className = 'particle';
+            particle.style.left = Math.random() * 100 + '%';
+            particle.style.animationDelay = Math.random() * 10 + 's';
+            particle.style.animationDuration = (10 + Math.random() * 10) + 's';
+            document.body.appendChild(particle);
+        }
+    </script>
+    
+    <div class="container">
+        <!-- Hero Section -->
+        <div class="hero">
+            <h1>ASCII Video Art</h1>
+            <p>Transform your videos into mesmerizing terminal art with real-time processing</p>
+        </div>
+        
+        <!-- ASCII Demo -->
+        <div class="ascii-demo">
+            <div class="ascii-frames">
+                <pre class="ascii-frame">
+     ██████╗ ███████╗ ██████╗██╗██╗
+    ██╔══██╗██╔════╝██╔════╝██║██║
+    ███████║███████╗██║     ██║██║
+    ██╔══██║╚════██║██║     ██║██║
+    ██║  ██║███████║╚██████╗██║██║
+    ╚═╝  ╚═╝╚══════╝ ╚═════╝╚═╝╚═╝
+    
+         ░▒▓█▓▒░░▒▓█▓▒░
+      ░▒▓████████████▓▒░
+    ░▒▓██████████████▓▒░
+    ▒▓████▓▒░░░░▒▓████▓▒
+    ▓████▒░      ░▒████▓
+    ████░          ░████
+    ▓███▒░        ░▒███▓
+    ▒▓████▓▒░░░▒▓████▓▒
+    ░▒▓██████████████▓▒░
+      ░▒▓████████████▓▒░
+         ░▒▓█▓▒░░▒▓█▓▒░
+                </pre>
+                <pre class="ascii-frame">
+    @@@@@@@@@@@@@@@@@@@@@@@
+    @@@@@@@@@@@@@@@@@@@@@@@
+    @@@@@   @@@@@    @@@@@@
+    @@@@  @@  @@@  @   @@@@
+    @@@  @@@  @@@  @@   @@@
+    @@@       @@@  @@@  @@@
+    @@@  @@@  @@@  @@@  @@@
+    @@@  @@@  @@@  @@@  @@@
+    @@@@    @@@@@       @@@
+    @@@@@@@@@@@@@@@@@@@@@@@
+    
+    .  *  .  *  .  *  .  *
+    *  .  *  .  *  .  *  .
+    .  *  .  *  .  *  .  *
+                </pre>
+                <pre class="ascii-frame">
+    :::::::::::::::::::::::
+    :::·∙•●●●●●●●●●•∙·:::
+    ::·∙•●●●●●●●●●●●•∙·::
+    :·∙•●●●●●●●●●●●●●•∙·:
+    ·∙•●●●●●●●●●●●●●●●•∙·
+    ∙•●●●●●●●●●●●●●●●●●•∙
+    •●●●●●●●●●●●●●●●●●●●•
+    ∙•●●●●●●●●●●●●●●●●●•∙
+    ·∙•●●●●●●●●●●●●●●●•∙·
+    :·∙•●●●●●●●●●●●●●•∙·:
+    ::·∙•●●●●●●●●●●●•∙·::
+    :::·∙•●●●●●●●●●•∙·:::
+    :::::::::::::::::::::::
+                </pre>
+            </div>
+        </div>
+        
+        <!-- Features -->
+        <div class="features">
+            <div class="feature-card">
+                <div class="feature-icon">✨</div>
+                <h3>8 ASCII Presets</h3>
+                <p>Choose from classic, minimal, blocks, detailed, matrix, binary, dots, or create your own custom character set.</p>
+            </div>
+            
+            <div class="feature-card">
+                <div class="feature-icon">🎨</div>
+                <h3>6 Color Themes</h3>
+                <p>Matrix green, Cyberpunk pink, Retro amber, Neon blue, Vaporwave, or classic Monochrome.</p>
+            </div>
+            
+            <div class="feature-card">
+                <div class="feature-icon">⚡</div>
+                <h3>Real-Time Processing</h3>
+                <p>WebWorker-based parallel processing for smooth, responsive video conversion.</p>
+            </div>
+            
+            <div class="feature-card">
+                <div class="feature-icon">🎬</div>
+                <h3>Live Preview</h3>
+                <p>See your ASCII art come to life with real-time playback and frame-by-frame control.</p>
+            </div>
+            
+            <div class="feature-card">
+                <div class="feature-icon">🎯</div>
+                <h3>Quality Control</h3>
+                <p>Adjust brightness, contrast, frame rate, and quality settings for perfect results.</p>
+            </div>
+            
+            <div class="feature-card">
+                <div class="feature-icon">💾</div>
+                <h3>Easy Export</h3>
+                <p>Download your ASCII animation as a text file to share or use in your projects.</p>
+            </div>
+        </div>
+        
+        <!-- Presets Showcase -->
+        <div class="presets-showcase">
+            <h2 style="font-size: 2.5rem; text-align: center; margin-bottom: 1rem; background: linear-gradient(135deg, var(--primary), var(--secondary)); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
+                ASCII Character Presets
+            </h2>
+            <p style="text-align: center; color: rgba(255, 255, 255, 0.7); margin-bottom: 2rem;">
+                Choose the perfect character set for your artistic vision
+            </p>
+            
+            <div class="preset-grid">
+                <div class="preset-item">
+                    <div class="preset-chars"> .:-=+*#%@</div>
+                    <div>Classic</div>
+                </div>
+                <div class="preset-item">
+                    <div class="preset-chars"> .oO@</div>
+                    <div>Minimal</div>
+                </div>
+                <div class="preset-item">
+                    <div class="preset-chars"> ░▒▓█</div>
+                    <div>Blocks</div>
+                </div>
+                <div class="preset-item">
+                    <div class="preset-chars"> .\'^",:;Il!i></div>
+                    <div>Detailed</div>
+                </div>
+                <div class="preset-item">
+                    <div class="preset-chars"> .:-=+*#%@ﾊﾐﾋ</div>
+                    <div>Matrix</div>
+                </div>
+                <div class="preset-item">
+                    <div class="preset-chars"> 01</div>
+                    <div>Binary</div>
+                </div>
+                <div class="preset-item">
+                    <div class="preset-chars"> ·∙•●</div>
+                    <div>Dots</div>
+                </div>
+                <div class="preset-item">
+                    <div class="preset-chars">?</div>
+                    <div>Custom</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- CTA -->
+        <div class="cta-section">
+            <a href="/ascii-video-converter" class="cta-button">
+                <span>Start Creating ASCII Art</span>
+                <span>→</span>
+            </a>
+            <p style="margin-top: 1rem; color: rgba(255, 255, 255, 0.5);">
+                No installation required • Works in your browser • Free to use
+            </p>
+        </div>
+    </div>
+</body>
+</html> 
