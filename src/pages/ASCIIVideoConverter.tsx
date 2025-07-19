@@ -185,7 +185,7 @@ const ASCIIVideoConverter: React.FC = () => {
       if (e.data.type === 'frameProcessed') {
         const asciiFrame = e.data.data.ascii;
         const colors = e.data.data.colors;
-        const { width: asciiWidth, height: asciiHeight } = e.data.data;
+        const { width: asciiWidth, height: asciiHeight, processingTime } = e.data.data;
         
         // Create colored ASCII if needed
         let finalFrame = asciiFrame;
@@ -201,8 +201,17 @@ const ASCIIVideoConverter: React.FC = () => {
           processedFrames: prev.processedFrames + 1,
           progress: ((prev.processedFrames + 1) / prev.totalFrames) * 100
         }));
+        
+        // Debug logging for parallel processing
+        console.log(`Frame processed in ${processingTime ? (performance.now() - processingTime).toFixed(2) : 'N/A'}ms`);
+      } else if (e.data.type === 'error') {
+        console.error('Worker error:', e.data.data.error);
+        // Continue processing other frames
       }
     };
+
+    // Test worker communication
+    console.log('ASCII Processor Worker initialized');
 
     return () => {
       workerRef.current?.terminate();
@@ -210,9 +219,78 @@ const ASCIIVideoConverter: React.FC = () => {
   }, [config.outputMode]);
 
   const createColoredAscii = (ascii: string, colors: Uint8ClampedArray) => {
-    // This would be rendered in a canvas or HTML with color spans
-    // For now, returning plain ASCII
-    return ascii;
+    if (config.outputMode !== 'colored' || !colors) {
+      return ascii;
+    }
+    
+    // Create colored ASCII with HTML spans
+    const lines = ascii.split('\n');
+    const colorIndex = 0;
+    
+    return lines.map(line => {
+      let coloredLine = '';
+      for (let i = 0; i < line.length; i++) {
+        const char = line[i];
+        const colorIdx = (colorIndex + i) * 3;
+        if (colorIdx < colors.length - 2) {
+          const r = colors[colorIdx];
+          const g = colors[colorIdx + 1];
+          const b = colors[colorIdx + 2];
+          
+          // Apply color theme transformation
+          let finalColor = `rgb(${r}, ${g}, ${b})`;
+          if (config.colorMode !== 'mono') {
+            // Apply theme-specific color transformations
+            switch (config.colorMode) {
+              case 'matrix':
+                finalColor = `rgb(0, ${Math.floor(r * 0.8 + g * 0.2)}, ${Math.floor(b * 0.3)}`;
+                break;
+              case 'cyberpunk':
+                if (b > r && b > g) {
+                  finalColor = '#00ffff';
+                } else if (r > b) {
+                  finalColor = '#ff00ff';
+                } else {
+                  finalColor = '#ff88ff';
+                }
+                break;
+              case 'retro':
+                if (r > g && r > b) {
+                  finalColor = '#ff6b1a';
+                } else if (g > b) {
+                  finalColor = '#ffd700';
+                } else {
+                  finalColor = '#ffaa66';
+                }
+                break;
+              case 'neon':
+                if (b > r && b > g) {
+                  finalColor = '#00fff0';
+                } else if (r > g) {
+                  finalColor = '#ff0099';
+                } else {
+                  finalColor = '#66ffff';
+                }
+                break;
+              case 'vaporwave':
+                if (r > g && r > b) {
+                  finalColor = '#ff71ce';
+                } else if (b > r) {
+                  finalColor = '#b967ff';
+                } else {
+                  finalColor = '#ffaadd';
+                }
+                break;
+            }
+          }
+          
+          coloredLine += `<span style="color: ${finalColor}">${char}</span>`;
+        } else {
+          coloredLine += char;
+        }
+      }
+      return coloredLine;
+    }).join('\n');
   };
 
   const handleFileDrop = (e: React.DragEvent) => {
@@ -463,6 +541,7 @@ const ASCIIVideoConverter: React.FC = () => {
       });
     }
     
+    // Process frames with better error handling and progress tracking
     for (let frame = 0; frame < totalFrames; frame++) {
       if (isPaused) {
         await new Promise(resolve => {
@@ -478,47 +557,69 @@ const ASCIIVideoConverter: React.FC = () => {
       const time = frame / fps;
       video.currentTime = time;
       
-      await new Promise<void>((resolve) => {
-        video.onseeked = () => {
-          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      try {
+        await new Promise<void>((resolve, reject) => {
+          const timeout = setTimeout(() => {
+            reject(new Error('Frame extraction timeout'));
+          }, 5000); // 5 second timeout
           
-          if (workerRef.current) {
-            workerRef.current.postMessage({
-              type: 'processFrame',
-              data: {
-                frameData: {
-                  frameNumber: frame,
-                  timestamp: time,
-                  width: canvas.width,
-                  height: canvas.height,
-                  pixels: imageData.data
-                },
-                config: {
-                  asciiChars: config.asciiChars,
-                  colorMode: config.colorMode,
-                  brightness: config.brightness,
-                  contrast: config.contrast,
-                  edgeDetection: config.outputMode === 'edge',
-                  edgeThreshold: config.edgeThreshold,
-                  negative: config.outputMode === 'negative',
-                  fontSize: config.fontSize,
-                  charDensity: config.charDensity
-                }
+          video.onseeked = () => {
+            clearTimeout(timeout);
+            try {
+              ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+              const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+              
+              if (workerRef.current) {
+                workerRef.current.postMessage({
+                  type: 'processFrame',
+                  data: {
+                    frameData: {
+                      frameNumber: frame,
+                      timestamp: time,
+                      width: canvas.width,
+                      height: canvas.height,
+                      pixels: imageData.data
+                    },
+                    config: {
+                      asciiChars: config.asciiChars,
+                      colorMode: config.colorMode,
+                      brightness: config.brightness,
+                      contrast: config.contrast,
+                      edgeDetection: config.outputMode === 'edge',
+                      edgeThreshold: config.edgeThreshold,
+                      negative: config.outputMode === 'negative',
+                      fontSize: config.fontSize,
+                      charDensity: config.charDensity
+                    }
+                  }
+                });
               }
-            });
-          }
+              
+              const elapsed = (performance.now() - startTime) / 1000;
+              const currentFps = frame / elapsed;
+              setMetrics(prev => ({
+                ...prev,
+                fps: currentFps,
+                processedFrames: frame + 1,
+                progress: ((frame + 1) / totalFrames) * 100
+              }));
+              
+              resolve();
+            } catch (error) {
+              reject(error);
+            }
+          };
           
-          const elapsed = (performance.now() - startTime) / 1000;
-          const currentFps = frame / elapsed;
-          setMetrics(prev => ({
-            ...prev,
-            fps: currentFps
-          }));
-          
-          resolve();
-        };
-      });
+          video.onerror = () => {
+            clearTimeout(timeout);
+            reject(new Error('Video seek error'));
+          };
+        });
+      } catch (error) {
+        console.error(`Error processing frame ${frame}:`, error);
+        // Continue with next frame instead of stopping completely
+        continue;
+      }
     }
     
     setIsProcessing(false);
@@ -532,7 +633,12 @@ const ASCIIVideoConverter: React.FC = () => {
     let lastTime = performance.now();
     
     const animate = (currentTime: number) => {
-      if (!isPlaying) return;
+      if (!isPlaying) {
+        if (animationRef.current) {
+          cancelAnimationFrame(animationRef.current);
+        }
+        return;
+      }
       
       const deltaTime = currentTime - lastTime;
       
@@ -582,10 +688,16 @@ const ASCIIVideoConverter: React.FC = () => {
     exportCanvas.width = maxLineLength * charWidth;
     exportCanvas.height = lineCount * charHeight;
     
+    // Configure canvas for rendering
+    ctx.fillStyle = '#000000';
+    ctx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
+    ctx.font = `${config.fontSize}px Consolas, Monaco, monospace`;
+    ctx.textBaseline = 'top';
+    
     // Configure MediaRecorder
     const stream = exportCanvas.captureStream(config.frameRate);
     const mediaRecorder = new MediaRecorder(stream, {
-      mimeType: 'video/webm',
+      mimeType: 'video/webm;codecs=vp9',
       videoBitsPerSecond: 5000000
     });
     
@@ -604,23 +716,40 @@ const ASCIIVideoConverter: React.FC = () => {
     // Start recording
     mediaRecorder.start();
     
-    // Render each frame
-    ctx.fillStyle = theme.background;
-    ctx.font = `${config.fontSize}px monospace`;
+    // Render each frame with proper timing
+    const frameTime = 1000 / config.frameRate;
+    let frameIndex = 0;
     
-    for (let i = 0; i < processedFrames.length; i++) {
+    const renderFrame = () => {
+      if (frameIndex >= processedFrames.length) {
+        mediaRecorder.stop();
+        return;
+      }
+      
+      const frame = processedFrames[frameIndex];
+      const lines = frame.split('\n');
+      
+      // Clear canvas
+      ctx.fillStyle = '#000000';
       ctx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
       
-      const lines = processedFrames[i].split('\n');
-      lines.forEach((line, lineIndex) => {
-        ctx.fillStyle = theme.text;
-        ctx.fillText(line, 0, (lineIndex + 1) * charHeight);
+      // Render ASCII frame
+      lines.forEach((line, y) => {
+        if (config.outputMode === 'colored') {
+          // Handle colored ASCII (simplified for video export)
+          ctx.fillStyle = theme.text;
+          ctx.fillText(line, 0, y * charHeight);
+        } else {
+          ctx.fillStyle = theme.text;
+          ctx.fillText(line, 0, y * charHeight);
+        }
       });
       
-      await new Promise(resolve => setTimeout(resolve, 1000 / config.frameRate));
-    }
+      frameIndex++;
+      setTimeout(renderFrame, frameTime);
+    };
     
-    mediaRecorder.stop();
+    renderFrame();
   };
 
   const handleExportGIF = () => {
@@ -754,11 +883,16 @@ const ASCIIVideoConverter: React.FC = () => {
         >
           <h1 className="text-6xl font-bold mb-4 flex items-center justify-center gap-4">
             <Terminal className="w-12 h-12" style={{ color: theme.primary }} />
-            <span style={{
-              background: `linear-gradient(135deg, ${theme.primary}, ${theme.secondary})`,
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent'
-            }}>
+            <span 
+              className="bg-gradient-to-r from-green-400 to-cyan-400 bg-clip-text text-transparent"
+              style={{
+                background: `linear-gradient(135deg, ${theme.primary}, ${theme.secondary})`,
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+                backgroundClip: 'text',
+                filter: `drop-shadow(0 0 20px ${theme.glow})`
+              }}
+            >
               ASCII Art Studio
             </span>
           </h1>
@@ -1181,22 +1315,39 @@ const ASCIIVideoConverter: React.FC = () => {
               )}
               {previewFrame ? (
                 <div className="w-full h-full flex items-center justify-center p-4">
-                  <pre
-                    className="leading-none text-center"
-                    style={{ 
-                      fontFamily: 'Consolas, Monaco, monospace',
-                      fontSize: `${config.fontSize}px`,
-                      color: theme.text,
-                      whiteSpace: 'pre',
-                      lineHeight: 1,
-                      maxWidth: '100%',
-                      maxHeight: '100%',
-                      overflow: 'auto',
-                      textShadow: `0 0 10px ${theme.glow}`
-                    }}
-                  >
-                    {previewFrame}
-                  </pre>
+                  {config.outputMode === 'colored' ? (
+                    <div
+                      className="leading-none text-center"
+                      style={{ 
+                        fontFamily: 'Consolas, Monaco, monospace',
+                        fontSize: `${config.fontSize}px`,
+                        whiteSpace: 'pre',
+                        lineHeight: 1,
+                        maxWidth: '100%',
+                        maxHeight: '100%',
+                        overflow: 'auto',
+                        textShadow: `0 0 10px ${theme.glow}`
+                      }}
+                      dangerouslySetInnerHTML={{ __html: previewFrame }}
+                    />
+                  ) : (
+                    <pre
+                      className="leading-none text-center"
+                      style={{ 
+                        fontFamily: 'Consolas, Monaco, monospace',
+                        fontSize: `${config.fontSize}px`,
+                        color: theme.text,
+                        whiteSpace: 'pre',
+                        lineHeight: 1,
+                        maxWidth: '100%',
+                        maxHeight: '100%',
+                        overflow: 'auto',
+                        textShadow: `0 0 10px ${theme.glow}`
+                      }}
+                    >
+                      {previewFrame}
+                    </pre>
+                  )}
                 </div>
               ) : (
                 <div className="flex items-center justify-center h-full p-8">

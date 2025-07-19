@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ASCII Video Converter Test</title>
+    <style>
+        body {
+            background: #0a0014;
+            color: #00ff41;
+            font-family: 'Courier New', monospace;
+            margin: 0;
+            padding: 20px;
+        }
+        .test-container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .test-section {
+            background: rgba(0, 255, 65, 0.1);
+            border: 1px solid #00ff41;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .ascii-output {
+            background: #000;
+            border: 1px solid #00ff41;
+            padding: 10px;
+            font-size: 8px;
+            line-height: 1;
+            white-space: pre;
+            overflow: auto;
+            max-height: 400px;
+        }
+        button {
+            background: #00ff41;
+            color: #000;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #00dd31;
+        }
+        input[type="file"] {
+            display: none;
+        }
+        .file-upload {
+            border: 2px dashed #00ff41;
+            padding: 40px;
+            text-align: center;
+            border-radius: 10px;
+            cursor: pointer;
+        }
+        .file-upload:hover {
+            background: rgba(0, 255, 65, 0.1);
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>ASCII Video Converter Test</h1>
+        
+        <div class="test-section">
+            <h2>Test 1: Basic ASCII Conversion</h2>
+            <p>Upload an image or video to test the ASCII conversion:</p>
+            <input type="file" id="fileInput" accept="image/*,video/*">
+            <div class="file-upload" onclick="document.getElementById('fileInput').click()">
+                Click to upload image/video
+            </div>
+            <button onclick="testWorker()">Test Worker Communication</button>
+            <button onclick="testColorThemes()">Test Color Themes</button>
+        </div>
+        
+        <div class="test-section">
+            <h2>Test 2: ASCII Output</h2>
+            <div id="asciiOutput" class="ascii-output">
+                Upload a file to see ASCII output here...
+            </div>
+        </div>
+        
+        <div class="test-section">
+            <h2>Test 3: Performance Metrics</h2>
+            <div id="metrics">
+                <p>FPS: <span id="fps">0</span></p>
+                <p>Processed Frames: <span id="processedFrames">0</span></p>
+                <p>Progress: <span id="progress">0%</span></p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let worker = null;
+        let processedFrames = [];
+        
+        // Initialize worker
+        function initWorker() {
+            if (worker) {
+                worker.terminate();
+            }
+            
+            worker = new Worker('/src/workers/asciiProcessor.worker.ts', { type: 'module' });
+            
+            worker.onmessage = (e) => {
+                if (e.data.type === 'frameProcessed') {
+                    const asciiFrame = e.data.data.ascii;
+                    processedFrames.push(asciiFrame);
+                    
+                    // Update display
+                    document.getElementById('asciiOutput').textContent = asciiFrame;
+                    document.getElementById('processedFrames').textContent = processedFrames.length;
+                    
+                    console.log('Frame processed successfully');
+                } else if (e.data.type === 'error') {
+                    console.error('Worker error:', e.data.data.error);
+                }
+            };
+            
+            console.log('Worker initialized');
+        }
+        
+        // Test worker communication
+        function testWorker() {
+            if (!worker) {
+                initWorker();
+            }
+            
+            // Create a simple test image
+            const canvas = document.createElement('canvas');
+            canvas.width = 100;
+            canvas.height = 50;
+            const ctx = canvas.getContext('2d');
+            
+            // Draw a simple pattern
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, 100, 50);
+            ctx.fillStyle = '#000000';
+            ctx.fillRect(25, 10, 50, 30);
+            
+            const imageData = ctx.getImageData(0, 0, 100, 50);
+            
+            worker.postMessage({
+                type: 'processFrame',
+                data: {
+                    frameData: {
+                        frameNumber: 0,
+                        timestamp: 0,
+                        width: 100,
+                        height: 50,
+                        pixels: imageData.data
+                    },
+                    config: {
+                        asciiChars: ' .:-=+*#%@',
+                        colorMode: 'matrix',
+                        brightness: 1.0,
+                        contrast: 1.0,
+                        edgeDetection: false,
+                        edgeThreshold: 0.5,
+                        negative: false,
+                        fontSize: 10,
+                        charDensity: 1.0
+                    }
+                }
+            });
+        }
+        
+        // Test color themes
+        function testColorThemes() {
+            const themes = ['mono', 'matrix', 'cyberpunk', 'retro', 'neon', 'vaporwave'];
+            const testFrame = 'Hello World!\nThis is a test\nof ASCII art!';
+            
+            themes.forEach((theme, index) => {
+                setTimeout(() => {
+                    document.getElementById('asciiOutput').innerHTML = 
+                        `<span style="color: ${getThemeColor(theme)}">${testFrame}</span>`;
+                }, index * 1000);
+            });
+        }
+        
+        function getThemeColor(theme) {
+            const colors = {
+                mono: '#ffffff',
+                matrix: '#00ff41',
+                cyberpunk: '#ff00ff',
+                retro: '#ff6b1a',
+                neon: '#00fff0',
+                vaporwave: '#ff71ce'
+            };
+            return colors[theme] || '#ffffff';
+        }
+        
+        // File upload handling
+        document.getElementById('fileInput').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                console.log('File selected:', file.name);
+                processFile(file);
+            }
+        });
+        
+        function processFile(file) {
+            if (!worker) {
+                initWorker();
+            }
+            
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const img = new Image();
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = 200;
+                    canvas.height = 100;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, 200, 100);
+                    
+                    const imageData = ctx.getImageData(0, 0, 200, 100);
+                    
+                    worker.postMessage({
+                        type: 'processFrame',
+                        data: {
+                            frameData: {
+                                frameNumber: 0,
+                                timestamp: 0,
+                                width: 200,
+                                height: 100,
+                                pixels: imageData.data
+                            },
+                            config: {
+                                asciiChars: ' .:-=+*#%@',
+                                colorMode: 'matrix',
+                                brightness: 1.0,
+                                contrast: 1.0,
+                                edgeDetection: false,
+                                edgeThreshold: 0.5,
+                                negative: false,
+                                fontSize: 8,
+                                charDensity: 1.0
+                            }
+                        }
+                    });
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+        
+        // Initialize on load
+        window.addEventListener('load', () => {
+            initWorker();
+        });
+    </script>
+</body>
+</html>
