@@ -17,6 +17,8 @@ interface ProcessingRequest {
     edgeDetection: boolean;
     edgeThreshold: number;
     negative?: boolean;
+    fontSize?: number;
+    charDensity?: number;
   };
 }
 
@@ -63,7 +65,7 @@ class EdgeDetector {
 
 const edgeDetector = new EdgeDetector();
 
-// Color processing functions
+// Enhanced color processing functions
 const getColorForMode = (r: number, g: number, b: number, mode: string): string => {
   switch(mode) {
     case 'mono':
@@ -93,15 +95,14 @@ const getColorForMode = (r: number, g: number, b: number, mode: string): string 
   }
 };
 
-// Main processing function
+// Main processing function with improved performance
 const processFrame = (request: ProcessingRequest) => {
   const { frameData, config } = request;
   const { width, height, pixels } = frameData;
-  const { asciiChars, brightness, contrast, edgeDetection, edgeThreshold, negative } = config;
+  const { asciiChars, brightness, contrast, edgeDetection, edgeThreshold, negative, charDensity = 1.0 } = config;
   
-  // Calculate optimal character dimensions based on input size
-  // Target approximately 80 characters wide for good readability
-  const targetCharWidth = 80;
+  // Calculate optimal character dimensions based on input size and density
+  const targetCharWidth = Math.floor(80 * charDensity);
   const charWidth = targetCharWidth;
   const charHeight = Math.ceil((height / width) * targetCharWidth * 0.5); // Adjust for character aspect ratio
   
@@ -145,7 +146,7 @@ const processFrame = (request: ProcessingRequest) => {
     edges = edgeDetector.detect(adjustedPixels, width, height);
   }
   
-  // Generate ASCII art
+  // Generate ASCII art with improved sampling
   for (let y = 0; y < charHeight; y++) {
     for (let x = 0; x < charWidth; x++) {
       // Sample multiple pixels for better accuracy
@@ -187,12 +188,15 @@ const processFrame = (request: ProcessingRequest) => {
         g = Math.floor(g / samples);
         b = Math.floor(b / samples);
         colors.push(r, g, b);
+      } else {
+        asciiFrame += asciiChars[0];
+        colors.push(0, 0, 0);
       }
     }
     asciiFrame += '\n';
   }
   
-  // Send processed frame back
+  // Send processed frame back with improved data structure
   self.postMessage({
     type: 'frameProcessed',
     data: {
@@ -201,14 +205,26 @@ const processFrame = (request: ProcessingRequest) => {
       ascii: asciiFrame,
       colors: new Uint8ClampedArray(colors),
       width: charWidth,
-      height: charHeight
+      height: charHeight,
+      processingTime: performance.now()
     }
   });
 };
 
-// Handle messages
+// Handle messages with error handling
 self.onmessage = (e) => {
-  if (e.data.type === 'processFrame') {
-    processFrame(e.data.data);
+  try {
+    if (e.data.type === 'processFrame') {
+      processFrame(e.data.data);
+    }
+  } catch (error) {
+    console.error('Worker error:', error);
+    self.postMessage({
+      type: 'error',
+      data: {
+        error: error.message,
+        frameNumber: e.data?.data?.frameData?.frameNumber
+      }
+    });
   }
 }; 
