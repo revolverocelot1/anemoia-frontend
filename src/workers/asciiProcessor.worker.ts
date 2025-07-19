@@ -17,6 +17,8 @@ interface ProcessingRequest {
     edgeDetection: boolean;
     edgeThreshold: number;
     negative?: boolean;
+    fontSize: number;
+    charDensity: number;
   };
 }
 
@@ -93,17 +95,32 @@ const getColorForMode = (r: number, g: number, b: number, mode: string): string 
   }
 };
 
+// Calculate optimal ASCII dimensions based on aspect ratio and character density
+const calculateAsciiDimensions = (width: number, height: number, fontSize: number, charDensity: number) => {
+  // Character aspect ratio (most monospace fonts are roughly 2:1 width:height)
+  const charAspectRatio = 2;
+  
+  // Target width in characters (adjust based on density)
+  const targetWidth = Math.floor(120 * charDensity);
+  
+  // Calculate height maintaining aspect ratio
+  const videoAspectRatio = width / height;
+  const charHeight = Math.floor(targetWidth / (videoAspectRatio * charAspectRatio));
+  
+  return {
+    charWidth: targetWidth,
+    charHeight: Math.max(charHeight, 20) // Minimum height for visibility
+  };
+};
+
 // Main processing function
 const processFrame = (request: ProcessingRequest) => {
   const { frameData, config } = request;
   const { width, height, pixels } = frameData;
-  const { asciiChars, brightness, contrast, edgeDetection, edgeThreshold, negative } = config;
+  const { asciiChars, brightness, contrast, edgeDetection, edgeThreshold, negative, fontSize, charDensity } = config;
   
-  // Calculate optimal character dimensions based on input size
-  // Target approximately 80 characters wide for good readability
-  const targetCharWidth = 80;
-  const charWidth = targetCharWidth;
-  const charHeight = Math.ceil((height / width) * targetCharWidth * 0.5); // Adjust for character aspect ratio
+  // Calculate optimal character dimensions
+  const { charWidth, charHeight } = calculateAsciiDimensions(width, height, fontSize, charDensity);
   
   let asciiFrame = '';
   const colors: number[] = [];
@@ -145,19 +162,20 @@ const processFrame = (request: ProcessingRequest) => {
     edges = edgeDetector.detect(adjustedPixels, width, height);
   }
   
-  // Generate ASCII art
+  // Generate ASCII art with improved sampling
   for (let y = 0; y < charHeight; y++) {
     for (let x = 0; x < charWidth; x++) {
-      // Sample multiple pixels for better accuracy
-      let totalBrightness = 0;
-      let r = 0, g = 0, b = 0;
-      let samples = 0;
-      
+      // Calculate pixel sampling area
       const startX = Math.floor(x * width / charWidth);
       const endX = Math.floor((x + 1) * width / charWidth);
       const startY = Math.floor(y * height / charHeight);
       const endY = Math.floor((y + 1) * height / charHeight);
       
+      let totalBrightness = 0;
+      let r = 0, g = 0, b = 0;
+      let samples = 0;
+      
+      // Sample pixels with weighted averaging
       for (let sy = startY; sy < endY && sy < height; sy++) {
         for (let sx = startX; sx < endX && sx < width; sx++) {
           const idx = (sy * width + sx) * 4;
@@ -166,8 +184,9 @@ const processFrame = (request: ProcessingRequest) => {
             const edgeValue = edges[sy * width + sx] / 255;
             totalBrightness += edgeValue > edgeThreshold ? 1 : 0;
           } else {
-            const pixelBrightness = (adjustedPixels[idx] + adjustedPixels[idx + 1] + adjustedPixels[idx + 2]) / 765;
-            totalBrightness += pixelBrightness;
+            // Use luminance formula for better brightness calculation
+            const luminance = 0.299 * adjustedPixels[idx] + 0.587 * adjustedPixels[idx + 1] + 0.114 * adjustedPixels[idx + 2];
+            totalBrightness += luminance / 255;
           }
           
           r += adjustedPixels[idx];
@@ -179,7 +198,12 @@ const processFrame = (request: ProcessingRequest) => {
       
       if (samples > 0) {
         const avgBrightness = totalBrightness / samples;
-        const charIndex = Math.floor(avgBrightness * (asciiChars.length - 1));
+        
+        // Improved character mapping with gamma correction
+        const gamma = 2.2;
+        const correctedBrightness = Math.pow(avgBrightness, 1 / gamma);
+        const charIndex = Math.floor(correctedBrightness * (asciiChars.length - 1));
+        
         asciiFrame += asciiChars[charIndex] || asciiChars[0];
         
         // Store average color for this character
@@ -187,12 +211,15 @@ const processFrame = (request: ProcessingRequest) => {
         g = Math.floor(g / samples);
         b = Math.floor(b / samples);
         colors.push(r, g, b);
+      } else {
+        asciiFrame += asciiChars[0];
+        colors.push(0, 0, 0);
       }
     }
     asciiFrame += '\n';
   }
   
-  // Send processed frame back
+  // Send processed frame back with dimension information
   self.postMessage({
     type: 'frameProcessed',
     data: {
@@ -201,7 +228,9 @@ const processFrame = (request: ProcessingRequest) => {
       ascii: asciiFrame,
       colors: new Uint8ClampedArray(colors),
       width: charWidth,
-      height: charHeight
+      height: charHeight,
+      originalWidth: width,
+      originalHeight: height
     }
   });
 };

@@ -185,6 +185,7 @@ const ASCIIVideoConverter: React.FC = () => {
       if (e.data.type === 'frameProcessed') {
         const asciiFrame = e.data.data.ascii;
         const colors = e.data.data.colors;
+        const { width: asciiWidth, height: asciiHeight } = e.data.data;
         
         // Create colored ASCII if needed
         let finalFrame = asciiFrame;
@@ -273,13 +274,26 @@ const ASCIIVideoConverter: React.FC = () => {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     
-    // Calculate dimensions maintaining aspect ratio
-    const maxWidth = window.innerWidth * 0.8;
-    const maxHeight = window.innerHeight * 0.6;
-    const scale = Math.min(maxWidth / img.width, maxHeight / img.height, 1);
+    // Calculate dimensions maintaining aspect ratio with better scaling
+    const maxWidth = 800; // Fixed processing width for consistency
+    const maxHeight = 600; // Fixed processing height for consistency
     
-    canvas.width = img.width * scale * config.scale;
-    canvas.height = img.height * scale * config.scale;
+    const imageAspectRatio = img.width / img.height;
+    let processWidth, processHeight;
+    
+    if (imageAspectRatio > maxWidth / maxHeight) {
+      // Image is wider than target aspect ratio
+      processWidth = maxWidth;
+      processHeight = maxWidth / imageAspectRatio;
+    } else {
+      // Image is taller than target aspect ratio
+      processHeight = maxHeight;
+      processWidth = maxHeight * imageAspectRatio;
+    }
+    
+    // Apply scale factor
+    canvas.width = processWidth * config.scale;
+    canvas.height = processHeight * config.scale;
     
     ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
     const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
@@ -302,7 +316,9 @@ const ASCIIVideoConverter: React.FC = () => {
             contrast: config.contrast,
             edgeDetection: config.outputMode === 'edge',
             edgeThreshold: config.edgeThreshold,
-            negative: config.outputMode === 'negative'
+            negative: config.outputMode === 'negative',
+            fontSize: config.fontSize,
+            charDensity: config.charDensity
           }
         }
       });
@@ -333,13 +349,26 @@ const ASCIIVideoConverter: React.FC = () => {
     
     return new Promise<void>((resolve) => {
       video.onseeked = () => {
-        // Calculate dimensions maintaining aspect ratio
-        const maxWidth = window.innerWidth * 0.8;
-        const maxHeight = window.innerHeight * 0.6;
-        const scale = Math.min(maxWidth / video.videoWidth, maxHeight / video.videoHeight, 1);
+        // Calculate dimensions maintaining aspect ratio with better scaling
+        const maxWidth = 800; // Fixed processing width for consistency
+        const maxHeight = 600; // Fixed processing height for consistency
         
-        canvas.width = video.videoWidth * scale * config.scale;
-        canvas.height = video.videoHeight * scale * config.scale;
+        const videoAspectRatio = video.videoWidth / video.videoHeight;
+        let processWidth, processHeight;
+        
+        if (videoAspectRatio > maxWidth / maxHeight) {
+          // Video is wider than target aspect ratio
+          processWidth = maxWidth;
+          processHeight = maxWidth / videoAspectRatio;
+        } else {
+          // Video is taller than target aspect ratio
+          processHeight = maxHeight;
+          processWidth = maxHeight * videoAspectRatio;
+        }
+        
+        // Apply scale factor
+        canvas.width = processWidth * config.scale;
+        canvas.height = processHeight * config.scale;
         
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
         const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
@@ -363,7 +392,9 @@ const ASCIIVideoConverter: React.FC = () => {
                 contrast: config.contrast,
                 edgeDetection: config.outputMode === 'edge',
                 edgeThreshold: config.edgeThreshold,
-                negative: config.outputMode === 'negative'
+                negative: config.outputMode === 'negative',
+                fontSize: config.fontSize,
+                charDensity: config.charDensity
               }
             }
           });
@@ -389,10 +420,22 @@ const ASCIIVideoConverter: React.FC = () => {
     const fps = config.frameRate;
     const totalFrames = Math.floor(videoDuration * fps);
     
-    // Calculate dimensions maintaining aspect ratio
-    const maxWidth = window.innerWidth * 0.8;
-    const maxHeight = window.innerHeight * 0.6;
-    const scale = Math.min(maxWidth / video.videoWidth, maxHeight / video.videoHeight, 1);
+    // Calculate dimensions maintaining aspect ratio with better scaling
+    const maxWidth = 800; // Fixed processing width for consistency
+    const maxHeight = 600; // Fixed processing height for consistency
+    
+    const videoAspectRatio = video.videoWidth / video.videoHeight;
+    let processWidth, processHeight;
+    
+    if (videoAspectRatio > maxWidth / maxHeight) {
+      // Video is wider than target aspect ratio
+      processWidth = maxWidth;
+      processHeight = maxWidth / videoAspectRatio;
+    } else {
+      // Video is taller than target aspect ratio
+      processHeight = maxHeight;
+      processWidth = maxHeight * videoAspectRatio;
+    }
     
     setMetrics(prev => ({
       ...prev,
@@ -400,18 +443,22 @@ const ASCIIVideoConverter: React.FC = () => {
       estimatedTime: totalFrames / fps
     }));
 
-    canvas.width = video.videoWidth * scale * config.scale;
-    canvas.height = video.videoHeight * scale * config.scale;
+    canvas.width = processWidth * config.scale;
+    canvas.height = processHeight * config.scale;
 
     const startTime = performance.now();
     
     // Initialize GIF if needed
     if (exportFormat === 'gif') {
+      // Calculate proper dimensions for GIF based on ASCII output
+      const estimatedCharWidth = 120 * config.charDensity;
+      const estimatedCharHeight = Math.floor(estimatedCharWidth / (canvas.width / canvas.height) / 2);
+      
       gifRef.current = new GIF({
         workers: 4,
         quality: 10,
-        width: canvas.width,
-        height: canvas.height,
+        width: estimatedCharWidth * config.fontSize * 0.6,
+        height: estimatedCharHeight * config.fontSize,
         workerScript: '/gif.worker.js'
       });
     }
@@ -454,7 +501,9 @@ const ASCIIVideoConverter: React.FC = () => {
                   contrast: config.contrast,
                   edgeDetection: config.outputMode === 'edge',
                   edgeThreshold: config.edgeThreshold,
-                  negative: config.outputMode === 'negative'
+                  negative: config.outputMode === 'negative',
+                  fontSize: config.fontSize,
+                  charDensity: config.charDensity
                 }
               }
             });
@@ -520,12 +569,18 @@ const ASCIIVideoConverter: React.FC = () => {
     const ctx = exportCanvas.getContext('2d');
     if (!ctx) return;
     
-    // Set canvas size based on font size and frame dimensions
-    const lines = processedFrames[0].split('\n');
-    const charWidth = config.fontSize * 0.6;
+    // Calculate optimal export dimensions based on ASCII frame
+    const sampleFrame = processedFrames[0];
+    const lines = sampleFrame.split('\n');
+    const maxLineLength = Math.max(...lines.map(line => line.length));
+    const lineCount = lines.length;
+    
+    // Set canvas size based on font size and frame dimensions with proper aspect ratio
+    const charWidth = config.fontSize * 0.6; // Approximate character width
     const charHeight = config.fontSize;
-    exportCanvas.width = lines[0].length * charWidth;
-    exportCanvas.height = lines.length * charHeight;
+    
+    exportCanvas.width = maxLineLength * charWidth;
+    exportCanvas.height = lineCount * charHeight;
     
     // Configure MediaRecorder
     const stream = exportCanvas.captureStream(config.frameRate);
@@ -570,6 +625,19 @@ const ASCIIVideoConverter: React.FC = () => {
 
   const handleExportGIF = () => {
     if (!gifRef.current || processedFrames.length === 0) return;
+    
+    // Calculate proper dimensions for GIF
+    const sampleFrame = processedFrames[0];
+    const lines = sampleFrame.split('\n');
+    const maxLineLength = Math.max(...lines.map(line => line.length));
+    const lineCount = lines.length;
+    
+    const charWidth = config.fontSize * 0.6;
+    const charHeight = config.fontSize;
+    
+    // Update GIF dimensions
+    gifRef.current.setOption('width', maxLineLength * charWidth);
+    gifRef.current.setOption('height', lineCount * charHeight);
     
     gifRef.current.on('finished', (blob: Blob) => {
       const url = URL.createObjectURL(blob);
@@ -1037,6 +1105,23 @@ const ASCIIVideoConverter: React.FC = () => {
                     />
                   </div>
 
+                  {/* Character Density */}
+                  <div>
+                    <label className="block text-sm font-medium mb-2">
+                      Character Density: {config.charDensity.toFixed(1)}x
+                    </label>
+                    <input
+                      type="range"
+                      min="0.5"
+                      max="2.0"
+                      step="0.1"
+                      value={config.charDensity}
+                      onChange={(e) => setConfig(prev => ({ ...prev, charDensity: parseFloat(e.target.value) }))}
+                      className="w-full"
+                      style={{ accentColor: theme.primary }}
+                    />
+                  </div>
+
                   {/* Edge Threshold (for edge detection mode) */}
                   {config.outputMode === 'edge' && (
                     <div>
@@ -1077,23 +1162,42 @@ const ASCIIVideoConverter: React.FC = () => {
               className="relative rounded-lg overflow-hidden bg-black border border-white/20"
                 style={{
                   minHeight: '400px',
-                maxHeight: '60vh',
-                overflow: 'auto'
-              }}
-            >
-              {previewFrame ? (
-                <pre
-                  className="p-4 leading-none overflow-x-auto"
-                  style={{ 
-                    fontFamily: 'Consolas, Monaco, monospace',
-                  fontSize: `${config.fontSize}px`,
-                    color: theme.text,
-                  whiteSpace: 'pre',
-                    lineHeight: 1
+                  maxHeight: '70vh',
+                  overflow: 'auto',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
                 }}
-              >
-                  {previewFrame}
-                </pre>
+            >
+              {/* Aspect Ratio Indicator */}
+              {previewFrame && (
+                <div className="absolute top-2 right-2 bg-black/50 backdrop-blur-sm rounded px-2 py-1 text-xs opacity-70">
+                  {processedFrames.length > 0 && (
+                    <span style={{ color: theme.primary }}>
+                      {processedFrames.length} frames • {config.frameRate} FPS
+                    </span>
+                  )}
+                </div>
+              )}
+              {previewFrame ? (
+                <div className="w-full h-full flex items-center justify-center p-4">
+                  <pre
+                    className="leading-none text-center"
+                    style={{ 
+                      fontFamily: 'Consolas, Monaco, monospace',
+                      fontSize: `${config.fontSize}px`,
+                      color: theme.text,
+                      whiteSpace: 'pre',
+                      lineHeight: 1,
+                      maxWidth: '100%',
+                      maxHeight: '100%',
+                      overflow: 'auto',
+                      textShadow: `0 0 10px ${theme.glow}`
+                    }}
+                  >
+                    {previewFrame}
+                  </pre>
+                </div>
               ) : (
                 <div className="flex items-center justify-center h-full p-8">
                     <div className="text-center">
