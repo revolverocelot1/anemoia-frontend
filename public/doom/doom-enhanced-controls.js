@@ -338,7 +338,25 @@
     // Module configuration for Emscripten
     window.Module = {
         preRun: [],
-        postRun: [init],
+        postRun: [function() {
+            init();
+            
+            // Auto-start the game after initialization
+            setTimeout(() => {
+                // Send an Enter key press to start the game
+                simulateKey('Enter', true);
+                setTimeout(() => simulateKey('Enter', false), 100);
+                
+                // Send Escape key to close any pause menu if it appears
+                setTimeout(() => {
+                    simulateKey('Escape', true);
+                    setTimeout(() => simulateKey('Escape', false), 100);
+                }, 200);
+                
+                // Focus the canvas to ensure input works
+                canvas.focus();
+            }, 1000);
+        }],
         
         canvas: canvas,
         

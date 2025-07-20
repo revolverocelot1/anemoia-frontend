@@ -28,14 +28,13 @@ export class FFmpegService {
   }
   
   private setupProgressHandling(): void {
-    this.ffmpeg.on('progress', ({ progress, time, speed }) => {
-      if (this.progressCallback) {
-        this.progressCallback({ ratio: progress, time, speed });
-      }
-    });
-    
     this.ffmpeg.on('log', ({ message }) => {
-      console.log('FFmpeg:', message);
+      console.log(message);
+    });
+
+    this.ffmpeg.on('progress', ({ progress, time }) => {
+      console.log(`Progress: ${(progress * 100).toFixed(2)}%`);
+      console.log(`Time: ${time / 1000000}s`);
     });
   }
   

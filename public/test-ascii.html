@@ -6,36 +6,36 @@
     <title>ASCII Video Converter Test</title>
     <style>
         body {
-            background: #0a0014;
-            color: #00ff41;
-            font-family: 'Courier New', monospace;
-            margin: 0;
-            padding: 20px;
-        }
-        .test-container {
+            font-family: Arial, sans-serif;
             max-width: 1200px;
             margin: 0 auto;
-        }
-        .test-section {
-            background: rgba(0, 255, 65, 0.1);
-            border: 1px solid #00ff41;
-            border-radius: 10px;
             padding: 20px;
-            margin: 20px 0;
+            background: #0a0014;
+            color: #fff;
         }
-        .ascii-output {
-            background: #000;
-            border: 1px solid #00ff41;
-            padding: 10px;
-            font-size: 8px;
+        .container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        .panel {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 20px;
+            border-radius: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        pre {
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
             line-height: 1;
             white-space: pre;
             overflow: auto;
             max-height: 400px;
+            color: #00ff41;
+            text-shadow: 0 0 10px #00ff41;
         }
         button {
-            background: #00ff41;
-            color: #000;
+            background: #ff00ff;
+            color: white;
             border: none;
             padding: 10px 20px;
             border-radius: 5px;
@@ -43,214 +43,185 @@
             margin: 5px;
         }
         button:hover {
-            background: #00dd31;
+            background: #ff66ff;
         }
         input[type="file"] {
-            display: none;
+            margin: 10px 0;
         }
-        .file-upload {
-            border: 2px dashed #00ff41;
-            padding: 40px;
-            text-align: center;
-            border-radius: 10px;
-            cursor: pointer;
+        #status {
+            margin: 10px 0;
+            color: #00ffff;
         }
-        .file-upload:hover {
-            background: rgba(0, 255, 65, 0.1);
+        canvas {
+            max-width: 100%;
+            height: auto;
+            border: 1px solid #333;
+        }
+        .controls {
+            margin: 20px 0;
+        }
+        label {
+            display: block;
+            margin: 10px 0;
+        }
+        input[type="range"] {
+            width: 100%;
         }
     </style>
 </head>
 <body>
-    <div class="test-container">
         <h1>ASCII Video Converter Test</h1>
         
-        <div class="test-section">
-            <h2>Test 1: Basic ASCII Conversion</h2>
-            <p>Upload an image or video to test the ASCII conversion:</p>
+    <div class="controls">
             <input type="file" id="fileInput" accept="image/*,video/*">
-            <div class="file-upload" onclick="document.getElementById('fileInput').click()">
-                Click to upload image/video
+        <button onclick="processFile()">Process</button>
+        <div id="status"></div>
             </div>
-            <button onclick="testWorker()">Test Worker Communication</button>
-            <button onclick="testColorThemes()">Test Color Themes</button>
+
+    <div class="controls">
+        <label>
+            Characters: 
+            <select id="charSet">
+                <option value=" .:-=+*#%@">Classic</option>
+                <option value=" ░▒▓█">Blocks</option>
+                <option value=" 01">Binary</option>
+                <option value=" .·:;">Minimal</option>
+            </select>
+        </label>
+        <label>
+            Scale: <span id="scaleValue">0.15</span>
+            <input type="range" id="scale" min="0.05" max="0.5" step="0.05" value="0.15">
+        </label>
+        <label>
+            Font Size: <span id="fontSizeValue">10</span>px
+            <input type="range" id="fontSize" min="6" max="20" step="1" value="10">
+        </label>
         </div>
         
-        <div class="test-section">
-            <h2>Test 2: ASCII Output</h2>
-            <div id="asciiOutput" class="ascii-output">
-                Upload a file to see ASCII output here...
-            </div>
+    <div class="container">
+        <div class="panel">
+            <h2>Original</h2>
+            <canvas id="canvas"></canvas>
+            <img id="preview" style="max-width: 100%; display: none;">
         </div>
-        
-        <div class="test-section">
-            <h2>Test 3: Performance Metrics</h2>
-            <div id="metrics">
-                <p>FPS: <span id="fps">0</span></p>
-                <p>Processed Frames: <span id="processedFrames">0</span></p>
-                <p>Progress: <span id="progress">0%</span></p>
-            </div>
+        <div class="panel">
+            <h2>ASCII Output</h2>
+            <pre id="output"></pre>
         </div>
     </div>
 
     <script>
-        let worker = null;
-        let processedFrames = [];
-        
-        // Initialize worker
-        function initWorker() {
-            if (worker) {
-                worker.terminate();
-            }
-            
-            worker = new Worker('/src/workers/asciiProcessor.worker.ts', { type: 'module' });
-            
-            worker.onmessage = (e) => {
-                if (e.data.type === 'frameProcessed') {
-                    const asciiFrame = e.data.data.ascii;
-                    processedFrames.push(asciiFrame);
-                    
-                    // Update display
-                    document.getElementById('asciiOutput').textContent = asciiFrame;
-                    document.getElementById('processedFrames').textContent = processedFrames.length;
-                    
-                    console.log('Frame processed successfully');
-                } else if (e.data.type === 'error') {
-                    console.error('Worker error:', e.data.data.error);
-                }
-            };
-            
-            console.log('Worker initialized');
-        }
-        
-        // Test worker communication
-        function testWorker() {
-            if (!worker) {
-                initWorker();
-            }
-            
-            // Create a simple test image
-            const canvas = document.createElement('canvas');
-            canvas.width = 100;
-            canvas.height = 50;
-            const ctx = canvas.getContext('2d');
-            
-            // Draw a simple pattern
-            ctx.fillStyle = '#ffffff';
-            ctx.fillRect(0, 0, 100, 50);
-            ctx.fillStyle = '#000000';
-            ctx.fillRect(25, 10, 50, 30);
-            
-            const imageData = ctx.getImageData(0, 0, 100, 50);
-            
-            worker.postMessage({
-                type: 'processFrame',
-                data: {
-                    frameData: {
-                        frameNumber: 0,
-                        timestamp: 0,
-                        width: 100,
-                        height: 50,
-                        pixels: imageData.data
-                    },
-                    config: {
-                        asciiChars: ' .:-=+*#%@',
-                        colorMode: 'matrix',
-                        brightness: 1.0,
-                        contrast: 1.0,
-                        edgeDetection: false,
-                        edgeThreshold: 0.5,
-                        negative: false,
-                        fontSize: 10,
-                        charDensity: 1.0
-                    }
-                }
-            });
-        }
-        
-        // Test color themes
-        function testColorThemes() {
-            const themes = ['mono', 'matrix', 'cyberpunk', 'retro', 'neon', 'vaporwave'];
-            const testFrame = 'Hello World!\nThis is a test\nof ASCII art!';
-            
-            themes.forEach((theme, index) => {
-                setTimeout(() => {
-                    document.getElementById('asciiOutput').innerHTML = 
-                        `<span style="color: ${getThemeColor(theme)}">${testFrame}</span>`;
-                }, index * 1000);
-            });
-        }
-        
-        function getThemeColor(theme) {
-            const colors = {
-                mono: '#ffffff',
-                matrix: '#00ff41',
-                cyberpunk: '#ff00ff',
-                retro: '#ff6b1a',
-                neon: '#00fff0',
-                vaporwave: '#ff71ce'
-            };
-            return colors[theme] || '#ffffff';
-        }
-        
-        // File upload handling
-        document.getElementById('fileInput').addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            if (file) {
-                console.log('File selected:', file.name);
-                processFile(file);
-            }
+        const fileInput = document.getElementById('fileInput');
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const output = document.getElementById('output');
+        const status = document.getElementById('status');
+        const scaleInput = document.getElementById('scale');
+        const fontSizeInput = document.getElementById('fontSize');
+        const charSetSelect = document.getElementById('charSet');
+
+        scaleInput.addEventListener('input', (e) => {
+            document.getElementById('scaleValue').textContent = e.target.value;
         });
-        
-        function processFile(file) {
-            if (!worker) {
-                initWorker();
+
+        fontSizeInput.addEventListener('input', (e) => {
+            document.getElementById('fontSizeValue').textContent = e.target.value;
+            output.style.fontSize = e.target.value + 'px';
+        });
+
+        function processFile() {
+            const file = fileInput.files[0];
+            if (!file) {
+                status.textContent = 'Please select a file';
+                return;
             }
-            
-            const reader = new FileReader();
-            reader.onload = (e) => {
+
+            status.textContent = 'Processing...';
+
+            if (file.type.startsWith('image/')) {
                 const img = new Image();
                 img.onload = () => {
-                    const canvas = document.createElement('canvas');
-                    canvas.width = 200;
-                    canvas.height = 100;
-                    const ctx = canvas.getContext('2d');
-                    ctx.drawImage(img, 0, 0, 200, 100);
-                    
-                    const imageData = ctx.getImageData(0, 0, 200, 100);
-                    
-                    worker.postMessage({
-                        type: 'processFrame',
-                        data: {
-                            frameData: {
-                                frameNumber: 0,
-                                timestamp: 0,
-                                width: 200,
-                                height: 100,
-                                pixels: imageData.data
-                            },
-                            config: {
-                                asciiChars: ' .:-=+*#%@',
-                                colorMode: 'matrix',
-                                brightness: 1.0,
-                                contrast: 1.0,
-                                edgeDetection: false,
-                                edgeThreshold: 0.5,
-                                negative: false,
-                                fontSize: 8,
-                                charDensity: 1.0
-                            }
-                        }
-                    });
+                    processImage(img);
+                    document.getElementById('preview').src = img.src;
+                    document.getElementById('preview').style.display = 'block';
+                    canvas.style.display = 'none';
                 };
-                img.src = e.target.result;
-            };
-            reader.readAsDataURL(file);
+                img.src = URL.createObjectURL(file);
+            } else if (file.type.startsWith('video/')) {
+                const video = document.createElement('video');
+                video.onloadedmetadata = () => {
+                    video.currentTime = 0;
+                    video.onseeked = () => {
+                        processVideo(video);
+                    };
+                };
+                video.src = URL.createObjectURL(file);
+            }
         }
+
+        function processImage(img) {
+            const scale = parseFloat(scaleInput.value);
+            canvas.width = img.width * scale;
+            canvas.height = img.height * scale;
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const ascii = convertToAscii(imageData);
+            output.textContent = ascii;
+            status.textContent = 'Done!';
+        }
+
+        function processVideo(video) {
+            const scale = parseFloat(scaleInput.value);
+            canvas.width = video.videoWidth * scale;
+            canvas.height = video.videoHeight * scale;
+            canvas.style.display = 'block';
+            document.getElementById('preview').style.display = 'none';
+            
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const ascii = convertToAscii(imageData);
+            output.textContent = ascii;
+            status.textContent = 'Done! (First frame)';
+        }
+
+        function convertToAscii(imageData) {
+            const { data, width, height } = imageData;
+            const asciiChars = charSetSelect.value;
+            let ascii = '';
+
+            for (let y = 0; y < height; y++) {
+                for (let x = 0; x < width; x++) {
+                    const idx = (y * width + x) * 4;
+                    const r = data[idx];
+                    const g = data[idx + 1];
+                    const b = data[idx + 2];
+                    
+                    const brightness = (r + g + b) / 765;
+                    const charIndex = Math.floor(brightness * (asciiChars.length - 1));
+                    ascii += asciiChars[charIndex];
+                }
+                ascii += '\n';
+            }
+
+            return ascii;
+        }
+
+        // Test with a simple canvas drawing
+        ctx.fillStyle = '#ff00ff';
+        ctx.fillRect(50, 50, 100, 100);
+        ctx.fillStyle = '#00ffff';
+        ctx.fillRect(150, 50, 100, 100);
+        canvas.width = 300;
+        canvas.height = 200;
         
-        // Initialize on load
-        window.addEventListener('load', () => {
-            initWorker();
-        });
+        // Auto-convert the test drawing
+        setTimeout(() => {
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const ascii = convertToAscii(imageData);
+            output.textContent = ascii;
+            status.textContent = 'Test pattern ready';
+        }, 100);
     </script>
 </body>
 </html>

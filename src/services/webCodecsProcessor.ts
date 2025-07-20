@@ -8,11 +8,7 @@ interface VideoDecoderConfig {
   description?: Uint8Array;
 }
 
-interface EncodedVideoChunk {
-  type: 'key' | 'delta';
-  timestamp: number;
-  data: ArrayBuffer;
-}
+// Remove custom EncodedVideoChunk interface - use the built-in Web API type
 
 export class WebCodecsProcessor {
   private decoder?: VideoDecoder;
@@ -78,13 +74,23 @@ export class WebCodecsProcessor {
     this.encoder.configure(config);
   }
   
-  // Decode video chunk
-  decodeChunk(chunk: EncodedVideoChunk): void {
+  // Decode video chunk - using any to avoid type conflicts
+  decodeChunk(chunk: any): void {
     if (!this.decoder) {
       throw new Error('Decoder not initialized');
     }
     
-    this.decoder.decode(chunk);
+    // Create proper EncodedVideoChunk if needed
+    if (chunk.data && chunk.timestamp !== undefined && chunk.type) {
+      const encodedChunk = new EncodedVideoChunk({
+        type: chunk.type,
+        timestamp: chunk.timestamp,
+        data: chunk.data
+      });
+      this.decoder.decode(encodedChunk);
+    } else {
+      this.decoder.decode(chunk);
+    }
   }
   
   // Process video frame

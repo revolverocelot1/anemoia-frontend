@@ -3,494 +3,416 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ASCII Video Art - Transform Videos into Terminal Art | Anemoia Studio</title>
-    <meta name="description" content="Convert videos to animated ASCII art with real-time processing, multiple presets, and stunning visual themes. Transform your videos into mesmerizing terminal art.">
+    <title>ASCII Art Studio - Transform Videos & Images to Terminal Art | Anemoia</title>
+    <meta name="description" content="Convert videos and images into mesmerizing ASCII art. Create retro terminal-style animations with multiple color themes and export formats.">
+    <link rel="icon" type="image/png" href="/favicon.png">
     
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap');
-        
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
         }
         
-        :root {
-            --primary: #00ff41;
-            --secondary: #00ffff;
-            --accent: #ff00ff;
-            --bg-dark: #0a0014;
-            --bg-darker: #050008;
-        }
-        
         body {
-            background: var(--bg-darker);
-            color: #ffffff;
-            font-family: 'Space Mono', monospace;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0a0014;
+            color: #fff;
             overflow-x: hidden;
-            position: relative;
-            min-height: 100vh;
-        }
-        
-        /* Animated gradient background */
-        .bg-gradient {
-            position: fixed;
-            inset: 0;
-            background: 
-                radial-gradient(circle at 20% 50%, rgba(0, 255, 65, 0.15) 0%, transparent 50%),
-                radial-gradient(circle at 80% 80%, rgba(0, 255, 255, 0.15) 0%, transparent 50%),
-                radial-gradient(circle at 40% 20%, rgba(255, 0, 255, 0.1) 0%, transparent 50%);
-            animation: gradientShift 20s ease-in-out infinite;
-        }
-        
-        @keyframes gradientShift {
-            0%, 100% { transform: rotate(0deg) scale(1); }
-            50% { transform: rotate(180deg) scale(1.2); }
-        }
-        
-        /* Floating particles */
-        .particle {
-            position: fixed;
-            width: 2px;
-            height: 2px;
-            background: var(--primary);
-            border-radius: 50%;
-            pointer-events: none;
-            opacity: 0;
-            animation: float 10s infinite;
-        }
-        
-        @keyframes float {
-            0% {
-                transform: translateY(100vh) translateX(0);
-                opacity: 0;
-            }
-            10% {
-                opacity: 1;
-            }
-            90% {
-                opacity: 1;
-            }
-            100% {
-                transform: translateY(-100vh) translateX(100px);
-                opacity: 0;
-            }
-        }
-        
-        .container {
-            position: relative;
-            z-index: 10;
-            max-width: 1400px;
-            margin: 0 auto;
-            padding: 2rem;
-        }
-        
-        /* Hero Section */
-        .hero {
-            text-align: center;
-            padding: 4rem 0;
-            position: relative;
-        }
-        
-        .hero h1 {
-            font-size: clamp(3rem, 8vw, 6rem);
-            font-weight: 700;
-            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 50%, var(--accent) 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            filter: drop-shadow(0 0 30px rgba(0, 255, 65, 0.5));
-            margin-bottom: 1rem;
-            animation: glow 3s ease-in-out infinite alternate;
-        }
-        
-        @keyframes glow {
-            from { filter: drop-shadow(0 0 30px rgba(0, 255, 65, 0.5)); }
-            to { filter: drop-shadow(0 0 50px rgba(0, 255, 65, 0.8)); }
-        }
-        
-        .hero p {
-            font-size: 1.25rem;
-            color: rgba(255, 255, 255, 0.7);
-            margin-bottom: 3rem;
-        }
-        
-        /* ASCII Demo */
-        .ascii-demo {
-            background: rgba(0, 0, 0, 0.6);
-            backdrop-filter: blur(20px);
-            border: 1px solid rgba(0, 255, 65, 0.3);
-            border-radius: 20px;
-            padding: 3rem;
-            margin: 3rem 0;
-            position: relative;
-            overflow: hidden;
-        }
-        
-        .ascii-demo::before {
-            content: '';
-            position: absolute;
-            inset: -2px;
-            background: linear-gradient(45deg, var(--primary), var(--secondary), var(--accent));
-            border-radius: 20px;
-            opacity: 0.5;
-            z-index: -1;
-            filter: blur(10px);
-            animation: borderRotate 4s linear infinite;
-        }
-        
-        @keyframes borderRotate {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-        
-        .ascii-frames {
-            position: relative;
-            height: 400px;
-            font-family: monospace;
-            font-size: 0.7rem;
-            line-height: 1;
-            overflow: hidden;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        
-        .ascii-frame {
-            position: absolute;
-            white-space: pre;
-            opacity: 0;
-            animation: frameSlide 9s infinite;
-        }
-        
-        .ascii-frame:nth-child(1) { animation-delay: 0s; color: var(--primary); }
-        .ascii-frame:nth-child(2) { animation-delay: 3s; color: var(--secondary); }
-        .ascii-frame:nth-child(3) { animation-delay: 6s; color: var(--accent); }
-        
-        @keyframes frameSlide {
-            0% { opacity: 0; transform: translateY(20px); }
-            10%, 23% { opacity: 1; transform: translateY(0); }
-            33% { opacity: 0; transform: translateY(-20px); }
-            100% { opacity: 0; }
-        }
-        
-        /* Features Grid */
-        .features {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
-            gap: 2rem;
-            margin: 4rem 0;
-        }
-        
-        .feature-card {
-            background: rgba(255, 255, 255, 0.02);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 16px;
-            padding: 2rem;
-            position: relative;
-            overflow: hidden;
-            transition: all 0.3s ease;
-        }
-        
-        .feature-card:hover {
-            transform: translateY(-5px);
-            border-color: var(--primary);
-            background: rgba(0, 255, 65, 0.05);
-            box-shadow: 0 10px 40px rgba(0, 255, 65, 0.2);
-        }
-        
-        .feature-icon {
-            width: 60px;
-            height: 60px;
-            background: linear-gradient(135deg, var(--primary), var(--secondary));
-            border-radius: 16px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.5rem;
-            margin-bottom: 1rem;
-        }
-        
-        .feature-card h3 {
-            font-size: 1.25rem;
-            margin-bottom: 0.5rem;
-            color: var(--primary);
-        }
-        
-        .feature-card p {
-            color: rgba(255, 255, 255, 0.7);
             line-height: 1.6;
         }
-        
-        /* Presets Showcase */
-        .presets-showcase {
-            background: rgba(0, 0, 0, 0.4);
-            backdrop-filter: blur(10px);
-            border-radius: 20px;
-            padding: 3rem;
-            margin: 4rem 0;
-        }
-        
-        .preset-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 1rem;
-            margin-top: 2rem;
-        }
-        
-        .preset-item {
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 12px;
-            padding: 1.5rem;
-            text-align: center;
-            transition: all 0.3s ease;
-            cursor: pointer;
-        }
-        
-        .preset-item:hover {
-            background: rgba(0, 255, 65, 0.1);
-            border-color: var(--primary);
-            transform: scale(1.05);
-        }
-        
-        .preset-chars {
-            font-family: monospace;
-            font-size: 1.5rem;
-            color: var(--primary);
-            margin-bottom: 0.5rem;
+
+        /* ASCII Rain Animation */
+        .ascii-rain {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
             overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
+            z-index: 1;
         }
-        
-        /* CTA Section */
-        .cta-section {
+
+        .ascii-drop {
+            position: absolute;
+            color: #00ff41;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 20px;
+            animation: fall linear infinite;
+            text-shadow: 0 0 10px currentColor;
+        }
+
+        @keyframes fall {
+            to {
+                transform: translateY(100vh);
+            }
+        }
+
+        /* Hero Section */
+        .hero {
+            position: relative;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+            z-index: 10;
+            background: radial-gradient(circle at 20% 50%, #ff00ff22 0%, transparent 50%),
+                        radial-gradient(circle at 80% 80%, #00ffff22 0%, transparent 50%);
+        }
+
+        .hero-content {
             text-align: center;
-            padding: 4rem 0;
+            max-width: 800px;
+            animation: fadeInUp 1s ease-out;
         }
-        
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        h1 {
+            font-size: clamp(3rem, 8vw, 5rem);
+            font-weight: 900;
+            margin-bottom: 1.5rem;
+            background: linear-gradient(135deg, #00ff41, #00ffff, #ff00ff);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            filter: drop-shadow(0 0 30px rgba(0, 255, 65, 0.5));
+        }
+
+        .subtitle {
+            font-size: 1.5rem;
+            color: #888;
+            margin-bottom: 3rem;
+        }
+
         .cta-button {
             display: inline-flex;
             align-items: center;
-            gap: 1rem;
-            padding: 1.25rem 3rem;
-            background: linear-gradient(135deg, var(--primary), var(--secondary));
-            color: var(--bg-darker);
-            font-weight: 700;
+            gap: 0.5rem;
+            padding: 1rem 2rem;
             font-size: 1.125rem;
-            border-radius: 50px;
+            font-weight: 600;
+            background: linear-gradient(135deg, #ff00ff, #00ffff);
+            color: white;
             text-decoration: none;
+            border-radius: 50px;
             transition: all 0.3s ease;
-            position: relative;
-            overflow: hidden;
+            box-shadow: 0 4px 20px rgba(255, 0, 255, 0.3);
         }
-        
-        .cta-button::before {
-            content: '';
-            position: absolute;
-            inset: 0;
-            background: linear-gradient(135deg, var(--secondary), var(--accent));
-            opacity: 0;
-            transition: opacity 0.3s ease;
-        }
-        
+
         .cta-button:hover {
             transform: translateY(-2px);
-            box-shadow: 0 10px 40px rgba(0, 255, 65, 0.4);
+            box-shadow: 0 6px 30px rgba(255, 0, 255, 0.5);
         }
-        
-        .cta-button:hover::before {
-            opacity: 1;
-        }
-        
-        .cta-button span {
+
+        /* ASCII Preview Animation */
+        .ascii-preview {
             position: relative;
-            z-index: 1;
+            margin: 4rem auto;
+            max-width: 600px;
+            padding: 2rem;
+            background: rgba(0, 0, 0, 0.5);
+            border: 1px solid rgba(0, 255, 65, 0.3);
+            border-radius: 10px;
+            overflow: hidden;
         }
-        
+
+        .ascii-text {
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 10px;
+            line-height: 1;
+            color: #00ff41;
+            text-shadow: 0 0 5px currentColor;
+            white-space: pre;
+            overflow: hidden;
+        }
+
+        /* Features Grid */
+        .features {
+            position: relative;
+            z-index: 10;
+            padding: 4rem 2rem;
+            background: rgba(0, 0, 0, 0.7);
+        }
+
+        .features-grid {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+        }
+
+        .feature-card {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 2rem;
+            transition: all 0.3s ease;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-5px);
+            border-color: rgba(0, 255, 65, 0.5);
+            box-shadow: 0 10px 30px rgba(0, 255, 65, 0.2);
+        }
+
+        .feature-icon {
+            width: 60px;
+            height: 60px;
+            margin-bottom: 1rem;
+            background: linear-gradient(135deg, #00ff41, #00ffff);
+            border-radius: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+        }
+
+        /* Color Themes Showcase */
+        .themes-showcase {
+            position: relative;
+            z-index: 10;
+            padding: 4rem 2rem;
+            text-align: center;
+        }
+
+        .theme-samples {
+            display: flex;
+            justify-content: center;
+            gap: 2rem;
+            flex-wrap: wrap;
+            margin-top: 3rem;
+        }
+
+        .theme-sample {
+            background: rgba(0, 0, 0, 0.8);
+            border: 1px solid currentColor;
+            border-radius: 10px;
+            padding: 1rem;
+            transition: all 0.3s ease;
+        }
+
+        .theme-sample:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 30px currentColor;
+        }
+
+        .theme-sample pre {
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 8px;
+            line-height: 1;
+        }
+
         /* Responsive */
         @media (max-width: 768px) {
-            .hero h1 { font-size: 3rem; }
-            .features { grid-template-columns: 1fr; }
-            .ascii-frames { font-size: 0.5rem; height: 300px; }
-            .container { padding: 1rem; }
+            .hero-content {
+                padding: 1rem;
+            }
+
+            h1 {
+                font-size: 2.5rem;
+            }
+
+            .subtitle {
+                font-size: 1.125rem;
+            }
+
+            .theme-samples {
+                gap: 1rem;
+            }
+        }
+
+        /* Glitch Effect */
+        .glitch {
+            position: relative;
+            animation: glitch 2s infinite;
+        }
+
+        @keyframes glitch {
+            0%, 100% { transform: translate(0); }
+            20% { transform: translate(-2px, 2px); }
+            40% { transform: translate(-2px, -2px); }
+            60% { transform: translate(2px, 2px); }
+            80% { transform: translate(2px, -2px); }
         }
     </style>
 </head>
 <body>
-    <div class="bg-gradient"></div>
-    
-    <!-- Floating particles -->
-    <script>
-        for (let i = 0; i < 50; i++) {
-            const particle = document.createElement('div');
-            particle.className = 'particle';
-            particle.style.left = Math.random() * 100 + '%';
-            particle.style.animationDelay = Math.random() * 10 + 's';
-            particle.style.animationDuration = (10 + Math.random() * 10) + 's';
-            document.body.appendChild(particle);
-        }
-    </script>
-    
-    <div class="container">
-        <!-- Hero Section -->
-        <div class="hero">
-            <h1>ASCII Video Art</h1>
-            <p>Transform your videos into mesmerizing terminal art with real-time processing</p>
-        </div>
-        
-        <!-- ASCII Demo -->
-        <div class="ascii-demo">
-            <div class="ascii-frames">
-                <pre class="ascii-frame">
-     ██████╗ ███████╗ ██████╗██╗██╗
-    ██╔══██╗██╔════╝██╔════╝██║██║
-    ███████║███████╗██║     ██║██║
-    ██╔══██║╚════██║██║     ██║██║
-    ██║  ██║███████║╚██████╗██║██║
-    ╚═╝  ╚═╝╚══════╝ ╚═════╝╚═╝╚═╝
-    
-         ░▒▓█▓▒░░▒▓█▓▒░
-      ░▒▓████████████▓▒░
-    ░▒▓██████████████▓▒░
-    ▒▓████▓▒░░░░▒▓████▓▒
-    ▓████▒░      ░▒████▓
-    ████░          ░████
-    ▓███▒░        ░▒███▓
-    ▒▓████▓▒░░░▒▓████▓▒
-    ░▒▓██████████████▓▒░
-      ░▒▓████████████▓▒░
-         ░▒▓█▓▒░░▒▓█▓▒░
-                </pre>
-                <pre class="ascii-frame">
-    @@@@@@@@@@@@@@@@@@@@@@@
-    @@@@@@@@@@@@@@@@@@@@@@@
-    @@@@@   @@@@@    @@@@@@
-    @@@@  @@  @@@  @   @@@@
-    @@@  @@@  @@@  @@   @@@
-    @@@       @@@  @@@  @@@
-    @@@  @@@  @@@  @@@  @@@
-    @@@  @@@  @@@  @@@  @@@
-    @@@@    @@@@@       @@@
-    @@@@@@@@@@@@@@@@@@@@@@@
-    
-    .  *  .  *  .  *  .  *
-    *  .  *  .  *  .  *  .
-    .  *  .  *  .  *  .  *
-                </pre>
-                <pre class="ascii-frame">
-    :::::::::::::::::::::::
-    :::·∙•●●●●●●●●●•∙·:::
-    ::·∙•●●●●●●●●●●●•∙·::
-    :·∙•●●●●●●●●●●●●●•∙·:
-    ·∙•●●●●●●●●●●●●●●●•∙·
-    ∙•●●●●●●●●●●●●●●●●●•∙
-    •●●●●●●●●●●●●●●●●●●●•
-    ∙•●●●●●●●●●●●●●●●●●•∙
-    ·∙•●●●●●●●●●●●●●●●•∙·
-    :·∙•●●●●●●●●●●●●●•∙·:
-    ::·∙•●●●●●●●●●●●•∙·::
-    :::·∙•●●●●●●●●●•∙·:::
-    :::::::::::::::::::::::
-                </pre>
+    <!-- ASCII Rain Background -->
+    <div class="ascii-rain" id="asciiRain"></div>
+
+    <!-- Hero Section -->
+    <section class="hero">
+        <div class="hero-content">
+            <h1 class="glitch">ASCII Art Studio</h1>
+            <p class="subtitle">Transform videos & images into mesmerizing terminal art</p>
+            
+            <!-- Live ASCII Preview -->
+            <div class="ascii-preview">
+                <pre class="ascii-text" id="asciiDemo"></pre>
             </div>
+            
+            <a href="/ascii-video-converter" class="cta-button">
+                <span>▶</span> Start Creating
+            </a>
         </div>
-        
-        <!-- Features -->
-        <div class="features">
+    </section>
+
+    <!-- Features -->
+    <section class="features">
+        <div class="features-grid">
             <div class="feature-card">
-                <div class="feature-icon">✨</div>
-                <h3>8 ASCII Presets</h3>
-                <p>Choose from classic, minimal, blocks, detailed, matrix, binary, dots, or create your own custom character set.</p>
+                <div class="feature-icon">🎥</div>
+                <h3>Video Processing</h3>
+                <p>Convert entire videos into ASCII animations with customizable frame rates and quality settings.</p>
             </div>
             
             <div class="feature-card">
                 <div class="feature-icon">🎨</div>
-                <h3>6 Color Themes</h3>
-                <p>Matrix green, Cyberpunk pink, Retro amber, Neon blue, Vaporwave, or classic Monochrome.</p>
+                <h3>Multiple Themes</h3>
+                <p>Choose from Matrix, Cyberpunk, Retro, Neon, and Vaporwave color themes for unique aesthetics.</p>
             </div>
             
             <div class="feature-card">
                 <div class="feature-icon">⚡</div>
-                <h3>Real-Time Processing</h3>
-                <p>WebWorker-based parallel processing for smooth, responsive video conversion.</p>
-            </div>
-            
-            <div class="feature-card">
-                <div class="feature-icon">🎬</div>
-                <h3>Live Preview</h3>
-                <p>See your ASCII art come to life with real-time playback and frame-by-frame control.</p>
-            </div>
-            
-            <div class="feature-card">
-                <div class="feature-icon">🎯</div>
-                <h3>Quality Control</h3>
-                <p>Adjust brightness, contrast, frame rate, and quality settings for perfect results.</p>
+                <h3>Real-time Preview</h3>
+                <p>See your ASCII art come to life instantly with our high-performance parallel processing engine.</p>
             </div>
             
             <div class="feature-card">
                 <div class="feature-icon">💾</div>
-                <h3>Easy Export</h3>
-                <p>Download your ASCII animation as a text file to share or use in your projects.</p>
+                <h3>Multiple Export Formats</h3>
+                <p>Export as MP4/WebM video, animated GIF, or plain text files for maximum flexibility.</p>
             </div>
-        </div>
-        
-        <!-- Presets Showcase -->
-        <div class="presets-showcase">
-            <h2 style="font-size: 2.5rem; text-align: center; margin-bottom: 1rem; background: linear-gradient(135deg, var(--primary), var(--secondary)); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
-                ASCII Character Presets
-            </h2>
-            <p style="text-align: center; color: rgba(255, 255, 255, 0.7); margin-bottom: 2rem;">
-                Choose the perfect character set for your artistic vision
-            </p>
             
-            <div class="preset-grid">
-                <div class="preset-item">
-                    <div class="preset-chars"> .:-=+*#%@</div>
-                    <div>Classic</div>
-                </div>
-                <div class="preset-item">
-                    <div class="preset-chars"> .oO@</div>
-                    <div>Minimal</div>
-                </div>
-                <div class="preset-item">
-                    <div class="preset-chars"> ░▒▓█</div>
-                    <div>Blocks</div>
-                </div>
-                <div class="preset-item">
-                    <div class="preset-chars"> .\'^",:;Il!i></div>
-                    <div>Detailed</div>
-                </div>
-                <div class="preset-item">
-                    <div class="preset-chars"> .:-=+*#%@ﾊﾐﾋ</div>
-                    <div>Matrix</div>
-                </div>
-                <div class="preset-item">
-                    <div class="preset-chars"> 01</div>
-                    <div>Binary</div>
-                </div>
-                <div class="preset-item">
-                    <div class="preset-chars"> ·∙•●</div>
-                    <div>Dots</div>
-                </div>
-                <div class="preset-item">
-                    <div class="preset-chars">?</div>
-                    <div>Custom</div>
-                </div>
+            <div class="feature-card">
+                <div class="feature-icon">🔧</div>
+                <h3>Advanced Controls</h3>
+                <p>Fine-tune brightness, contrast, character density, and edge detection for perfect results.</p>
+            </div>
+            
+            <div class="feature-card">
+                <div class="feature-icon">🚀</div>
+                <h3>GPU Accelerated</h3>
+                <p>Utilizes multiple CPU cores and web workers for blazing-fast processing speeds.</p>
             </div>
         </div>
+    </section>
+
+    <!-- Color Themes Showcase -->
+    <section class="themes-showcase">
+        <h2 style="font-size: 2.5rem; margin-bottom: 1rem;">Choose Your Style</h2>
+        <p style="color: #888;">Multiple color themes to match your aesthetic</p>
         
-        <!-- CTA -->
-        <div class="cta-section">
-            <a href="/ascii-video-converter" class="cta-button">
-                <span>Start Creating ASCII Art</span>
-                <span>→</span>
-            </a>
-            <p style="margin-top: 1rem; color: rgba(255, 255, 255, 0.5);">
-                No installation required • Works in your browser • Free to use
-            </p>
+        <div class="theme-samples">
+            <div class="theme-sample" style="color: #00ff41; border-color: #00ff41;">
+                <h4>Matrix</h4>
+                <pre>
+╔═══════╗
+║ ▓▓█▓▓ ║
+║ ░▒▓█▓ ║
+╚═══════╝
+                </pre>
+            </div>
+            
+            <div class="theme-sample" style="color: #ff00ff; border-color: #ff00ff;">
+                <h4>Cyberpunk</h4>
+                <pre>
+◢█████◣
+█▓▒░░▒▓█
+◥█████◤
+                </pre>
+            </div>
+            
+            <div class="theme-sample" style="color: #00fff0; border-color: #00fff0;">
+                <h4>Neon</h4>
+                <pre>
+┌─────┐
+│●───●│
+└─────┘
+                </pre>
+            </div>
         </div>
-    </div>
+    </section>
+
+    <script>
+        // ASCII Rain Effect
+        const asciiChars = '01ﾊﾐﾋｰｳｼﾅﾓﾆｻﾜﾂｵﾘｱﾎﾃﾏｹﾒｴｶｷﾑﾕﾗｾﾈｽﾀﾇﾍ';
+        const asciiRain = document.getElementById('asciiRain');
+        
+        function createDrop() {
+            const drop = document.createElement('div');
+            drop.className = 'ascii-drop';
+            drop.style.left = Math.random() * 100 + '%';
+            drop.style.animationDuration = (Math.random() * 3 + 2) + 's';
+            drop.style.opacity = Math.random() * 0.5 + 0.1;
+            drop.textContent = asciiChars[Math.floor(Math.random() * asciiChars.length)];
+            
+            const colors = ['#00ff41', '#00ffff', '#ff00ff', '#ff71ce'];
+            drop.style.color = colors[Math.floor(Math.random() * colors.length)];
+            
+            asciiRain.appendChild(drop);
+            
+            // Remove drop after animation
+            setTimeout(() => drop.remove(), 5000);
+        }
+        
+        // Create drops periodically
+        setInterval(createDrop, 100);
+
+        // Animated ASCII Demo
+        const asciiDemo = document.getElementById('asciiDemo');
+        const demoFrames = [
+            `     ╔═══════════════╗
+     ║    ▄▄▄▄▄▄▄    ║
+     ║  ▄█▓▓▓▓▓▓▓█▄  ║
+     ║ █▓▓▓▓▓▓▓▓▓▓█ ║
+     ║ █▓▓▓▓▓▓▓▓▓▓█ ║
+     ║  ▀█▓▓▓▓▓▓▓█▀  ║
+     ║    ▀▀▀▀▀▀▀    ║
+     ╚═══════════════╝`,
+            `     ╔═══════════════╗
+     ║    ░░░░░░░    ║
+     ║  ░▒▓▓▓▓▓▓▒░  ║
+     ║ ▒▓▓▓▓▓▓▓▓▓▒ ║
+     ║ ▒▓▓▓▓▓▓▓▓▓▒ ║
+     ║  ░▒▓▓▓▓▓▓▒░  ║
+     ║    ░░░░░░░    ║
+     ╚═══════════════╝`,
+            `     ╔═══════════════╗
+     ║    ·········    ║
+     ║  ·:::::::::·  ║
+     ║ ::::::::::::: ║
+     ║ ::::::::::::: ║
+     ║  ·:::::::::·  ║
+     ║    ·········    ║
+     ╚═══════════════╝`
+        ];
+        
+        let currentFrame = 0;
+        setInterval(() => {
+            asciiDemo.textContent = demoFrames[currentFrame];
+            currentFrame = (currentFrame + 1) % demoFrames.length;
+        }, 1000);
+
+        // Parallax effect on scroll
+        window.addEventListener('scroll', () => {
+            const scrolled = window.pageYOffset;
+            const parallax = document.querySelector('.hero');
+            parallax.style.transform = `translateY(${scrolled * 0.5}px)`;
+        });
+    </script>
 </body>
 </html> 
