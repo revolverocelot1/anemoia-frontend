@@ -1,16 +1,19 @@
 import { describe, it, expect } from 'vitest';
+import {
+  formatFileSize,
+  isValidImageFile,
+  isValidVideoFile,
+  clamp,
+  debounce,
+  throttle,
+  deepClone,
+  generateUniqueId,
+  parseJSON
+} from './common';
 
 // Common utility functions tests
 describe('Utility Functions', () => {
   describe('formatFileSize', () => {
-    const formatFileSize = (bytes: number): string => {
-      if (bytes === 0) return '0 Bytes';
-      const k = 1024;
-      const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
-      const i = Math.floor(Math.log(bytes) / Math.log(k));
-      return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-    };
-
     it('should format bytes correctly', () => {
       expect(formatFileSize(0)).toBe('0 Bytes');
       expect(formatFileSize(1023)).toBe('1023 Bytes');
@@ -26,11 +29,6 @@ describe('Utility Functions', () => {
   });
 
   describe('isValidImageFile', () => {
-    const isValidImageFile = (file: File): boolean => {
-      const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/bmp'];
-      return validTypes.includes(file.type);
-    };
-
     it('should validate image file types', () => {
       const jpegFile = new File([''], 'test.jpg', { type: 'image/jpeg' });
       const pngFile = new File([''], 'test.png', { type: 'image/png' });
@@ -57,11 +55,6 @@ describe('Utility Functions', () => {
   });
 
   describe('isValidVideoFile', () => {
-    const isValidVideoFile = (file: File): boolean => {
-      const validTypes = ['video/mp4', 'video/webm', 'video/ogg', 'video/quicktime'];
-      return validTypes.includes(file.type);
-    };
-
     it('should validate video file types', () => {
       const mp4File = new File([''], 'test.mp4', { type: 'video/mp4' });
       const webmFile = new File([''], 'test.webm', { type: 'video/webm' });
@@ -86,10 +79,6 @@ describe('Utility Functions', () => {
   });
 
   describe('clamp', () => {
-    const clamp = (value: number, min: number, max: number): number => {
-      return Math.min(Math.max(value, min), max);
-    };
-
     it('should clamp values within range', () => {
       expect(clamp(5, 0, 10)).toBe(5);
       expect(clamp(0, 0, 10)).toBe(0);
@@ -108,23 +97,6 @@ describe('Utility Functions', () => {
   });
 
   describe('debounce', () => {
-    const debounce = <T extends (...args: any[]) => any>(
-      func: T,
-      wait: number
-    ): ((...args: Parameters<T>) => void) => {
-      let timeout: NodeJS.Timeout | undefined;
-      
-      return function executedFunction(...args: Parameters<T>) {
-        const later = () => {
-          clearTimeout(timeout);
-          func(...args);
-        };
-        
-        clearTimeout(timeout);
-        timeout = setTimeout(later, wait);
-      };
-    };
-
     it('should debounce function calls', async () => {
       let callCount = 0;
       const testFunc = () => {
@@ -150,21 +122,6 @@ describe('Utility Functions', () => {
   });
 
   describe('throttle', () => {
-    const throttle = <T extends (...args: any[]) => any>(
-      func: T,
-      limit: number
-    ): ((...args: Parameters<T>) => void) => {
-      let inThrottle: boolean;
-      
-      return function executedFunction(...args: Parameters<T>) {
-        if (!inThrottle) {
-          func(...args);
-          inThrottle = true;
-          setTimeout(() => inThrottle = false, limit);
-        }
-      };
-    };
-
     it('should throttle function calls', async () => {
       let callCount = 0;
       const testFunc = () => {
@@ -192,28 +149,6 @@ describe('Utility Functions', () => {
   });
 
   describe('deepClone', () => {
-    const deepClone = <T>(obj: T): T => {
-      if (obj === null || typeof obj !== 'object') return obj;
-      if (obj instanceof Date) return new Date(obj.getTime()) as any;
-      if (obj instanceof Array) {
-        const clonedArr: any[] = [];
-        obj.forEach((element, index) => {
-          clonedArr[index] = deepClone(element);
-        });
-        return clonedArr as any;
-      }
-      if (obj instanceof Object) {
-        const clonedObj: any = {};
-        for (const key in obj) {
-          if (obj.hasOwnProperty(key)) {
-            clonedObj[key] = deepClone(obj[key]);
-          }
-        }
-        return clonedObj;
-      }
-      return obj;
-    };
-
     it('should deep clone objects', () => {
       const original = {
         a: 1,
@@ -252,10 +187,6 @@ describe('Utility Functions', () => {
   });
 
   describe('generateUniqueId', () => {
-    const generateUniqueId = (): string => {
-      return Date.now().toString(36) + Math.random().toString(36).substr(2);
-    };
-
     it('should generate unique IDs', () => {
       const id1 = generateUniqueId();
       const id2 = generateUniqueId();
@@ -274,14 +205,6 @@ describe('Utility Functions', () => {
   });
 
   describe('parseJSON', () => {
-    const parseJSON = <T>(json: string, fallback: T): T => {
-      try {
-        return JSON.parse(json);
-      } catch {
-        return fallback;
-      }
-    };
-
     it('should parse valid JSON', () => {
       expect(parseJSON('{"a": 1}', {})).toEqual({ a: 1 });
       expect(parseJSON('[1, 2, 3]', [])).toEqual([1, 2, 3]);

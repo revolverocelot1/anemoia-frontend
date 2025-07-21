@@ -27,3 +27,9 @@ public/models/
 public/**/*.onnx
 public/**/*.safetensors
 public/ort-wasm-*.wasm
+
+# Large model files
+public/models/face-swap/*.onnx
+public/models/**/*.onnx
+public/models/**/*.bin
+public/models/**/*.safetensors

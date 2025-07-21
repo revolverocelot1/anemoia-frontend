@@ -23,6 +23,15 @@ interface ProcessingRequest {
   };
 }
 
+// Enhanced character sets for super detailed ASCII art
+const DETAILED_CHAR_SETS = {
+  ultra: ` .'"-_:,;^~=+<>iv%xclrs{*}I?!][1taeo7zjLunT#JCwfy325Fp6mqSghVd4EgXPGZbYkOA&8U$@KHDBWNMR0Q`,
+  super: ` .':;!~+-xmo*#W&8@`,
+  high: ` .:-=+*#%@`,
+  medium: ` .:-+#@`,
+  low: ` .#@`
+};
+
 // Performance monitoring
 let lastPerformanceCheck = 0;
 const PERFORMANCE_CHECK_INTERVAL = 1000; // Check every second
@@ -103,26 +112,51 @@ const getColorForMode = (r: number, g: number, b: number, mode: string): [number
   }
 };
 
-// Main processing function with improved performance
+// Enhanced color processing for true color support
+const getRGBColor = (r: number, g: number, b: number): [number, number, number] => {
+  return [r, g, b];
+};
+
+// Enhanced brightness calculation with better color perception
+const calculateBrightness = (r: number, g: number, b: number): number => {
+  // Using Rec. 709 luma coefficients for better perceptual accuracy
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+};
+
+// Get enhanced character set based on density
+const getCharacterSet = (charDensity: number, customChars?: string): string => {
+  if (customChars) return customChars;
+  
+  if (charDensity >= 2.0) return DETAILED_CHAR_SETS.ultra;
+  if (charDensity >= 1.5) return DETAILED_CHAR_SETS.super;
+  if (charDensity >= 1.0) return DETAILED_CHAR_SETS.high;
+  if (charDensity >= 0.5) return DETAILED_CHAR_SETS.medium;
+  return DETAILED_CHAR_SETS.low;
+};
+
+// Main processing function with improved performance and color support
 const processFrame = (request: ProcessingRequest) => {
   const startTime = performance.now();
   const { frameData, config } = request;
   const { width, height, pixels } = frameData;
-  const { asciiChars, brightness, contrast, edgeDetection, edgeThreshold, negative, charDensity = 1.0, colored = false } = config;
+  const { brightness, contrast, edgeDetection, edgeThreshold, negative, charDensity = 1.0, colored = false } = config;
+  
+  // Get appropriate character set
+  const asciiChars = getCharacterSet(charDensity, config.asciiChars);
   
   // Calculate optimal character dimensions based on input size and density
-  const targetCharWidth = Math.floor(80 * charDensity);
-  const charWidth = targetCharWidth;
-  const charHeight = Math.ceil((height / width) * targetCharWidth * 0.5); // Adjust for character aspect ratio
+  const baseWidth = 120; // Base width for high quality
+  const targetCharWidth = Math.floor(baseWidth * charDensity);
+  const charWidth = Math.min(targetCharWidth, 200); // Cap at 200 for performance
+  const charHeight = Math.ceil((height / width) * charWidth * 0.5); // Adjust for character aspect ratio
   
-  let asciiFrame = '';
-  const colors: number[] = [];
+  const asciiLines: string[] = [];
+  const colorData: number[] = [];
   
-  // Apply brightness and contrast adjustments using typed arrays for performance
+  // Apply brightness and contrast adjustments
   const adjustedPixels = new Uint8ClampedArray(pixels.length);
-  const contrastFactor = (contrast - 1) * 255;
+  const contrastFactor = contrast;
   
-  // Vectorized brightness/contrast adjustment
   for (let i = 0; i < pixels.length; i += 4) {
     let r = pixels[i];
     let g = pixels[i + 1];
@@ -135,10 +169,10 @@ const processFrame = (request: ProcessingRequest) => {
       b = 255 - b;
     }
     
-    // Apply contrast and brightness in one pass
-    r = Math.max(0, Math.min(255, ((r - 128) * contrast + 128) * brightness));
-    g = Math.max(0, Math.min(255, ((g - 128) * contrast + 128) * brightness));
-    b = Math.max(0, Math.min(255, ((b - 128) * contrast + 128) * brightness));
+    // Apply contrast and brightness
+    r = Math.max(0, Math.min(255, ((r - 128) * contrastFactor + 128) * brightness));
+    g = Math.max(0, Math.min(255, ((g - 128) * contrastFactor + 128) * brightness));
+    b = Math.max(0, Math.min(255, ((b - 128) * contrastFactor + 128) * brightness));
     
     adjustedPixels[i] = r;
     adjustedPixels[i + 1] = g;
@@ -157,42 +191,51 @@ const processFrame = (request: ProcessingRequest) => {
   const blockHeight = height / charHeight;
   const numChars = asciiChars.length;
   
+  // Process each character position
   for (let y = 0; y < charHeight; y++) {
+    let line = '';
+    
     for (let x = 0; x < charWidth; x++) {
-      // Calculate block boundaries
+      // Calculate block boundaries with sub-pixel accuracy
       const startX = Math.floor(x * blockWidth);
-      const endX = Math.min(Math.floor((x + 1) * blockWidth), width);
+      const endX = Math.ceil((x + 1) * blockWidth);
       const startY = Math.floor(y * blockHeight);
-      const endY = Math.min(Math.floor((y + 1) * blockHeight), height);
+      const endY = Math.ceil((y + 1) * blockHeight);
       
       let totalBrightness = 0;
       let totalR = 0, totalG = 0, totalB = 0;
       let samples = 0;
       
-      // Sample pixels in block
-      for (let sy = startY; sy < endY; sy++) {
-        for (let sx = startX; sx < endX; sx++) {
+      // Sample pixels in block with better coverage
+      for (let sy = startY; sy < endY && sy < height; sy++) {
+        for (let sx = startX; sx < endX && sx < width; sx++) {
           const idx = (sy * width + sx) * 4;
+          
+          const r = adjustedPixels[idx];
+          const g = adjustedPixels[idx + 1];
+          const b = adjustedPixels[idx + 2];
           
           if (edgeDetection && edges) {
             const edgeValue = edges[sy * width + sx] / 255;
             totalBrightness += edgeValue > edgeThreshold ? 1 : 0;
           } else {
-            const pixelBrightness = (adjustedPixels[idx] + adjustedPixels[idx + 1] + adjustedPixels[idx + 2]) / 765;
+            const pixelBrightness = calculateBrightness(r, g, b) / 255;
             totalBrightness += pixelBrightness;
           }
           
-          totalR += adjustedPixels[idx];
-          totalG += adjustedPixels[idx + 1];
-          totalB += adjustedPixels[idx + 2];
+          totalR += r;
+          totalG += g;
+          totalB += b;
           samples++;
         }
       }
       
       if (samples > 0) {
         const avgBrightness = totalBrightness / samples;
-        const charIndex = Math.min(Math.floor(avgBrightness * numChars), numChars - 1);
-        asciiFrame += asciiChars[charIndex] || asciiChars[0];
+        // Use a smoother mapping function for better gradients
+        const charIndex = Math.floor(avgBrightness * avgBrightness * (numChars - 1));
+        const clampedIndex = Math.max(0, Math.min(numChars - 1, charIndex));
+        line += asciiChars[clampedIndex];
         
         // Store color data for colored output
         if (colored || config.colorMode !== 'mono') {
@@ -201,24 +244,26 @@ const processFrame = (request: ProcessingRequest) => {
           const avgB = Math.floor(totalB / samples);
           
           if (colored) {
-            // For colored mode, use actual pixel colors
-            colors.push(avgR, avgG, avgB);
+            // For true color mode, use actual pixel colors
+            colorData.push(avgR, avgG, avgB);
           } else {
             // For themed modes, apply color theme
             const [r, g, b] = getColorForMode(avgR, avgG, avgB, config.colorMode);
-        colors.push(r, g, b);
+            colorData.push(r, g, b);
           }
         }
       } else {
-        asciiFrame += asciiChars[0];
+        line += asciiChars[0];
         if (colored || config.colorMode !== 'mono') {
-        colors.push(0, 0, 0);
+          colorData.push(0, 0, 0);
         }
       }
     }
-    asciiFrame += '\n';
+    
+    asciiLines.push(line);
   }
   
+  const asciiFrame = asciiLines.join('\n');
   const processingTime = performance.now() - startTime;
   
   // Check performance periodically
@@ -230,7 +275,7 @@ const processFrame = (request: ProcessingRequest) => {
     const cpuUsage = Math.min(100, (processingTime / (1000 / 30)) * 100);
     
     // Estimate memory usage
-    const memoryUsage = (colors.length * 3 + asciiFrame.length * 2) / (1024 * 1024); // MB
+    const memoryUsage = (colorData.length * 3 + asciiFrame.length * 2) / (1024 * 1024); // MB
     
     self.postMessage({
       type: 'performance',
@@ -239,14 +284,14 @@ const processFrame = (request: ProcessingRequest) => {
     });
   }
   
-  // Send processed frame back with improved data structure
+  // Send processed frame back with frame number for proper ordering
   self.postMessage({
     type: 'frameProcessed',
     data: {
       frameNumber: frameData.frameNumber,
       timestamp: frameData.timestamp,
       ascii: asciiFrame,
-      colors: colored || config.colorMode !== 'mono' ? new Uint8ClampedArray(colors) : null,
+      colors: colored || config.colorMode !== 'mono' ? new Uint8ClampedArray(colorData) : null,
       width: charWidth,
       height: charHeight,
       processingTime

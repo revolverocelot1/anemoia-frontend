@@ -491,7 +491,13 @@ const SplatViewerPage = () => {
 
     let determinedType: 'gaussian' | 'triangle' | 'mesh' | null = null;
     if (fileToProcess.name.endsWith('.ply')) {
-      const headerText = await fileToProcess.slice(0, 1000).text();
+      // Read the header to determine if it's gaussian or mesh
+      const headerSlice = fileToProcess.slice(0, 1000);
+      const headerText = await new Promise<string>((resolve) => {
+        const reader = new FileReader();
+        reader.onload = (e) => resolve(e.target?.result as string || '');
+        reader.readAsText(headerSlice);
+      });
       const hasGaussianProperties = headerText.includes('f_dc_0') && headerText.includes('opacity');
       determinedType = hasGaussianProperties ? 'gaussian' : 'mesh';
     } else if (fileToProcess.name.endsWith('.tsf')) {

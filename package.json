@@ -16,7 +16,9 @@
     "test:ui": "vitest --ui",
     "test:coverage": "vitest --coverage",
     "test:watch": "vitest --watch",
-    "postinstall": "node scripts/copy-wasm-files.cjs"
+    "postinstall": "node scripts/copy-wasm-files.cjs",
+    "download-models": "node scripts/download-models.js",
+    "pre-deploy": "node scripts/pre-deploy-check.cjs"
   },
   "dependencies": {
     "@emotion/react": "^11.13.5",

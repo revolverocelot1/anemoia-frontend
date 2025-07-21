@@ -12,7 +12,8 @@
         touchStartY: 0,
         isMobile: /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent),
         hasFocus: false,
-        pointerLocked: false
+        pointerLocked: false,
+        isInitialized: false
     };
     
     // Get elements
@@ -24,6 +25,9 @@
     
     // Initialize
     function init() {
+        if (state.isInitialized) return;
+        state.isInitialized = true;
+        
         setupKeyboardControls();
         setupMouseControls();
         setupMobileControls();
@@ -36,6 +40,45 @@
         if (state.isMobile) {
             document.getElementById('mobile-controls').style.display = 'block';
         }
+        
+        // Auto-start the game
+        autoStartGame();
+    }
+    
+    // Auto-start game function
+    function autoStartGame() {
+        // Check if Module is ready
+        const checkAndStart = () => {
+            if (window.Module && window.Module._main) {
+                // Wait a bit for game to initialize
+                setTimeout(() => {
+                    // First, send Enter to get past title screen
+                    simulateKeyPress('Enter');
+                    
+                    // Then send Escape to close any pause menu
+                    setTimeout(() => {
+                        simulateKeyPress('Escape');
+                        
+                        // Focus canvas again
+                        canvas.focus();
+                        
+                        // Show a brief message
+                        console.log('Game started automatically');
+                    }, 500);
+                }, 1000);
+            } else {
+                // Keep checking
+                setTimeout(checkAndStart, 100);
+            }
+        };
+        
+        checkAndStart();
+    }
+    
+    // Simulate a key press and release
+    function simulateKeyPress(key) {
+        simulateKey(key, true);
+        setTimeout(() => simulateKey(key, false), 100);
     }
     
     // Keyboard Controls
@@ -44,7 +87,8 @@
         const preventDefaultKeys = ['Tab', 'Alt', 'F1', 'F2', 'F3', 'F4', 'F5', 'F6', 
                                   'F7', 'F8', 'F9', 'F10', 'F11', 'F12'];
         
-        canvas.addEventListener('keydown', (e) => {
+        // Create a proper event handler for keyboard
+        const handleKeyDown = (e) => {
             if (preventDefaultKeys.includes(e.key)) {
                 e.preventDefault();
             }
@@ -72,16 +116,17 @@
             };
             
             const mappedKey = keyMap[e.key] || e.key;
-            state.keys[mappedKey] = true;
             
-            // Send key event to Doom
-            sendKeyToDoom(mappedKey, true);
+            if (!state.keys[mappedKey]) {
+                state.keys[mappedKey] = true;
+                sendKeyToDoom(mappedKey, true);
+            }
             
             // Show keyboard focus indicator
             showKeyboardFocus();
-        });
+        };
         
-        canvas.addEventListener('keyup', (e) => {
+        const handleKeyUp = (e) => {
             const keyMap = {
                 'w': 'ArrowUp',
                 'W': 'ArrowUp',
@@ -99,11 +144,18 @@
             };
             
             const mappedKey = keyMap[e.key] || e.key;
-            state.keys[mappedKey] = false;
             
-            // Send key event to Doom
-            sendKeyToDoom(mappedKey, false);
-        });
+            if (state.keys[mappedKey]) {
+                state.keys[mappedKey] = false;
+                sendKeyToDoom(mappedKey, false);
+            }
+        };
+        
+        // Add event listeners to both canvas and document
+        canvas.addEventListener('keydown', handleKeyDown, true);
+        canvas.addEventListener('keyup', handleKeyUp, true);
+        document.addEventListener('keydown', handleKeyDown, true);
+        document.addEventListener('keyup', handleKeyUp, true);
         
         // Handle focus
         canvas.addEventListener('focus', () => {
@@ -134,17 +186,21 @@
     // Mouse Controls
     function setupMouseControls() {
         canvas.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            canvas.focus();
+            
             if (e.button === 0) { // Left click
                 state.keys['Control'] = true;
                 sendKeyToDoom('Control', true);
             } else if (e.button === 2) { // Right click
-                e.preventDefault();
                 state.keys['Alt'] = true;
                 sendKeyToDoom('Alt', true);
             }
         });
         
         canvas.addEventListener('mouseup', (e) => {
+            e.preventDefault();
+            
             if (e.button === 0) {
                 state.keys['Control'] = false;
                 sendKeyToDoom('Control', false);
@@ -155,8 +211,13 @@
         });
         
         canvas.addEventListener('mousemove', (e) => {
-            if (state.pointerLocked) {
-                handleMouseMove(e.movementX, e.movementY);
+            if (state.pointerLocked || state.hasFocus) {
+                const movementX = e.movementX || e.mozMovementX || 0;
+                const movementY = e.movementY || e.mozMovementY || 0;
+                
+                if (movementX !== 0 || movementY !== 0) {
+                    handleMouseMove(movementX, movementY);
+                }
             }
         });
         
@@ -169,7 +230,13 @@
     function setupPointerLock() {
         canvas.addEventListener('click', () => {
             if (!state.pointerLocked && !state.isMobile) {
-                canvas.requestPointerLock();
+                canvas.requestPointerLock = canvas.requestPointerLock ||
+                                          canvas.mozRequestPointerLock ||
+                                          canvas.webkitRequestPointerLock;
+                                          
+                if (canvas.requestPointerLock) {
+                    canvas.requestPointerLock();
+                }
             }
         });
         
@@ -177,8 +244,12 @@
             state.pointerLocked = document.pointerLockElement === canvas;
         });
         
+        document.addEventListener('mozpointerlockchange', () => {
+            state.pointerLocked = document.mozPointerLockElement === canvas;
+        });
+        
         document.addEventListener('pointerlockerror', () => {
-            console.error('Pointer lock failed');
+            console.warn('Pointer lock failed');
         });
     }
     
@@ -289,33 +360,61 @@
     
     // Send key events to Doom
     function sendKeyToDoom(key, isDown) {
-        if (window.Module && window.Module.canvas) {
-            const event = new KeyboardEvent(isDown ? 'keydown' : 'keyup', {
-                key: key,
-                code: key,
-                bubbles: true,
-                cancelable: true
-            });
-            window.Module.canvas.dispatchEvent(event);
+        if (!window.Module || !window.Module.canvas) {
+            console.warn('Module not ready for key event');
+            return;
         }
+        
+        // Create proper key event
+        let keyCode;
+        switch(key) {
+            case 'ArrowUp': keyCode = 38; break;
+            case 'ArrowDown': keyCode = 40; break;
+            case 'ArrowLeft': keyCode = 37; break;
+            case 'ArrowRight': keyCode = 39; break;
+            case 'Control': keyCode = 17; break;
+            case 'Shift': keyCode = 16; break;
+            case 'Space': keyCode = 32; break;
+            case 'Enter': keyCode = 13; break;
+            case 'Escape': keyCode = 27; break;
+            case 'Tab': keyCode = 9; break;
+            case '1': keyCode = 49; break;
+            case '2': keyCode = 50; break;
+            case '3': keyCode = 51; break;
+            case '4': keyCode = 52; break;
+            case '5': keyCode = 53; break;
+            case '6': keyCode = 54; break;
+            case '7': keyCode = 55; break;
+            default: keyCode = key.charCodeAt(0);
+        }
+        
+        const event = new KeyboardEvent(isDown ? 'keydown' : 'keyup', {
+            key: key,
+            keyCode: keyCode,
+            which: keyCode,
+            code: key,
+            bubbles: true,
+            cancelable: true
+        });
+        
+        // Dispatch to both canvas and document
+        window.Module.canvas.dispatchEvent(event);
+        document.dispatchEvent(event);
     }
     
     // Handle mouse movement
     function handleMouseMove(deltaX, deltaY) {
-        if (window.Module && window.Module._mouseMove) {
-            // Call Doom's mouse move function if available
-            window.Module._mouseMove(deltaX, deltaY);
-        } else {
-            // Fallback: simulate mouse events
-            if (window.Module && window.Module.canvas) {
-                const event = new MouseEvent('mousemove', {
-                    movementX: deltaX,
-                    movementY: deltaY,
-                    bubbles: true
-                });
-                window.Module.canvas.dispatchEvent(event);
-            }
-        }
+        if (!window.Module || !window.Module.canvas) return;
+        
+        // Create mouse event
+        const event = new MouseEvent('mousemove', {
+            movementX: deltaX,
+            movementY: deltaY,
+            bubbles: true,
+            cancelable: true
+        });
+        
+        window.Module.canvas.dispatchEvent(event);
     }
     
     // UI Helpers
@@ -339,23 +438,8 @@
     window.Module = {
         preRun: [],
         postRun: [function() {
+            console.log('Doom engine loaded, initializing controls...');
             init();
-            
-            // Auto-start the game after initialization
-            setTimeout(() => {
-                // Send an Enter key press to start the game
-                simulateKey('Enter', true);
-                setTimeout(() => simulateKey('Enter', false), 100);
-                
-                // Send Escape key to close any pause menu if it appears
-                setTimeout(() => {
-                    simulateKey('Escape', true);
-                    setTimeout(() => simulateKey('Escape', false), 100);
-                }, 200);
-                
-                // Focus the canvas to ensure input works
-                canvas.focus();
-            }, 1000);
         }],
         
         canvas: canvas,
@@ -401,7 +485,10 @@
                     canvas.focus();
                 }, 500);
             }
-        }
+        },
+        
+        // Ensure keyboard input works
+        keyboardListeningElement: canvas
     };
     
     Module.setStatus('Downloading...');

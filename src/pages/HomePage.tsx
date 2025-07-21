@@ -207,14 +207,71 @@ const HomePage = () => {
                   path="/compare"
                 />
                 
-                <ToolCard
-                  variants={itemVariants}
-                  title="ASCII Video Art"
-                  description="Transform videos into animated ASCII art with parallel WebWorker processing. Real-time conversion with multiple retro color themes."
-                  icon="text_fields"
-                  accent="8"
-                  path="/ascii-video-converter"
-                />
+                {/* ASCII Art Studio Card - Custom */}
+                <motion.div variants={itemVariants}>
+                  <Link to="/ascii-video-converter" className="card h-full block" data-accent="8">
+                    <div className="p-6 flex flex-col items-start text-left flex-1 h-full">
+                      <div className="icon-container mb-4" data-accent="8">
+                        <div className="relative w-full h-full flex items-center justify-center">
+                          {/* Animated ASCII Art Icon */}
+                          <motion.div
+                            className="font-mono text-[10px] leading-[1.1] text-center text-white"
+                            animate={{
+                              opacity: [0.7, 1, 0.7],
+                              textShadow: [
+                                "0 0 10px #00ff41",
+                                "0 0 20px #00ff41",
+                                "0 0 10px #00ff41"
+                              ]
+                            }}
+                            transition={{
+                              duration: 2,
+                              repeat: Infinity,
+                              ease: "easeInOut"
+                            }}
+                          >
+                            <div>╔═══╗</div>
+                            <div>║▓▓▓║</div>
+                            <div>╚═══╝</div>
+                          </motion.div>
+                          
+                          {/* Matrix rain effect */}
+                          {[...Array(4)].map((_, i) => (
+                            <motion.div
+                              key={i}
+                              className="absolute text-[8px] font-mono text-green-400"
+                              style={{
+                                left: `${20 + i * 20}%`,
+                                top: -5
+                              }}
+                              animate={{
+                                y: [0, 45],
+                                opacity: [0, 0.6, 0]
+                              }}
+                              transition={{
+                                duration: 1.5 + i * 0.3,
+                                repeat: Infinity,
+                                delay: i * 0.2
+                              }}
+                            >
+                              {['@', '#', '%', '&', '*'][i]}
+                            </motion.div>
+                          ))}
+                        </div>
+                      </div>
+                      <h3 className="text-xl font-bold mb-3 text-white">ASCII Art Studio</h3>
+                      <p className="text-base text-gray-300 flex-1 leading-relaxed">
+                        Transform videos into animated ASCII art with parallel WebWorker processing. Real-time conversion with multiple retro color themes.
+                      </p>
+                      <div className="mt-4 pt-4 w-full">
+                        <div className="flex items-center text-sm font-medium text-cyan-400 hover:text-cyan-300 transition-colors">
+                          <span>Use Tool</span>
+                          <span className="material-symbols-outlined text-lg ml-1">arrow_forward</span>
+                        </div>
+                      </div>
+                    </div>
+                  </Link>
+                </motion.div>
                 
                 {/* Miscellaneous Tools Card - Enhanced with Star Wars styling */}
                 <motion.div

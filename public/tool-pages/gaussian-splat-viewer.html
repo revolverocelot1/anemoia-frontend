@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Gaussian Splat Viewer - Anemoia</title>
+    <meta name="description" content="Experience next-generation 3D visualization with Gaussian Splatting. View and interact with photorealistic 3D captures in your browser.">
+    <style>
+        :root {
+            --primary: #ff0080;
+            --secondary: #7928ca;
+            --accent: #0070f3;
+            --glow: #ff0080;
+            --bg-dark: #000000;
+            --text-light: #ffffff;
+            --text-dim: #999999;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg-dark);
+            color: var(--text-light);
+            overflow-x: hidden;
+        }
+        
+        /* Gaussian Splat Background Effect */
+        .splat-bg {
+            position: fixed;
+            inset: 0;
+            z-index: -1;
+            overflow: hidden;
+        }
+        
+        .splat {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(60px);
+            opacity: 0.6;
+            animation: splat-float 20s ease-in-out infinite;
+        }
+        
+        .splat:nth-child(1) {
+            width: 400px;
+            height: 400px;
+            background: radial-gradient(circle, var(--primary), transparent);
+            top: -200px;
+            left: -200px;
+        }
+        
+        .splat:nth-child(2) {
+            width: 300px;
+            height: 300px;
+            background: radial-gradient(circle, var(--secondary), transparent);
+            bottom: -150px;
+            right: -150px;
+            animation-delay: -10s;
+        }
+        
+        .splat:nth-child(3) {
+            width: 500px;
+            height: 500px;
+            background: radial-gradient(circle, var(--accent), transparent);
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            animation-delay: -5s;
+        }
+        
+        @keyframes splat-float {
+            0%, 100% {
+                transform: translate(0, 0) scale(1) rotate(0deg);
+            }
+            25% {
+                transform: translate(100px, -50px) scale(1.2) rotate(90deg);
+            }
+            50% {
+                transform: translate(-50px, 100px) scale(0.8) rotate(180deg);
+            }
+            75% {
+                transform: translate(-100px, -50px) scale(1.1) rotate(270deg);
+            }
+        }
+        
+        /* Point Cloud Animation */
+        .point-cloud {
+            position: fixed;
+            inset: 0;
+            z-index: -1;
+            pointer-events: none;
+        }
+        
+        .point {
+            position: absolute;
+            width: 2px;
+            height: 2px;
+            background: var(--primary);
+            border-radius: 50%;
+            box-shadow: 0 0 4px var(--primary);
+            animation: point-orbit 30s linear infinite;
+        }
+        
+        @keyframes point-orbit {
+            from {
+                transform: rotate(0deg) translateX(200px) rotate(0deg);
+            }
+            to {
+                transform: rotate(360deg) translateX(200px) rotate(-360deg);
+            }
+        }
+        
+        /* Hero Section */
+        .hero {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            padding: 2rem;
+        }
+        
+        .hero-content {
+            max-width: 1200px;
+            width: 100%;
+            text-align: center;
+            z-index: 1;
+        }
+        
+        .title {
+            font-size: 5rem;
+            font-weight: 900;
+            margin-bottom: 1rem;
+            background: linear-gradient(135deg, var(--primary), var(--secondary), var(--accent));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            position: relative;
+        }
+        
+        .title::after {
+            content: attr(data-text);
+            position: absolute;
+            left: 2px;
+            top: 2px;
+            z-index: -1;
+            background: none;
+            -webkit-text-fill-color: rgba(255, 255, 255, 0.1);
+            filter: blur(3px);
+        }
+        
+        .subtitle {
+            font-size: 1.5rem;
+            color: var(--text-dim);
+            margin-bottom: 3rem;
+        }
+        
+        /* 3D Demo Visualization */
+        .demo-container {
+            margin: 4rem auto;
+            max-width: 900px;
+            perspective: 1000px;
+        }
+        
+        .demo-3d-box {
+            width: 100%;
+            height: 500px;
+            position: relative;
+            transform-style: preserve-3d;
+            animation: rotate-3d 20s linear infinite;
+        }
+        
+        @keyframes rotate-3d {
+            from {
+                transform: rotateY(0deg) rotateX(10deg);
+            }
+            to {
+                transform: rotateY(360deg) rotateX(10deg);
+            }
+        }
+        
+        .splat-visual {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .splat-sphere {
+            width: 300px;
+            height: 300px;
+            background: radial-gradient(circle at 30% 30%, var(--primary), var(--secondary));
+            border-radius: 50%;
+            box-shadow: 
+                0 0 100px rgba(255, 0, 128, 0.5),
+                inset -20px -20px 50px rgba(0, 0, 0, 0.5);
+            animation: pulse 2s ease-in-out infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% {
+                transform: scale(1);
+            }
+            50% {
+                transform: scale(1.05);
+            }
+        }
+        
+        /* Features Section */
+        .features {
+            padding: 6rem 2rem;
+            position: relative;
+            z-index: 1;
+        }
+        
+        .features-title {
+            text-align: center;
+            font-size: 3rem;
+            margin-bottom: 3rem;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .features-grid {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 3rem;
+        }
+        
+        .feature {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            padding: 2.5rem;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+        
+        .feature::before {
+            content: '';
+            position: absolute;
+            top: -100%;
+            left: -100%;
+            width: 300%;
+            height: 300%;
+            background: radial-gradient(circle, var(--primary) 0%, transparent 70%);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            pointer-events: none;
+        }
+        
+        .feature:hover {
+            transform: translateY(-5px);
+            border-color: var(--primary);
+        }
+        
+        .feature:hover::before {
+            opacity: 0.1;
+        }
+        
+        .feature-icon {
+            font-size: 3rem;
+            margin-bottom: 1.5rem;
+            display: inline-block;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        /* Tech Showcase */
+        .tech-section {
+            padding: 4rem 2rem;
+            background: rgba(255, 255, 255, 0.02);
+        }
+        
+        .tech-content {
+            max-width: 1000px;
+            margin: 0 auto;
+            text-align: center;
+        }
+        
+        .tech-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 2rem;
+            margin-top: 3rem;
+        }
+        
+        .tech-item {
+            padding: 2rem;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+            transition: all 0.3s ease;
+        }
+        
+        .tech-item:hover {
+            background: rgba(255, 255, 255, 0.08);
+            transform: scale(1.05);
+        }
+        
+        /* CTA Section */
+        .cta-section {
+            padding: 6rem 2rem;
+            text-align: center;
+            position: relative;
+        }
+        
+        .cta-button {
+            display: inline-block;
+            padding: 1.5rem 4rem;
+            font-size: 1.3rem;
+            font-weight: bold;
+            text-decoration: none;
+            color: var(--text-light);
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            border-radius: 50px;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s ease;
+            box-shadow: 0 10px 30px rgba(255, 0, 128, 0.3);
+        }
+        
+        .cta-button:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 15px 40px rgba(255, 0, 128, 0.5);
+        }
+        
+        .cta-button::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            transition: width 0.6s, height 0.6s;
+        }
+        
+        .cta-button:hover::before {
+            width: 400px;
+            height: 400px;
+        }
+        
+        @media (max-width: 768px) {
+            .title {
+                font-size: 3rem;
+            }
+            
+            .demo-3d-box {
+                height: 300px;
+            }
+            
+            .splat-sphere {
+                width: 200px;
+                height: 200px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="splat-bg">
+        <div class="splat"></div>
+        <div class="splat"></div>
+        <div class="splat"></div>
+    </div>
+    
+    <div class="point-cloud" id="pointCloud"></div>
+    
+    <section class="hero">
+        <div class="hero-content">
+            <h1 class="title" data-text="Gaussian Splat Viewer">Gaussian Splat Viewer</h1>
+            <p class="subtitle">Experience photorealistic 3D in your browser</p>
+            
+            <div class="demo-container">
+                <div class="demo-3d-box">
+                    <div class="splat-visual">
+                        <div class="splat-sphere"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <p style="color: var(--text-dim); font-size: 1.1rem; margin-bottom: 2rem;">
+                Revolutionary 3D rendering technology that captures reality with unprecedented detail
+            </p>
+        </div>
+    </section>
+    
+    <section class="features">
+        <h2 class="features-title">Next-Gen 3D Visualization</h2>
+        
+        <div class="features-grid">
+            <div class="feature">
+                <div class="feature-icon">✨</div>
+                <h3 style="font-size: 1.5rem; margin-bottom: 1rem;">Photorealistic Quality</h3>
+                <p style="color: var(--text-dim);">View 3D scenes with incredible detail and realism. Every reflection, texture, and lighting nuance is preserved</p>
+            </div>
+            
+            <div class="feature">
+                <div class="feature-icon">🚀</div>
+                <h3 style="font-size: 1.5rem; margin-bottom: 1rem;">Real-Time Rendering</h3>
+                <p style="color: var(--text-dim);">Smooth 60+ FPS performance on modern GPUs. Optimized WebGL rendering for instant interaction</p>
+            </div>
+            
+            <div class="feature">
+                <div class="feature-icon">🌐</div>
+                <h3 style="font-size: 1.5rem; margin-bottom: 1rem;">Web-Based</h3>
+                <p style="color: var(--text-dim);">No downloads or installations. View and share 3D captures directly in any modern browser</p>
+            </div>
+            
+            <div class="feature">
+                <div class="feature-icon">🎮</div>
+                <h3 style="font-size: 1.5rem; margin-bottom: 1rem;">Interactive Controls</h3>
+                <p style="color: var(--text-dim);">Orbit, pan, and zoom with intuitive mouse and touch controls. VR support for immersive viewing</p>
+            </div>
+            
+            <div class="feature">
+                <div class="feature-icon">📊</div>
+                <h3 style="font-size: 1.5rem; margin-bottom: 1rem;">Efficient Compression</h3>
+                <p style="color: var(--text-dim);">Advanced compression algorithms reduce file sizes while maintaining visual quality</p>
+            </div>
+            
+            <div class="feature">
+                <div class="feature-icon">🔧</div>
+                <h3 style="font-size: 1.5rem; margin-bottom: 1rem;">Developer Friendly</h3>
+                <p style="color: var(--text-dim);">Easy integration with existing 3D pipelines. Support for PLY and custom splat formats</p>
+            </div>
+        </div>
+    </section>
+    
+    <section class="tech-section">
+        <div class="tech-content">
+            <h2 style="font-size: 2.5rem; margin-bottom: 1rem;">Powered by Cutting-Edge Tech</h2>
+            <p style="color: var(--text-dim); font-size: 1.2rem;">
+                Gaussian Splatting represents objects as millions of 3D Gaussians instead of polygons
+            </p>
+            
+            <div class="tech-grid">
+                <div class="tech-item">
+                    <h3>3D Gaussians</h3>
+                    <p style="color: var(--text-dim); font-size: 0.9rem;">Volumetric primitives that naturally represent fuzzy geometry</p>
+                </div>
+                <div class="tech-item">
+                    <h3>Neural Rendering</h3>
+                    <p style="color: var(--text-dim); font-size: 0.9rem;">AI-optimized representation for photorealistic results</p>
+                </div>
+                <div class="tech-item">
+                    <h3>WebGL 2.0</h3>
+                    <p style="color: var(--text-dim); font-size: 0.9rem;">Hardware-accelerated rendering in the browser</p>
+                </div>
+                <div class="tech-item">
+                    <h3>Adaptive LOD</h3>
+                    <p style="color: var(--text-dim); font-size: 0.9rem;">Dynamic level-of-detail for optimal performance</p>
+                </div>
+            </div>
+        </div>
+    </section>
+    
+    <section class="cta-section">
+        <h2 style="font-size: 2.5rem; margin-bottom: 1rem;">Ready to Explore 3D?</h2>
+        <p style="color: var(--text-dim); font-size: 1.2rem; margin-bottom: 2rem;">
+            View stunning 3D captures with our Gaussian Splat Viewer
+        </p>
+        <a href="/splat-viewer" class="cta-button">
+            <span style="position: relative; z-index: 1;">Launch Viewer</span>
+        </a>
+    </section>
+    
+    <script>
+        // Create point cloud
+        const pointCloud = document.getElementById('pointCloud');
+        const centerX = window.innerWidth / 2;
+        const centerY = window.innerHeight / 2;
+        
+        for (let i = 0; i < 100; i++) {
+            const point = document.createElement('div');
+            point.className = 'point';
+            
+            const angle = (i / 100) * Math.PI * 2;
+            const radius = 100 + Math.random() * 200;
+            const x = centerX + Math.cos(angle) * radius;
+            const y = centerY + Math.sin(angle) * radius;
+            
+            point.style.left = x + 'px';
+            point.style.top = y + 'px';
+            point.style.animationDelay = (i * 0.1) + 's';
+            point.style.animationDuration = (20 + Math.random() * 10) + 's';
+            
+            // Random colors
+            const colors = ['#ff0080', '#7928ca', '#0070f3'];
+            point.style.background = colors[Math.floor(Math.random() * colors.length)];
+            point.style.boxShadow = `0 0 8px ${point.style.background}`;
+            
+            pointCloud.appendChild(point);
+        }
+        
+        // Interactive 3D effect on mouse move
+        const demo3d = document.querySelector('.demo-3d-box');
+        let mouseX = 0, mouseY = 0;
+        let targetX = 0, targetY = 0;
+        
+        document.addEventListener('mousemove', (e) => {
+            mouseX = (e.clientX / window.innerWidth - 0.5) * 2;
+            mouseY = (e.clientY / window.innerHeight - 0.5) * 2;
+        });
+        
+        function updateRotation() {
+            targetX += (mouseX - targetX) * 0.05;
+            targetY += (mouseY - targetY) * 0.05;
+            
+            demo3d.style.transform = `rotateY(${targetX * 30}deg) rotateX(${-targetY * 30 + 10}deg)`;
+            
+            requestAnimationFrame(updateRotation);
+        }
+        
+        // Start animation only on desktop
+        if (window.innerWidth > 768) {
+            demo3d.style.animation = 'none';
+            updateRotation();
+        }
+    </script>
+</body>
+</html> 
