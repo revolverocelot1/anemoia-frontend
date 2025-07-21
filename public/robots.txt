@@ -8,16 +8,7 @@ Allow: /
 # Sitemap location
 Sitemap: https://anemoias.me/sitemap.xml
 
-# Disallow crawling of specific directories
-Disallow: /api/
-Disallow: /admin/
-Disallow: /.git/
-Disallow: /node_modules/
-
-# Crawl delay (in seconds) - optional
-Crawl-delay: 1
-
-# Specific crawler rules
+# Allow all major search engine crawlers
 User-agent: Googlebot
 Allow: /
 
@@ -29,6 +20,15 @@ Allow: /
 
 User-agent: DuckDuckBot
 Allow: /
+
+# Disallow sensitive or unnecessary pages
+Disallow: /auth/callback
+Disallow: /test
+Disallow: /api/
+Disallow: /.well-known/
+
+# Crawl-delay for respectful crawling
+Crawl-delay: 1
 
 # Block bad bots
 User-agent: AhrefsBot

@@ -1,56 +1,110 @@
-# Google Search Console Sitemap Submission Guide
+# Google Search Console Indexing Guide for anemoias.me
 
-## Step 1: Access Google Search Console
-1. Go to [Google Search Console](https://search.google.com/search-console)
-2. Sign in with your Google account
+## 1. Set Up Google Search Console
 
-## Step 2: Add Your Property
-1. Click "Add property"
-2. Choose "Domain" and enter: `anemoias.me`
-3. Or choose "URL prefix" and enter: `https://anemoias.me`
+1. Go to [Google Search Console](https://search.google.com/search-console/)
+2. Add your property: `https://anemoias.me`
+3. Verify ownership using one of these methods:
+   - HTML file upload (recommended)
+   - HTML tag
+   - Domain name provider
+   - Google Analytics
+   - Google Tag Manager
 
-## Step 3: Verify Ownership
-Choose one of these methods:
+## 2. Submit Your Sitemap
 
-### Method 1: HTML File Upload (Recommended)
-1. Download the HTML verification file from Google
-2. Upload it to your public folder
-3. Deploy to Render
-4. Click "Verify" in Search Console
-
-### Method 2: DNS TXT Record
-1. Go to your domain registrar (where you bought anemoias.me)
-2. Add the TXT record Google provides
-3. Wait 5-10 minutes for DNS propagation
-4. Click "Verify"
-
-### Method 3: HTML Meta Tag
-1. Copy the meta tag from Google
-2. Add it to your index.html <head> section
-3. Deploy and verify
-
-## Step 4: Submit Your Sitemap
-1. After verification, go to "Sitemaps" in the left menu
-2. Enter: `sitemap.xml` in the "Add a new sitemap" field
+1. In Search Console, go to "Sitemaps" in the left menu
+2. Enter: `https://anemoias.me/sitemap.xml`
 3. Click "Submit"
-4. Google will process it (may take a few hours to days)
+4. Google will automatically crawl and index all URLs in your sitemap
 
-## Step 5: Request Indexing for Important Pages
+## 3. Request Indexing for Important Pages
+
+For faster indexing of critical pages:
+
 1. Go to "URL Inspection" tool
 2. Enter each important URL:
-   - `https://anemoias.me`
+   - `https://anemoias.me/`
    - `https://anemoias.me/compare/landing`
    - `https://anemoias.me/depth-map/landing`
    - `https://anemoias.me/upscaler/landing`
+   - `https://anemoias.me/pose-estimation/landing`
+   - `https://anemoias.me/splat-viewer/landing`
+   - `https://anemoias.me/ascii-video-converter`
 3. Click "Request Indexing" for each
 
-## Step 6: Monitor Performance
-1. Check "Performance" tab after a few days
-2. View "Coverage" for indexing issues
-3. Check "Core Web Vitals" for performance
+## 4. Improve Indexing with robots.txt
 
-## Additional Tips
-- Submit sitemap after each major update
-- Fix any errors shown in Coverage report
-- Use URL Inspection to debug specific pages
-- Check Mobile Usability report 
+Create or update `/public/robots.txt`:
+
+```
+User-agent: *
+Allow: /
+Sitemap: https://anemoias.me/sitemap.xml
+
+# Allow all crawlers
+User-agent: Googlebot
+Allow: /
+
+User-agent: Bingbot
+Allow: /
+
+# Disallow auth callback pages
+Disallow: /auth/callback
+Disallow: /test
+```
+
+## 5. Add Structured Data (Optional but Recommended)
+
+Add JSON-LD structured data to your tool pages for better search appearance:
+
+```javascript
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebApplication",
+  "name": "Anemoia AI Tools",
+  "url": "https://anemoias.me",
+  "description": "Free AI-powered image and video processing tools",
+  "applicationCategory": "Multimedia",
+  "offers": {
+    "@type": "Offer",
+    "price": "0",
+    "priceCurrency": "USD"
+  }
+}
+</script>
+```
+
+## 6. Monitor Indexing Progress
+
+1. Check "Coverage" report in Search Console
+2. Monitor "Performance" to see which pages appear in search
+3. Use "Core Web Vitals" to ensure good page experience
+
+## 7. Best Practices for Better Indexing
+
+1. **Internal Linking**: Link between your tools and landing pages
+2. **Fresh Content**: Update landing pages regularly
+3. **Page Speed**: Optimize images and code for fast loading
+4. **Mobile-Friendly**: Ensure all pages work well on mobile
+5. **Meta Tags**: Each page should have unique title and description tags
+
+## 8. Common Issues and Solutions
+
+- **Pages not indexed**: Check robots.txt, ensure pages are in sitemap
+- **Slow indexing**: Request manual indexing, improve page quality
+- **Duplicate content**: Use canonical tags to specify preferred URLs
+- **404 errors**: Fix broken links or redirect them
+
+## Timeline
+
+- Sitemap submission: Indexed within 1-3 days
+- Manual indexing requests: Usually within hours
+- Full site indexing: 1-4 weeks depending on site size
+
+## Additional Resources
+
+- [Google Search Console Help](https://support.google.com/webmasters/)
+- [Google SEO Starter Guide](https://developers.google.com/search/docs/beginner/seo-starter-guide)
+- [PageSpeed Insights](https://pagespeed.web.dev/) - Check your site speed 

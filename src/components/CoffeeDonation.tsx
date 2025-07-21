@@ -1,33 +1,124 @@
 ﻿import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
+// Diverse messages for the coffee popup
+const COFFEE_MESSAGES = [
+  "Coffee time? ☕",
+  "Support me with coffee! ☕",
+  "Buy me a coffee? 🥺",
+  "Fuel my coding! ⚡",
+  "Keep me caffeinated! ☕",
+  "Coffee = More features! 🚀",
+  "Help me stay awake! 😴",
+  "Espresso yourself! ☕",
+  "Coffee break? ☕",
+  "Coding fuel needed! ⚡",
+  "Support = ❤️ + ☕",
+  "Coffee powers AI! 🤖",
+  "Buy me a latte? ☕",
+  "Keep the code flowing! 💻",
+  "Coffee fund? 🙏",
+];
+
+// Possible positions on the sidelines
+type SidePosition = {
+  side: 'left' | 'right' | 'top';
+  position: string;
+  initial: any;
+  animate: any;
+  exit: any;
+  className: string;
+  style: React.CSSProperties;
+};
+
 const CoffeeDonation = () => {
-  const [isVisible, setIsVisible] = useState(true); // Start visible for testing
+  const [isVisible, setIsVisible] = useState(false);
   const [showCount, setShowCount] = useState(0);
+  const [currentMessage, setCurrentMessage] = useState(COFFEE_MESSAGES[0]);
+  const [currentPosition, setCurrentPosition] = useState<SidePosition | null>(null);
+
+  // Function to get random sideline position
+  const getRandomSidePosition = (): SidePosition => {
+    const sides = ['left', 'right', 'top'] as const;
+    const side = sides[Math.floor(Math.random() * sides.length)];
+    
+    // Random vertical position for left/right sides (20% to 80% of viewport height)
+    const verticalPos = 20 + Math.random() * 60;
+    
+    // Random horizontal position for top side (20% to 80% of viewport width)
+    const horizontalPos = 20 + Math.random() * 60;
+    
+    switch (side) {
+      case 'left':
+        return {
+          side: 'left',
+          position: `${verticalPos}%`,
+          initial: { x: -100, opacity: 0, scale: 0 },
+          animate: { x: 0, opacity: 1, scale: 1 },
+          exit: { x: -100, opacity: 0, scale: 0 },
+          className: `fixed left-4 z-[9999]`,
+          style: { top: `${verticalPos}%` }
+        };
+      case 'right':
+        return {
+          side: 'right',
+          position: `${verticalPos}%`,
+          initial: { x: 100, opacity: 0, scale: 0 },
+          animate: { x: 0, opacity: 1, scale: 1 },
+          exit: { x: 100, opacity: 0, scale: 0 },
+          className: `fixed right-4 z-[9999]`,
+          style: { top: `${verticalPos}%` }
+        };
+      case 'top':
+        return {
+          side: 'top',
+          position: `${horizontalPos}%`,
+          initial: { y: -100, opacity: 0, scale: 0 },
+          animate: { y: 0, opacity: 1, scale: 1 },
+          exit: { y: -100, opacity: 0, scale: 0 },
+          className: `fixed top-4 z-[9999]`,
+          style: { left: `${horizontalPos}%` }
+        };
+    }
+  };
 
   // Show the button periodically with cartoon pop effect
   useEffect(() => {
-    // Hide after 3 seconds initially
-    const hideTimer = setTimeout(() => {
-      setIsVisible(false);
-    }, 3000);
-
     const showButton = () => {
+      // Select random message
+      const randomMessage = COFFEE_MESSAGES[Math.floor(Math.random() * COFFEE_MESSAGES.length)];
+      setCurrentMessage(randomMessage);
+      
+      // Select random position
+      const position = getRandomSidePosition();
+      setCurrentPosition(position);
+      
       setIsVisible(true);
       setShowCount(prev => prev + 1);
       
-      // Auto-hide after 3 seconds
+      // Auto-hide after 5 seconds
       setTimeout(() => {
         setIsVisible(false);
-      }, 3000);
+      }, 5000);
     };
 
-    // Show every 2 minutes
-    const interval = setInterval(showButton, 120000);
+    // Initial delay of 30 seconds
+    const initialTimer = setTimeout(showButton, 30000);
+
+    // Show every 2-3 minutes (random interval)
+    const setupInterval = () => {
+      const randomInterval = 120000 + Math.random() * 60000; // 2-3 minutes
+      return setTimeout(() => {
+        showButton();
+        setupInterval(); // Set up next interval
+      }, randomInterval);
+    };
+
+    const intervalTimer = setupInterval();
 
     return () => {
-      clearTimeout(hideTimer);
-      clearInterval(interval);
+      clearTimeout(initialTimer);
+      clearTimeout(intervalTimer);
     };
   }, []);
 
@@ -38,14 +129,12 @@ const CoffeeDonation = () => {
 
   return (
     <AnimatePresence>
-      {isVisible && (
+      {isVisible && currentPosition && (
         <motion.div
           key={showCount} // Force re-animation on each show
-          initial={{ scale: 0, opacity: 0, y: 100 }}
-          animate={{ 
-            scale: 1,
-            opacity: 1,
-            y: 0,
+          initial={currentPosition.initial}
+          animate={{
+            ...currentPosition.animate,
             transition: {
               type: "spring",
               duration: 0.6,
@@ -54,17 +143,15 @@ const CoffeeDonation = () => {
               stiffness: 100
             }
           }}
-          exit={{ 
-            scale: 0,
-            opacity: 0,
-            y: -50,
-            transition: { 
+          exit={{
+            ...currentPosition.exit,
+            transition: {
               duration: 0.3,
               ease: "easeIn"
             }
           }}
-          className="fixed bottom-6 right-6 z-[9999]"
-          style={{ pointerEvents: 'auto' }}
+          className={currentPosition.className}
+          style={{ ...currentPosition.style, pointerEvents: 'auto' }}
         >
           <motion.button
             onClick={handleClick}
@@ -157,7 +244,7 @@ const CoffeeDonation = () => {
               className="absolute -top-12 left-1/2 transform -translate-x-1/2 whitespace-nowrap"
             >
               <div className="relative bg-white rounded-2xl px-3 py-1.5 shadow-lg border-2 border-gray-200">
-                <div className="text-xs font-bold text-gray-800">Coffee time? </div>
+                <div className="text-xs font-bold text-gray-800">{currentMessage}</div>
                 {/* Bubble tail */}
                 <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-full">
                   <div className="w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[8px] border-t-white" />

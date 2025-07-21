@@ -13,7 +13,8 @@
         isMobile: /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent),
         hasFocus: false,
         pointerLocked: false,
-        isInitialized: false
+        isInitialized: false,
+        mouseSensitivity: 0.4  // Reduced from 1.0 (default) to 0.4 for less sensitive mouse
     };
     
     // Get elements
@@ -216,7 +217,8 @@
                 const movementY = e.movementY || e.mozMovementY || 0;
                 
                 if (movementX !== 0 || movementY !== 0) {
-                    handleMouseMove(movementX, movementY);
+                    // Apply sensitivity multiplier to reduce mouse movement
+                    handleMouseMove(movementX * state.mouseSensitivity, movementY * state.mouseSensitivity);
                 }
             }
         });

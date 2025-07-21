@@ -460,6 +460,9 @@ const ASCIIVideoConverter: React.FC = () => {
       // Render colored ASCII
       let colorIndex = 0;
       
+      // Enable shadows for colored mode for better visibility
+      ctx.shadowBlur = 1;
+      
       lines.forEach((line, lineIndex) => {
         const y = lineIndex * charHeight;
         
@@ -474,14 +477,21 @@ const ASCIIVideoConverter: React.FC = () => {
             colorIndex += 3;
             
             ctx.fillStyle = `rgb(${r},${g},${b})`;
+            ctx.shadowColor = `rgba(${r},${g},${b},0.5)`;
           } else {
             // Fallback color
             ctx.fillStyle = theme.text;
+            ctx.shadowColor = theme.glow;
           }
           
           // Draw character
           if (char !== ' ') {
             ctx.fillText(char, x, y);
+          } else {
+            // For spaces in colored mode, draw a faint colored block
+            ctx.globalAlpha = 0.1;
+            ctx.fillRect(x, y, charWidth, charHeight);
+            ctx.globalAlpha = 1.0;
           }
         }
       });
@@ -921,7 +931,12 @@ const ASCIIVideoConverter: React.FC = () => {
     const exportCanvas = document.createElement('canvas');
     exportCanvas.width = maxLineLength * charWidth;
     exportCanvas.height = lineCount * charHeight;
-    const ctx = exportCanvas.getContext('2d', { willReadFrequently: true });
+    const ctx = exportCanvas.getContext('2d', { 
+      willReadFrequently: true,
+      alpha: false, // Opaque background for better color
+      colorSpace: 'srgb', // Ensure consistent color space
+      desynchronized: false // Better color accuracy
+    });
     
     if (!ctx) return;
     
@@ -931,7 +946,8 @@ const ASCIIVideoConverter: React.FC = () => {
     
     const mediaRecorder = new MediaRecorder(stream, {
       mimeType,
-      videoBitsPerSecond: 5000000 // 5 Mbps for good quality
+      videoBitsPerSecond: 10000000, // Increased from 5 Mbps to 10 Mbps for better color quality
+      audioBitsPerSecond: 0 // No audio
     });
     
     const chunks: Blob[] = [];
