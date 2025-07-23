@@ -42,19 +42,46 @@ export class FFmpegService {
     if (this.loaded) return;
     
     try {
-      // Load FFmpeg with WebAssembly files from CDN
-      const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd';
+      // Check if we're in development or production
+      const isDevelopment = import.meta.env.DEV;
       
-      await this.ffmpeg.load({
-        coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
-        wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
-      });
+      // Load FFmpeg with WebAssembly files from local public directory
+      if (isDevelopment) {
+        // In development, use local files directly
+        await this.ffmpeg.load({
+          coreURL: '/ffmpeg/ffmpeg-core.js',
+          wasmURL: '/ffmpeg/ffmpeg-core.wasm',
+        });
+      } else {
+        // In production, use local files with proper base URL
+        const base = import.meta.env.BASE_URL || '/';
+        await this.ffmpeg.load({
+          coreURL: `${base}ffmpeg/ffmpeg-core.js`,
+          wasmURL: `${base}ffmpeg/ffmpeg-core.wasm`,
+        });
+      }
       
       this.loaded = true;
-      console.log('FFmpeg.wasm loaded successfully');
+      console.log('FFmpeg.wasm loaded successfully from local files');
     } catch (error) {
       console.error('Failed to load FFmpeg:', error);
-      throw new Error('Failed to load FFmpeg. Please check your internet connection.');
+      
+      // Fallback to CDN if local loading fails
+      try {
+        console.log('Attempting to load FFmpeg from CDN as fallback...');
+        const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd';
+        
+        await this.ffmpeg.load({
+          coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
+          wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
+        });
+        
+        this.loaded = true;
+        console.log('FFmpeg.wasm loaded successfully from CDN');
+      } catch (cdnError) {
+        console.error('Failed to load FFmpeg from CDN:', cdnError);
+        throw new Error('Failed to load FFmpeg. Please check your internet connection.');
+      }
     }
   }
   

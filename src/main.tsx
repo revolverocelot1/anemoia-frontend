@@ -1,4 +1,7 @@
 // src/main.tsx (Corrected)
+// Import ONNX patch first before any other modules
+import './utils/onnx-patch';
+
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
@@ -17,6 +20,18 @@ import { validateEnvironment } from './config/environment';
 import * as THREE from 'three';
 import * as R3F from '@react-three/fiber';
 import * as Drei from '@react-three/drei';
+
+// Fix ONNX Runtime WebGL backend conflict
+// This prevents multiple versions from trying to register the same backend
+(window as any).ort = (window as any).ort || {};
+if ((window as any).ort.env) {
+  (window as any).ort.env.wasm = (window as any).ort.env.wasm || {};
+  (window as any).ort.env.wasm.numThreads = 1;
+  (window as any).ort.env.wasm.simd = true;
+  // Prevent WebGL backend registration conflicts
+  (window as any).ort.env.webgl = (window as any).ort.env.webgl || {};
+  (window as any).ort.env.webgl.disabled = false;
+}
 
 // Make them globally available for debugging
 (window as any).THREE = THREE;

@@ -1,11 +1,10 @@
 import { createClient } from '@supabase/supabase-js';
-
 import { supabaseConfig } from '../config/supabase.config';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || supabaseConfig.url;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || supabaseConfig.anonKey;
+// Create Supabase client
+export const supabase = createClient(supabaseConfig.url, supabaseConfig.anonKey);
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export default supabase;
 
 // Database types
 export interface User {

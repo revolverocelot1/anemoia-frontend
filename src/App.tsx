@@ -3,6 +3,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import AnimatedPage from './components/AnimatedPage';
 import ErrorBoundary from './components/ErrorBoundary';
 import LoadingFallback from './components/LoadingFallback';
+import ProtectedRoute from './components/ProtectedRoute';
 import HomePage from './pages/HomePage';
 import DepthMapPage from './pages/DepthMapPage';
 import AuthCallbackPage from './pages/AuthCallbackPage';
@@ -30,9 +31,14 @@ import { SupabaseAuthProvider } from './context/SupabaseAuthContext';
 import SupabaseLoginPage from './pages/SupabaseLoginPage';
 import { detectGPU, logDeploymentInfo } from './utils/gpuUtils';
 import FaceSwapPage from './pages/FaceSwapPage';
-import SubtitlePage from './pages/SubtitlePage';
 import { AnimatePresence } from 'framer-motion';
 import ASCIIVideoConverter from './pages/ASCIIVideoConverter'
+
+// Lazy load SubtitlePage to prevent ONNX runtime conflicts on app startup
+const SubtitlePage = lazy(() => import('./pages/SubtitlePageEnhanced'));
+const DemoLoginPage = lazy(() => import('./pages/DemoLoginPage'));
+const LoginPage = lazy(() => import('./pages/LoginPage'));
+const OAuthCallbackPage = lazy(() => import('./pages/OAuthCallbackPage'));
 
 // Landing Pages
 import ImageComparisonLanding from './pages/landing/ImageComparisonLanding';
@@ -293,7 +299,9 @@ function App() {
               path="/login"
               element={
                 <AnimatedPage>
-                  <SupabaseLoginPage />
+                  <Suspense fallback={<LoadingFallback />}>
+                    <LoginPage />
+                  </Suspense>
                 </AnimatedPage>
               }
             />
@@ -302,6 +310,46 @@ function App() {
               element={
                 <AnimatedPage>
                   <AuthCallbackPage />
+                </AnimatedPage>
+              }
+            />
+            <Route
+              path="/auth/callback/google"
+              element={
+                <AnimatedPage>
+                  <Suspense fallback={<LoadingFallback />}>
+                    <OAuthCallbackPage />
+                  </Suspense>
+                </AnimatedPage>
+              }
+            />
+            <Route
+              path="/auth/callback/twitter"
+              element={
+                <AnimatedPage>
+                  <Suspense fallback={<LoadingFallback />}>
+                    <OAuthCallbackPage />
+                  </Suspense>
+                </AnimatedPage>
+              }
+            />
+            <Route
+              path="/auth/callback/github"
+              element={
+                <AnimatedPage>
+                  <Suspense fallback={<LoadingFallback />}>
+                    <OAuthCallbackPage />
+                  </Suspense>
+                </AnimatedPage>
+              }
+            />
+            <Route
+              path="/auth/success"
+              element={
+                <AnimatedPage>
+                  <Suspense fallback={<LoadingFallback />}>
+                    <OAuthCallbackPage />
+                  </Suspense>
                 </AnimatedPage>
               }
             />
@@ -405,9 +453,13 @@ function App() {
             <Route
               path="/subtitle"
               element={
-                <AnimatedPage>
-                  <SubtitlePage />
-                </AnimatedPage>
+                <ProtectedRoute>
+                  <AnimatedPage>
+                    <Suspense fallback={<LoadingFallback />}>
+                      <SubtitlePage />
+                    </Suspense>
+                  </AnimatedPage>
+                </ProtectedRoute>
               }
             />
             <Route

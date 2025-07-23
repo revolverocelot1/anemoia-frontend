@@ -241,10 +241,10 @@ const CoffeeDonation = () => {
               initial={{ scale: 0, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               transition={{ delay: 0.3 }}
-              className="absolute -top-12 left-1/2 transform -translate-x-1/2 whitespace-nowrap"
+              className="absolute -top-14 left-1/2 transform -translate-x-1/2"
             >
-              <div className="relative bg-white rounded-2xl px-3 py-1.5 shadow-lg border-2 border-gray-200">
-                <div className="text-xs font-bold text-gray-800">{currentMessage}</div>
+              <div className="relative bg-white rounded-2xl px-3 py-2 shadow-lg border-2 border-gray-200 max-w-[150px]">
+                <div className="text-xs font-bold text-gray-800 text-center">{currentMessage}</div>
                 {/* Bubble tail */}
                 <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-full">
                   <div className="w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[8px] border-t-white" />
