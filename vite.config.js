@@ -1,26 +1,56 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { resolve } from 'path';
+// Custom plugin to handle ONNX WASM imports
+const onnxWasmPlugin = () => {
+    return {
+        name: 'onnx-wasm-resolver',
+        resolveId(id) {
+            // Handle ONNX WASM module imports
+            if (id.includes('ort-wasm-simd-threaded.jsep')) {
+                const extension = id.split('.').pop()?.split('?')[0];
+                return `/ort-wasm/ort-wasm-simd-threaded.jsep.${extension}`;
+            }
+            return null;
+        },
+        transform(code, id) {
+            // Transform dynamic imports for ONNX modules
+            if (code.includes('import(') && code.includes('ort-wasm')) {
+                return code.replace(/import\s*\(\s*["']([^"']*ort-wasm[^"']*)["']\s*\)/g, (match, path) => {
+                    const filename = path.split('/').pop() || '';
+                    return `import('/ort-wasm/${filename}')`;
+                });
+            }
+            return code;
+        }
+    };
+};
 // https://vitejs.dev/config/
 export default defineConfig({
-    plugins: [react()],
+    plugins: [react(), onnxWasmPlugin()],
     base: '/',
     assetsInclude: ['**/*.wasm'],
     optimizeDeps: {
         exclude: [
-            'onnxruntime-web',
             '@ffmpeg/ffmpeg',
             '@ffmpeg/util',
-            '@huggingface/transformers'
+            '@huggingface/transformers',
+            '@xenova/transformers'
         ],
         include: [
+            'onnxruntime-web',
             '@tensorflow/tfjs-core',
             '@tensorflow/tfjs-backend-cpu',
             '@tensorflow/tfjs-backend-webgl',
             '@tensorflow/tfjs-backend-webgpu',
             '@tensorflow-models/pose-detection',
             '@mediapipe/pose'
-        ]
+        ],
+        esbuildOptions: {
+            define: {
+                global: 'globalThis'
+            }
+        }
     },
     worker: {
         format: 'es'
@@ -98,7 +128,10 @@ export default defineConfig({
             'three': 'three',
             '@react-three/fiber': '@react-three/fiber',
             '@react-three/drei': '@react-three/drei',
-            '@mediapipe/pose': resolve(__dirname, 'node_modules/@mediapipe/pose/pose.js')
+            '@mediapipe/pose': resolve(__dirname, 'node_modules/@mediapipe/pose/pose.js'),
+            // Force all ONNX Runtime imports to use the same version
+            'onnxruntime-web': resolve(__dirname, 'node_modules/onnxruntime-web/dist/ort.min.js'),
+            'onnxruntime-web/webgpu': resolve(__dirname, 'node_modules/onnxruntime-web/dist/ort.webgpu.min.js')
         },
     },
 });

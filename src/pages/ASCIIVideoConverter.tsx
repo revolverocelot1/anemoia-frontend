@@ -296,6 +296,14 @@ const ASCIIVideoConverter: React.FC = () => {
       setFrameBuffer(prev => {
         const newBuffer = new Map(prev);
         newBuffer.set(frame.frameNumber, frame);
+        
+        // Clean up old frames to prevent memory leak
+        if (newBuffer.size > MAX_BUFFER_SIZE) {
+          const sortedKeys = Array.from(newBuffer.keys()).sort((a, b) => a - b);
+          const keysToRemove = sortedKeys.slice(0, sortedKeys.length - MAX_BUFFER_SIZE);
+          keysToRemove.forEach(key => newBuffer.delete(key));
+        }
+        
         return newBuffer;
       });
       
@@ -305,6 +313,14 @@ const ASCIIVideoConverter: React.FC = () => {
         setProcessedColorFrames(prev => {
           const newMap = new Map(prev);
           newMap.set(frame.frameNumber, coloredHtml);
+          
+          // Clean up old colored frames
+          if (newMap.size > MAX_BUFFER_SIZE) {
+            const sortedKeys = Array.from(newMap.keys()).sort((a, b) => a - b);
+            const keysToRemove = sortedKeys.slice(0, sortedKeys.length - MAX_BUFFER_SIZE);
+            keysToRemove.forEach(key => newMap.delete(key));
+          }
+          
           return newMap;
         });
       }
@@ -316,7 +332,22 @@ const ASCIIVideoConverter: React.FC = () => {
     nextExpectedFrameRef.current = currentExpected;
     
     // Update ordered frames array
-    setOrderedFrames(prev => [...prev, ...newOrderedFrames]);
+    setOrderedFrames(prev => {
+      const updated = [...prev, ...newOrderedFrames];
+      
+      // Perform memory cleanup on ordered frames
+      if (updated.length > MAX_BUFFER_SIZE * 2) {
+        // Keep only the most recent frames and clear color data from older ones
+        updated.forEach((frame, index) => {
+          if (index < updated.length - MAX_BUFFER_SIZE) {
+            // Clear color data to save memory but keep ASCII for export
+            frame.colors = null;
+          }
+        });
+      }
+      
+      return updated;
+    });
     
     // Update processed frames for display
     setProcessedFrames(prev => {
@@ -326,6 +357,12 @@ const ASCIIVideoConverter: React.FC = () => {
           newFrames[frame.frameNumber] = frame.ascii;
         }
       });
+      
+      // Limit array size to prevent memory issues
+      if (newFrames.length > MAX_BUFFER_SIZE * 3) {
+        return newFrames.slice(-MAX_BUFFER_SIZE * 2);
+      }
+      
       return newFrames;
     });
     
@@ -809,6 +846,10 @@ const ASCIIVideoConverter: React.FC = () => {
     let nextFrameToProcess = 0;
     let workerIndex = 0;
     
+    // Track seek performance
+    let lastSeekTime = 0;
+    let seekDelayMultiplier = 1;
+    
     const processNextFrame = async () => {
       if (nextFrameToProcess >= totalFrames || !isProcessingRef.current) {
         return;
@@ -826,6 +867,20 @@ const ASCIIVideoConverter: React.FC = () => {
             resolve();
             return;
           }
+          
+          // Monitor seek performance and adjust delays
+          const currentTime = performance.now();
+          if (lastSeekTime > 0) {
+            const seekDuration = currentTime - lastSeekTime;
+            if (seekDuration > 100) {
+              // Seek is getting slower, increase delay
+              seekDelayMultiplier = Math.min(seekDelayMultiplier * 1.1, 3);
+            } else {
+              // Seek is fast, reduce delay
+              seekDelayMultiplier = Math.max(seekDelayMultiplier * 0.95, 1);
+            }
+          }
+          lastSeekTime = currentTime;
           
           ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
           const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
@@ -876,8 +931,9 @@ const ASCIIVideoConverter: React.FC = () => {
       while (nextFrameToProcess < totalFrames || activePromises.size > 0) {
         if (!isProcessingRef.current) break;
         
-        // Start new frames up to worker limit (reduced for smoother processing)
-        const maxConcurrent = Math.min(workerCount, 2); // Limit concurrent seeks
+        // Adjust concurrent limit based on performance
+        const maxConcurrent = Math.max(1, Math.min(workerCount, Math.floor(3 / seekDelayMultiplier)));
+        
         while (activePromises.size < maxConcurrent && nextFrameToProcess < totalFrames && isProcessingRef.current) {
           const framePromise = processNextFrame();
           activePromises.add(framePromise);
@@ -890,8 +946,9 @@ const ASCIIVideoConverter: React.FC = () => {
             activePromises.delete(framePromise);
           });
           
-          // Small delay between starting new frames to avoid video seek conflicts
-          await new Promise(resolve => setTimeout(resolve, 50));
+          // Dynamic delay based on seek performance
+          const delay = Math.floor(50 * seekDelayMultiplier);
+          await new Promise(resolve => setTimeout(resolve, delay));
         }
         
         // Wait for at least one to complete before continuing
@@ -902,6 +959,11 @@ const ASCIIVideoConverter: React.FC = () => {
         // Small delay to prevent UI blocking
         if (nextFrameToProcess % 5 === 0) {
           await new Promise(resolve => setTimeout(resolve, 10));
+        }
+        
+        // Force garbage collection hint every 100 frames
+        if (nextFrameToProcess % 100 === 0 && (global as any).gc) {
+          (global as any).gc();
         }
       }
     };

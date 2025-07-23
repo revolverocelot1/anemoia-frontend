@@ -8,102 +8,74 @@ interface Props {
 interface State {
   hasError: boolean;
   error: Error | null;
-  errorInfo: ErrorInfo | null;
 }
 
 class ErrorBoundary extends Component<Props, State> {
-  constructor(props: Props) {
-    super(props);
-    this.state = {
-      hasError: false,
-      error: null,
-      errorInfo: null
-    };
-  }
-
-  static getDerivedStateFromError(error: Error): State {
-    return {
-      hasError: true,
-      error,
-      errorInfo: null
-    };
-  }
-
-  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error('ErrorBoundary caught an error:', error, errorInfo);
-    
-    // Log to monitoring service in production
-    if (process.env.NODE_ENV === 'production') {
-      // You can integrate with services like Sentry here
-      console.error('Production error:', {
-        error: error.toString(),
-        componentStack: errorInfo.componentStack,
-        timestamp: new Date().toISOString(),
-        userAgent: navigator.userAgent,
-        url: window.location.href
-      });
-    }
-
-    this.setState({
-      error,
-      errorInfo
-    });
-  }
-
-  handleReset = () => {
-    this.setState({
-      hasError: false,
-      error: null,
-      errorInfo: null
-    });
-    // Optionally reload the page
-    window.location.reload();
+  public state: State = {
+    hasError: false,
+    error: null
   };
 
-  render() {
-    if (this.state.hasError) {
-      // Custom fallback UI
+  public static getDerivedStateFromError(error: Error): State {
+    console.error('ErrorBoundary caught an error:', error);
+    
+    // Ignore ONNX backend registration errors
+    if (error.message && (
+      error.message.includes('Backend already registered') ||
+      error.message.includes('cannot register backend') ||
+      error.message === '' // Our patched empty error
+    )) {
+      console.warn('Ignoring ONNX backend error in ErrorBoundary');
+      return { hasError: false, error: null };
+    }
+    
+    return { hasError: true, error };
+  }
+
+  public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    console.error('Uncaught error:', error, errorInfo);
+    
+    // Don't log ONNX errors to error tracking
+    if (error.message && (
+      error.message.includes('Backend already registered') ||
+      error.message.includes('cannot register backend') ||
+      error.message === ''
+    )) {
+      return;
+    }
+  }
+
+  public render() {
+    if (this.state.hasError && this.state.error) {
       if (this.props.fallback) {
-        return <>{this.props.fallback}</>;
+        return this.props.fallback;
       }
 
-      // Default error UI
       return (
-        <div className="min-h-screen flex items-center justify-center bg-gray-950 text-white p-6">
-          <div className="max-w-2xl w-full bg-gray-900 rounded-xl p-8 shadow-2xl border border-red-500/20">
-            <div className="flex items-center gap-3 mb-6">
-              <span className="material-symbols-outlined text-5xl text-red-500">error</span>
-              <h1 className="text-3xl font-bold">Something went wrong</h1>
+        <div className="min-h-screen bg-gray-950 text-white flex items-center justify-center p-4">
+          <div className="max-w-md w-full text-center">
+            <div className="mb-4">
+              <span className="material-symbols-outlined text-6xl text-red-500">error</span>
             </div>
-            
-            <p className="text-gray-300 mb-6">
+            <h1 className="text-2xl font-bold mb-4">Something went wrong</h1>
+            <p className="text-gray-400 mb-6">
               We encountered an unexpected error. Don't worry, your work is safe and the team has been notified.
             </p>
-
-            {process.env.NODE_ENV === 'development' && this.state.error && (
-              <div className="mb-6">
-                <details className="bg-gray-800 rounded-lg p-4">
-                  <summary className="cursor-pointer text-orange-400 hover:text-orange-300 font-semibold">
-                    Error Details (Development Only)
-                  </summary>
-                  <pre className="mt-4 text-xs text-gray-400 overflow-auto">
-                    {this.state.error.toString()}
-                    {this.state.errorInfo && this.state.errorInfo.componentStack}
-                  </pre>
-                </details>
-              </div>
-            )}
-
-            <div className="flex gap-4">
+            <div className="space-y-2">
+              <pre className="text-xs text-left bg-gray-900 p-4 rounded-lg overflow-auto max-h-40 mb-4">
+                {this.state.error.message || 'Unknown error'}
+              </pre>
+            </div>
+            <div className="flex gap-4 justify-center">
               <button
-                onClick={this.handleReset}
-                className="px-6 py-3 bg-blue-600 hover:bg-blue-700 rounded-lg font-semibold transition-colors"
+                onClick={() => window.location.reload()}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
               >
                 Reload Page
               </button>
               <button
                 onClick={() => window.location.href = '/'}
-                className="px-6 py-3 bg-gray-700 hover:bg-gray-600 rounded-lg font-semibold transition-colors"
+                className="px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors"
               >
                 Go Home
               </button>
