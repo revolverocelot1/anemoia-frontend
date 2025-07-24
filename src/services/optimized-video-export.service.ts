@@ -11,7 +11,7 @@ export class OptimizedVideoExportService {
   async exportVideo(
     videoElement: HTMLVideoElement,
     subtitles: SubtitleSegment[],
-    options: VideoExportOptions & { embedType?: 'burn' | 'track' },
+    options: VideoExportOptions & { embedType?: 'burn' | 'track' | 'embed-first' },
     onProgress?: (progress: number) => void
   ): Promise<Blob> {
     console.log('[OptimizedExport] Starting export with options:', options);
@@ -21,6 +21,28 @@ export class OptimizedVideoExportService {
     try {
       // Get video blob first
       const videoBlob = await this.getVideoBlob(videoElement);
+      
+      // New option: Try embedding first, fall back to burning if it fails
+      if ((options.embedType as string) === 'embed-first') {
+        console.log('[OptimizedExport] Trying to embed subtitles first...');
+        try {
+          const result = await fastSubtitleEmbedService.embedSubtitlesWithValidation(
+            videoBlob,
+            subtitles,
+            options.format === 'mkv' ? 'mkv' : 'mp4',
+            onProgress
+          );
+          
+          if (result.isValid) {
+            console.log('[OptimizedExport] Successfully embedded subtitles');
+            return result.blob;
+          }
+        } catch (embedError) {
+          console.warn('[OptimizedExport] Embedding failed, falling back to burning:', embedError);
+          // Fall through to burning
+          options.embedType = 'burn';
+        }
+      }
       
       // For burning subtitles, use FFmpeg directly
       if (options.embedType === 'burn' || options.burnSubtitles) {
@@ -35,24 +57,19 @@ export class OptimizedVideoExportService {
         // Pre-load FFmpeg to avoid delays
         await fastSubtitleEmbedService.preloadFFmpeg();
         
-        // Choose format based on options
-        const format = options.format || 'mp4';
-        
-        if (format === 'mkv' as any) {
-          console.log('[OptimizedExport] Using ultra-fast MKV stream copy');
-          return await fastSubtitleEmbedService.embedSubtitlesInMKV(
-            videoBlob,
-            subtitles,
-            onProgress
-          );
-        } else {
-          console.log('[OptimizedExport] Using fast MP4 embedding');
-          return await fastSubtitleEmbedService.embedSubtitlesInMP4(
+        // Use the validated embedding method
+        const result = await fastSubtitleEmbedService.embedSubtitlesWithValidation(
           videoBlob,
           subtitles,
+          options.format === 'mkv' ? 'mkv' : 'mp4',
           onProgress
         );
+        
+        if (!result.isValid) {
+          throw new Error('Failed to produce valid video output with embedded subtitles');
         }
+        
+        return result.blob;
       }
       
       // Default: return the original video with warning
