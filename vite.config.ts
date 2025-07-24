@@ -32,7 +32,10 @@ const onnxWasmPlugin = () => {
 
 // https://vitejs.dev/config/
 export default defineConfig({
-  plugins: [react(), onnxWasmPlugin()],
+  plugins: [
+    react(),
+    onnxWasmPlugin(),
+  ],
   base: '/',
   assetsInclude: ['**/*.wasm'],
   publicDir: 'public',
@@ -68,19 +71,11 @@ export default defineConfig({
       'Cross-Origin-Resource-Policy': 'cross-origin',
       'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type',
-      // Add MIME type for WASM files
-      'Content-Type': 'application/wasm'
     },
     fs: {
       allow: ['..']
     },
     cors: true,
-    // Configure MIME types for static files
-    mimeTypes: {
-      '.wasm': 'application/wasm',
-      '.js': 'application/javascript'
-    },
     // Add proxy for Hugging Face to avoid CORS issues
     proxy: {
       '/hf-proxy': {
@@ -98,13 +93,13 @@ export default defineConfig({
             console.log('Received Response from the Target:', proxyRes.statusCode, req.url);
           });
         },
-      }
+      },
     },
     // Configure MIME types for WASM files
     middlewareMode: false,
     hmr: {
       overlay: false
-    }
+    },
   },
   preview: {
     headers: {

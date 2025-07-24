@@ -160,8 +160,8 @@ const ASCIIVideoConverter: React.FC = () => {
   // Improved frame buffer management
   const [frameBuffer, setFrameBuffer] = useState<Map<number, FrameData>>(new Map());
   const [processedColorFrames, setProcessedColorFrames] = useState<Map<number, string>>(new Map());
-  const CHUNK_SIZE = 50; // Process frames in chunks to prevent memory issues
-  const MAX_BUFFER_SIZE = 100; // Keep only recent frames in memory
+  const CHUNK_SIZE = 30; // Reduced chunk size to prevent memory issues
+  const MAX_BUFFER_SIZE = 50; // Keep fewer frames in memory to prevent performance degradation
   
   // Add frame ordering management
   const [orderedFrames, setOrderedFrames] = useState<FrameData[]>([]);
@@ -170,18 +170,18 @@ const ASCIIVideoConverter: React.FC = () => {
 
   const [config, setConfig] = useState<ProcessingConfig>({
     asciiChars: ASCII_PRESETS.classic.chars,
-    colorMode: 'matrix',
+    colorMode: 'mono',
     brightness: 1.0,
     contrast: 1.0,
-    scale: 0.15,
-    fontSize: 10,
+    scale: 0.5, // Reduced from 1.0 for better performance
+    fontSize: 12,
     charDensity: 1.0,
-    frameRate: 15,
+    frameRate: 15, // Default to 15 fps for better performance
     quality: 'medium',
     outputMode: 'normal',
-    edgeThreshold: 0.5,
+    edgeThreshold: 0.2,
     workerCount: navigator.hardwareConcurrency || 4,
-    batchSize: 5
+    batchSize: 5 // Reduced from default for better memory usage
   });
 
   const [metrics, setMetrics] = useState<ProcessingMetrics>({
@@ -426,52 +426,72 @@ const ASCIIVideoConverter: React.FC = () => {
       console.warn(`Color data mismatch: expected ${expectedColorBytes} bytes, got ${colors.length}`);
     }
 
+    // Build HTML more efficiently using array join
+    const htmlParts: string[] = [];
+    
     for (let lineIndex = 0; lineIndex < lines.length; lineIndex++) {
       const line = lines[lineIndex];
-      if (lineIndex > 0) html += '\n';
+      if (lineIndex > 0) htmlParts.push('\n');
       
-      // Create spans for each character with its color
+      // Process characters in batches with same color to reduce spans
+      let currentColor = '';
+      let currentChars = '';
+      
       for (let charIndex = 0; charIndex < line.length; charIndex++) {
         const char = line[charIndex];
         
-        // Ensure we don't exceed color data bounds
+        // Get color for this character
+        let color = '';
         if (colorIndex + 2 < colors.length) {
           const r = colors[colorIndex];
           const g = colors[colorIndex + 1];
           const b = colors[colorIndex + 2];
           colorIndex += 3;
           
-          // For spaces, use a colored block or maintain spacing
+          // For spaces, use transparent color
           if (char === ' ') {
-            html += `<span style="color:rgba(${r},${g},${b},0.1)">█</span>`;
+            color = 'transparent';
           } else {
-            // Apply color to the character - escape HTML entities
-            const escapedChar = char
-              .replace(/&/g, '&amp;')
-              .replace(/</g, '&lt;')
-              .replace(/>/g, '&gt;')
-              .replace(/"/g, '&quot;')
-              .replace(/'/g, '&#039;');
-            html += `<span style="color:rgb(${r},${g},${b})">${escapedChar}</span>`;
+            color = `rgb(${r},${g},${b})`;
           }
         } else {
-          // Fallback to theme color if we run out of color data
-          if (char === ' ') {
-            html += `<span style="color:transparent">█</span>`;
+          // Fallback color
+          color = char === ' ' ? 'transparent' : theme.text;
+        }
+        
+        // If color changed, output the previous batch
+        if (color !== currentColor && currentChars) {
+          if (currentColor === 'transparent') {
+            htmlParts.push(`<span style="opacity:0">${currentChars}</span>`);
           } else {
-            const escapedChar = char
-              .replace(/&/g, '&amp;')
-              .replace(/</g, '&lt;')
-              .replace(/>/g, '&gt;')
-              .replace(/"/g, '&quot;')
-              .replace(/'/g, '&#039;');
-            html += `<span style="color:${theme.text}">${escapedChar}</span>`;
+            htmlParts.push(`<span style="color:${currentColor}">${currentChars}</span>`);
           }
+          currentChars = '';
+        }
+        
+        currentColor = color;
+        
+        // Escape HTML entities more efficiently
+        if (char === '&') currentChars += '&amp;';
+        else if (char === '<') currentChars += '&lt;';
+        else if (char === '>') currentChars += '&gt;';
+        else if (char === '"') currentChars += '&quot;';
+        else if (char === "'") currentChars += '&#039;';
+        else if (char === ' ') currentChars += '█'; // Use block for spaces
+        else currentChars += char;
+      }
+      
+      // Output any remaining characters
+      if (currentChars) {
+        if (currentColor === 'transparent') {
+          htmlParts.push(`<span style="opacity:0">${currentChars}</span>`);
+        } else {
+          htmlParts.push(`<span style="color:${currentColor}">${currentChars}</span>`);
         }
       }
     }
 
-    return html;
+    return htmlParts.join('');
   };
 
   const renderFrameToCanvas = (canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D, ascii: string, colors?: Uint8ClampedArray | null) => {
@@ -848,7 +868,8 @@ const ASCIIVideoConverter: React.FC = () => {
     
     // Track seek performance
     let lastSeekTime = 0;
-    let seekDelayMultiplier = 1;
+    let frameProcessingDelay = 10; // Fixed initial delay
+    let processedInBatch = 0; // Track frames processed in current batch
     
     const processNextFrame = async () => {
       if (nextFrameToProcess >= totalFrames || !isProcessingRef.current) {
@@ -857,6 +878,11 @@ const ASCIIVideoConverter: React.FC = () => {
       
       const frameNumber = nextFrameToProcess++;
       const time = frameNumber / fps;
+      
+      // Add small delay between seeks to prevent browser buffer congestion
+      if (frameNumber > 0) {
+        await new Promise(resolve => setTimeout(resolve, frameProcessingDelay));
+      }
       
       // Seek to the frame time
       return new Promise<void>((resolve) => {
@@ -868,22 +894,20 @@ const ASCIIVideoConverter: React.FC = () => {
             return;
           }
           
-          // Monitor seek performance and adjust delays
+          // Adjust processing delay based on performance
           const currentTime = performance.now();
           if (lastSeekTime > 0) {
             const seekDuration = currentTime - lastSeekTime;
-            if (seekDuration > 100) {
-              // Seek is getting slower, increase delay
-              seekDelayMultiplier = Math.min(seekDelayMultiplier * 1.1, 3);
-            } else {
-              // Seek is fast, reduce delay
-              seekDelayMultiplier = Math.max(seekDelayMultiplier * 0.95, 1);
-            }
+            // Maintain a consistent delay to prevent performance degradation
+            frameProcessingDelay = Math.min(Math.max(seekDuration * 0.5, 10), 50);
           }
           lastSeekTime = currentTime;
           
           ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
           const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          
+          // Track processed frames for performance monitoring
+          processedInBatch++;
           
           // Get next worker in round-robin fashion
           const worker = workerPoolRef.current[workerIndex];
@@ -931,8 +955,8 @@ const ASCIIVideoConverter: React.FC = () => {
       while (nextFrameToProcess < totalFrames || activePromises.size > 0) {
         if (!isProcessingRef.current) break;
         
-        // Adjust concurrent limit based on performance
-        const maxConcurrent = Math.max(1, Math.min(workerCount, Math.floor(3 / seekDelayMultiplier)));
+        // Adjust concurrent limit based on performance and available workers
+        const maxConcurrent = Math.max(2, Math.min(workerCount, 8)); // Increased from 3 to 8
         
         while (activePromises.size < maxConcurrent && nextFrameToProcess < totalFrames && isProcessingRef.current) {
           const framePromise = processNextFrame();
@@ -946,9 +970,8 @@ const ASCIIVideoConverter: React.FC = () => {
             activePromises.delete(framePromise);
           });
           
-          // Dynamic delay based on seek performance
-          const delay = Math.floor(50 * seekDelayMultiplier);
-          await new Promise(resolve => setTimeout(resolve, delay));
+          // Reduced delay for better throughput
+          await new Promise(resolve => setTimeout(resolve, Math.max(10, frameProcessingDelay / 2)));
         }
         
         // Wait for at least one to complete before continuing
@@ -957,12 +980,12 @@ const ASCIIVideoConverter: React.FC = () => {
         }
         
         // Small delay to prevent UI blocking
-        if (nextFrameToProcess % 5 === 0) {
-          await new Promise(resolve => setTimeout(resolve, 10));
+        if (nextFrameToProcess % 10 === 0) { // Changed from 5 to 10
+          await new Promise(resolve => setTimeout(resolve, 5)); // Reduced from 10ms to 5ms
         }
         
-        // Force garbage collection hint every 100 frames
-        if (nextFrameToProcess % 100 === 0 && (global as any).gc) {
+        // Force garbage collection hint every 200 frames (increased from 100)
+        if (nextFrameToProcess % 200 === 0 && (global as any).gc) {
           (global as any).gc();
         }
       }
@@ -1002,13 +1025,32 @@ const ASCIIVideoConverter: React.FC = () => {
     
     if (!ctx) return;
     
-    // Set up video recording
+    // Set up video recording - try MP4 first, fallback to WebM
     const stream = exportCanvas.captureStream(config.frameRate);
-    const mimeType = 'video/webm;codecs=vp9';
+    
+    // Check for MP4 support
+    const mp4MimeType = 'video/mp4;codecs=h264';
+    const webmMimeType = 'video/webm;codecs=vp9';
+    
+    let mimeType = mp4MimeType;
+    let fileExtension = 'mp4';
+    
+    // Check if MP4 is supported
+    if (!MediaRecorder.isTypeSupported(mp4MimeType)) {
+      // Try WebM as fallback
+      if (MediaRecorder.isTypeSupported(webmMimeType)) {
+        mimeType = webmMimeType;
+        fileExtension = 'webm';
+        console.warn('MP4 not supported, falling back to WebM');
+      } else {
+        console.error('Neither MP4 nor WebM is supported');
+        return;
+      }
+    }
     
     const mediaRecorder = new MediaRecorder(stream, {
       mimeType,
-      videoBitsPerSecond: 10000000, // Increased from 5 Mbps to 10 Mbps for better color quality
+      videoBitsPerSecond: 8000000, // 8 Mbps for good quality
       audioBitsPerSecond: 0 // No audio
     });
     
@@ -1022,7 +1064,7 @@ const ASCIIVideoConverter: React.FC = () => {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `ascii-video-${config.outputMode}-${Date.now()}.webm`;
+      a.download = `ascii-video-${config.outputMode}-${Date.now()}.${fileExtension}`;
       a.click();
       URL.revokeObjectURL(url);
     };

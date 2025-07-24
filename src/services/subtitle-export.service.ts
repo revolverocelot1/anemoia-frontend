@@ -1,8 +1,137 @@
-import type { SubtitleSegment, ExportOptions, VideoExportOptions } from '../types/caption-studio';
-import { SubtitleRenderer } from './subtitle-renderer.service';
+import type { SubtitleSegment, ExportOptions } from '../types/caption-studio';
 
 export class SubtitleExportService {
-  // Convert time in seconds to SRT format (00:00:00,000)
+  // Convert subtitle segments to SRT format
+  toSRT(subtitles: SubtitleSegment[]): string {
+    return subtitles
+      .sort((a, b) => a.startTime - b.startTime)
+      .map((subtitle, index) => {
+        const startTime = this.formatSRTTime(subtitle.startTime);
+        const endTime = this.formatSRTTime(subtitle.endTime);
+        return `${index + 1}\n${startTime} --> ${endTime}\n${subtitle.text}\n`;
+      })
+      .join('\n');
+  }
+
+  // Convert subtitle segments to WebVTT format
+  toWebVTT(subtitles: SubtitleSegment[], includeStyles: boolean = true): string {
+    let vtt = 'WEBVTT\n\n';
+    
+    if (includeStyles && subtitles.length > 0) {
+      // Add style section if needed
+      vtt += 'STYLE\n';
+      vtt += '::cue {\n';
+      vtt += '  background-color: rgba(0, 0, 0, 0.8);\n';
+      vtt += '  color: white;\n';
+      vtt += '  font-size: 16px;\n';
+      vtt += '}\n\n';
+    }
+    
+    subtitles
+      .sort((a, b) => a.startTime - b.startTime)
+      .forEach((subtitle) => {
+        const startTime = this.formatVTTTime(subtitle.startTime);
+        const endTime = this.formatVTTTime(subtitle.endTime);
+        
+        let cueSettings = '';
+        if (subtitle.position) {
+          cueSettings = ` position:${subtitle.position.x}% line:${subtitle.position.y}%`;
+        }
+        
+        vtt += `${startTime} --> ${endTime}${cueSettings}\n${subtitle.text}\n\n`;
+      });
+    
+    return vtt;
+  }
+
+  // Convert subtitle segments to ASS/SSA format
+  toASS(subtitles: SubtitleSegment[], videoWidth: number = 1920, videoHeight: number = 1080): string {
+    let ass = `[Script Info]
+Title: Generated Subtitles
+ScriptType: v4.00+
+PlayResX: ${videoWidth}
+PlayResY: ${videoHeight}
+WrapStyle: 0
+ScaledBorderAndShadow: yes
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Default,Arial,48,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,2,1,2,10,10,10,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n`;
+
+    subtitles
+      .sort((a, b) => a.startTime - b.startTime)
+      .forEach((subtitle) => {
+        const start = this.formatASSTime(subtitle.startTime);
+        const end = this.formatASSTime(subtitle.endTime);
+        const text = subtitle.text.replace(/\n/g, '\\N');
+        
+        // Convert style to ASS format if available
+        let styleName = 'Default';
+        if (subtitle.style) {
+          // Could create custom styles here based on subtitle.style
+          styleName = 'Default';
+        }
+        
+        ass += `Dialogue: 0,${start},${end},${styleName},,0,0,0,,${text}\n`;
+      });
+
+    return ass;
+  }
+
+  // Export subtitles to a file
+  exportSubtitles(
+    subtitles: SubtitleSegment[],
+    options: ExportOptions,
+    filename: string = 'subtitles'
+  ): void {
+    let content: string;
+    let mimeType: string;
+    let extension: string;
+
+    switch (options.format) {
+      case 'srt':
+        content = this.toSRT(subtitles);
+        mimeType = 'text/plain';
+        extension = 'srt';
+        break;
+      case 'vtt':
+        content = this.toWebVTT(subtitles, options.includeStyles || false);
+        mimeType = 'text/vtt';
+        extension = 'vtt';
+        break;
+      case 'ass':
+        content = this.toASS(subtitles);
+        mimeType = 'text/plain';
+        extension = 'ass';
+        break;
+      case 'json':
+        content = JSON.stringify(subtitles, null, 2);
+        mimeType = 'application/json';
+        extension = 'json';
+        break;
+      default:
+        throw new Error(`Unsupported format: ${options.format}`);
+    }
+
+    // Handle encoding
+    const encoding = options.encoding || 'utf-8';
+    const blob = new Blob([content], { type: `${mimeType};charset=${encoding}` });
+
+    // Create download link
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${filename}.${extension}`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  // Format time for SRT (HH:MM:SS,mmm)
   private formatSRTTime(seconds: number): string {
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
@@ -12,7 +141,7 @@ export class SubtitleExportService {
     return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')},${millis.toString().padStart(3, '0')}`;
   }
 
-  // Convert time in seconds to VTT format (00:00:00.000)
+  // Format time for WebVTT (HH:MM:SS.mmm)
   private formatVTTTime(seconds: number): string {
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
@@ -22,89 +151,7 @@ export class SubtitleExportService {
     return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}.${millis.toString().padStart(3, '0')}`;
   }
 
-  // Export subtitles to SRT format
-  exportToSRT(subtitles: SubtitleSegment[]): string {
-    let srtContent = '';
-    const sortedSubtitles = [...subtitles].sort((a, b) => a.startTime - b.startTime);
-    
-    sortedSubtitles.forEach((subtitle, index) => {
-      srtContent += `${index + 1}\n`;
-      srtContent += `${this.formatSRTTime(subtitle.startTime)} --> ${this.formatSRTTime(subtitle.endTime)}\n`;
-      srtContent += `${subtitle.text}\n\n`;
-    });
-    
-    return srtContent.trim();
-  }
-
-  // Export subtitles to WebVTT format
-  exportToVTT(subtitles: SubtitleSegment[], includeStyles: boolean = true): string {
-    let vttContent = 'WEBVTT\n\n';
-    
-    // Add style block if requested
-    if (includeStyles && subtitles.some(s => s.style)) {
-      vttContent += 'STYLE\n';
-      vttContent += '::cue {\n';
-      vttContent += '  background-color: rgba(0, 0, 0, 0.8);\n';
-      vttContent += '  color: white;\n';
-      vttContent += '}\n\n';
-    }
-    
-    const sortedSubtitles = [...subtitles].sort((a, b) => a.startTime - b.startTime);
-    
-    sortedSubtitles.forEach((subtitle, index) => {
-      // Add cue identifier
-      vttContent += `${index + 1}\n`;
-      
-      // Add timing
-      vttContent += `${this.formatVTTTime(subtitle.startTime)} --> ${this.formatVTTTime(subtitle.endTime)}`;
-      
-      // Add position if available
-      if (subtitle.position) {
-        const vttPosition = this.getVTTPosition(subtitle.position);
-        if (vttPosition) {
-          vttContent += ` ${vttPosition}`;
-        }
-      }
-      
-      vttContent += '\n';
-      vttContent += `${subtitle.text}\n\n`;
-    });
-    
-    return vttContent.trim();
-  }
-
-  // Export subtitles to ASS (Advanced SubStation Alpha) format
-  exportToASS(subtitles: SubtitleSegment[]): string {
-    let assContent = '[Script Info]\n';
-    assContent += 'Title: Subtitles\n';
-    assContent += 'ScriptType: v4.00+\n';
-    assContent += 'Collisions: Normal\n';
-    assContent += 'PlayDepth: 0\n\n';
-    
-    assContent += '[V4+ Styles]\n';
-    assContent += 'Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n';
-    assContent += 'Style: Default,Arial,24,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,2,2,2,10,10,10,1\n\n';
-    
-    assContent += '[Events]\n';
-    assContent += 'Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n';
-    
-    const sortedSubtitles = [...subtitles].sort((a, b) => a.startTime - b.startTime);
-    
-    sortedSubtitles.forEach(subtitle => {
-      const start = this.formatASSTime(subtitle.startTime);
-      const end = this.formatASSTime(subtitle.endTime);
-      assContent += `Dialogue: 0,${start},${end},Default,,0,0,0,,${subtitle.text}\n`;
-    });
-    
-    return assContent;
-  }
-
-  // Export subtitles to JSON format
-  exportToJSON(subtitles: SubtitleSegment[]): string {
-    return JSON.stringify(subtitles, null, 2);
-  }
-
-  // Format time for ASS format
+  // Format time for ASS (H:MM:SS.cc)
   private formatASSTime(seconds: number): string {
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
@@ -114,90 +161,28 @@ export class SubtitleExportService {
     return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}.${centisecs.toString().padStart(2, '0')}`;
   }
 
-  // Get VTT position string
-  private getVTTPosition(position: SubtitleSegment['position']): string {
-    if (!position) return '';
+  // Parse time from various formats
+  parseTime(timeString: string, format: 'srt' | 'vtt' | 'ass'): number {
+    const parts = timeString.split(/[:,.]/).map(p => parseInt(p, 10));
     
-    let vttPosition = '';
+    if (parts.length < 4) return 0;
     
-    // Line position (vertical)
-    if (position.y !== undefined) {
-      vttPosition += `line:${position.y}%`;
+    const [hours, minutes, seconds] = parts;
+    let fraction = parts[3];
+    
+    // Convert to seconds based on format
+    if (format === 'srt') {
+      // SRT uses milliseconds
+      fraction = fraction / 1000;
+    } else if (format === 'ass') {
+      // ASS uses centiseconds
+      fraction = fraction / 100;
+    } else {
+      // VTT uses milliseconds
+      fraction = fraction / 1000;
     }
     
-    // Position (horizontal)
-    if (position.x !== undefined) {
-      if (vttPosition) vttPosition += ' ';
-      vttPosition += `position:${position.x}%`;
-    }
-    
-    // Alignment
-    if (position.alignment && position.alignment !== 'center') {
-      if (vttPosition) vttPosition += ' ';
-      vttPosition += `align:${position.alignment}`;
-    }
-    
-    return vttPosition;
-  }
-
-  // Download file utility
-  downloadFile(content: string, filename: string, mimeType: string = 'text/plain') {
-    const blob = new Blob([content], { type: mimeType });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  }
-
-  // Export subtitles based on options
-  exportSubtitles(subtitles: SubtitleSegment[], options: ExportOptions, baseFilename: string = 'subtitles') {
-    let content: string;
-    let extension: string;
-    let mimeType: string;
-    
-    switch (options.format) {
-      case 'srt':
-        content = this.exportToSRT(subtitles);
-        extension = 'srt';
-        mimeType = 'text/plain';
-        break;
-        
-      case 'vtt':
-        content = this.exportToVTT(subtitles, options.includeStyles);
-        extension = 'vtt';
-        mimeType = 'text/vtt';
-        break;
-        
-      case 'ass':
-        content = this.exportToASS(subtitles);
-        extension = 'ass';
-        mimeType = 'text/plain';
-        break;
-        
-      case 'json':
-        content = this.exportToJSON(subtitles);
-        extension = 'json';
-        mimeType = 'application/json';
-        break;
-        
-      default:
-        throw new Error(`Unsupported format: ${options.format}`);
-    }
-    
-    // Apply encoding if needed
-    if (options.encoding === 'utf-16') {
-      // Convert to UTF-16
-      const encoder = new TextEncoder();
-      const utf8Bytes = encoder.encode(content);
-      content = String.fromCharCode(0xFEFF) + content; // Add BOM
-    }
-    
-    const filename = `${baseFilename}.${extension}`;
-    this.downloadFile(content, filename, mimeType);
+    return hours * 3600 + minutes * 60 + seconds + fraction;
   }
 }
 

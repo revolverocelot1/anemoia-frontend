@@ -17,6 +17,7 @@ export interface SubtitleStyle {
   fontColor?: string;
   backgroundColor?: string;
   backgroundOpacity?: number;
+  backgroundBlur?: number;
   textShadow?: string;
   textStroke?: string;
   padding?: number;

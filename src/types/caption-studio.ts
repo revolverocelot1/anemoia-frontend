@@ -17,6 +17,7 @@ export interface SubtitleStyle {
   color: string;
   backgroundColor?: string;
   backgroundOpacity?: number;
+  backgroundBlur?: number;
   strokeColor?: string;
   strokeWidth?: number;
   shadowColor?: string;
@@ -91,13 +92,25 @@ export interface ExportOptions {
   encoding: 'utf-8' | 'utf-16';
 }
 
+export interface SubtitleExportOptions {
+  format: 'srt' | 'vtt' | 'ass' | 'json';
+  includeStyles: boolean;
+  encoding: 'utf-8' | 'utf-16';
+}
+
 export interface VideoExportOptions {
   burnSubtitles: boolean;
-  format: 'mp4' | 'webm';
+  embedSubtitles?: boolean;
+  embedType?: 'burn' | 'track';
+  format: 'mp4' | 'webm' | 'mkv';
   quality: 'low' | 'medium' | 'high' | 'ultra';
   fps: number;
   bitrate?: number;
   codec?: string;
+  removeBackground?: boolean;
+  backgroundOpacity?: number;
+  backgroundBlur?: number;
+  resolution?: '480p' | '720p' | '1080p' | '4k';
 }
 
 export interface AudioAnalysisResult {

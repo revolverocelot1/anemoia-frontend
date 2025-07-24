@@ -16,11 +16,11 @@ const Header = () => {
   return (
     <header className="flex items-center justify-between whitespace-nowrap border-b border-[#1a1a1a] px-6 md:px-10 lg:px-20 xl:px-40 py-4 backdrop-blur-md bg-black/50 relative z-20">
       <div className="flex items-center gap-4 text-white">
-        <Link to="/" className="flex items-center gap-3 group">
-          <div className="w-10 h-10 flex items-center justify-center flex-shrink-0">
+        <Link to="/" className="flex items-center gap-2 group">
+          <div className="w-8 h-8 flex items-center justify-center flex-shrink-0">
             <img src="/A_logo.png" alt="Anemoia" className="w-full h-full object-contain" />
           </div>
-          <h2 className="text-2xl font-bold tracking-tight bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent group-hover:from-cyan-300 group-hover:to-blue-400 transition-all duration-300">
+          <h2 className="text-2xl font-bold tracking-tight leading-none bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent group-hover:from-cyan-300 group-hover:to-blue-400 transition-all duration-300">
             Anemoia
           </h2>
         </Link>
@@ -35,6 +35,9 @@ const Header = () => {
         </Link>
         <Link to="/settings" className="text-sm font-medium text-gray-300 hover:text-white transition-colors">
           Settings
+        </Link>
+        <Link to="/support" className="text-sm font-medium text-gray-300 hover:text-white transition-colors">
+          Support
         </Link>
       </nav>
 
@@ -104,6 +107,13 @@ const Header = () => {
                 onClick={() => setIsMenuOpen(false)}
               >
                 Settings
+              </Link>
+              <Link
+                to="/support"
+                className="text-sm font-medium text-gray-300 hover:text-white transition-colors"
+                onClick={() => setIsMenuOpen(false)}
+              >
+                Support
               </Link>
               {isAuthenticated && (
                 <Link

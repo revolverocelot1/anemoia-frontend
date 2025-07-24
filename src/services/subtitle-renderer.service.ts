@@ -6,13 +6,18 @@ export class SubtitleRenderer {
   private offscreenCanvas?: OffscreenCanvas;
   private offscreenCtx?: OffscreenCanvasRenderingContext2D;
   private textCache: Map<string, ImageBitmap> = new Map();
+  private fontLoaded: boolean = false;
 
-  constructor(canvas: HTMLCanvasElement) {
-    this.canvas = canvas;
-    const ctx = canvas.getContext('2d', { 
-      alpha: true,
+  constructor(canvas?: HTMLCanvasElement) {
+    this.canvas = canvas || document.createElement('canvas');
+    this.canvas.width = 1920;
+    this.canvas.height = 1080;
+    
+    // Force GPU acceleration by setting willReadFrequently to false
+    const ctx = this.canvas.getContext('2d', {
+      willReadFrequently: false,
       desynchronized: true,
-      willReadFrequently: false 
+      alpha: true
     });
     
     if (!ctx) {
@@ -21,17 +26,23 @@ export class SubtitleRenderer {
     
     this.ctx = ctx;
     
-    // Try to create offscreen canvas for better performance
-    if ('OffscreenCanvas' in window) {
-      try {
-        this.offscreenCanvas = new OffscreenCanvas(canvas.width, canvas.height);
-        this.offscreenCtx = this.offscreenCanvas.getContext('2d', {
-          alpha: true,
-          desynchronized: true
-        }) as OffscreenCanvasRenderingContext2D;
-      } catch (e) {
-        console.warn('OffscreenCanvas not available:', e);
+    // Enable image smoothing for better text quality
+    this.ctx.imageSmoothingEnabled = true;
+    this.ctx.imageSmoothingQuality = 'high';
+  }
+
+  private async loadFonts() {
+    try {
+      // Check if fonts API is available
+      if ('fonts' in document) {
+        await (document as any).fonts.load('bold 24px Arial');
+        await (document as any).fonts.load('24px Arial');
+        this.fontLoaded = true;
+        console.log('[SubtitleRenderer] Fonts loaded successfully');
       }
+    } catch (error) {
+      console.warn('[SubtitleRenderer] Font loading failed:', error);
+      this.fontLoaded = true; // Continue anyway with fallback
     }
   }
 
@@ -73,14 +84,23 @@ export class SubtitleRenderer {
     const style = subtitle.style || this.getDefaultStyle();
     const position = subtitle.position || this.getDefaultPosition();
 
+    // Save context state
+    ctx.save();
+
+    // Ensure proper rendering settings
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+
     // Calculate actual position
     const x = (position.x / 100) * videoWidth;
     const y = (position.y / 100) * videoHeight;
 
-    // Configure text style
-    ctx.font = `${style.fontWeight} ${style.fontStyle} ${style.fontSize}px ${style.fontFamily}`;
-    ctx.textAlign = position.alignment;
-    ctx.textBaseline = position.verticalAlignment;
+    // Configure text style with fallback fonts
+    const fontFamily = style.fontFamily || 'Arial, sans-serif';
+    ctx.font = `${style.fontWeight || 'bold'} ${style.fontStyle || 'normal'} ${style.fontSize}px ${fontFamily}`;
+    ctx.textAlign = position.alignment as CanvasTextAlign;
+    ctx.textBaseline = position.verticalAlignment as CanvasTextBaseline;
 
     // Measure text for background
     const lines = this.wrapText(subtitle.text, videoWidth * 0.8, ctx);
@@ -89,7 +109,7 @@ export class SubtitleRenderer {
     const totalHeight = lines.length * lineHeight;
 
     // Draw background if specified
-    if (style.backgroundColor && style.backgroundOpacity) {
+    if (style.backgroundColor && style.backgroundOpacity && style.backgroundOpacity > 0) {
       ctx.save();
       ctx.globalAlpha = style.backgroundOpacity;
       ctx.fillStyle = style.backgroundColor;
@@ -98,8 +118,14 @@ export class SubtitleRenderer {
       const bgX = this.getBackgroundX(x, maxWidth, position.alignment, padding);
       const bgY = this.getBackgroundY(y, totalHeight, position.verticalAlignment, padding);
       
+      // Add blur effect if specified
+      if (style.backgroundBlur && style.backgroundBlur > 0) {
+        ctx.filter = `blur(${style.backgroundBlur}px)`;
+      }
+      
       this.drawRoundedRect(ctx, bgX, bgY, maxWidth + padding * 2, totalHeight + padding * 2, 5);
       ctx.fill();
+      ctx.filter = 'none'; // Reset filter
       ctx.restore();
     }
 
@@ -108,28 +134,40 @@ export class SubtitleRenderer {
       const lineY = this.getLineY(y, index, lineHeight, lines.length, position.verticalAlignment);
       
       // Shadow effect
-      if (style.shadowColor && style.shadowBlur) {
+      if (style.shadowColor && style.shadowBlur && style.shadowBlur > 0) {
         ctx.save();
         ctx.shadowColor = style.shadowColor;
         ctx.shadowBlur = style.shadowBlur;
         ctx.shadowOffsetX = 2;
         ctx.shadowOffsetY = 2;
-        ctx.fillStyle = style.color;
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = style.color || '#FFFFFF';
         ctx.fillText(line, x, lineY);
         ctx.restore();
       }
       
       // Stroke effect
-      if (style.strokeColor && style.strokeWidth) {
+      if (style.strokeColor && style.strokeWidth && style.strokeWidth > 0) {
+        ctx.save();
         ctx.strokeStyle = style.strokeColor;
         ctx.lineWidth = style.strokeWidth;
+        ctx.lineJoin = 'round';
+        ctx.lineCap = 'round';
+        ctx.globalAlpha = 1;
         ctx.strokeText(line, x, lineY);
+        ctx.restore();
       }
       
       // Main text
-      ctx.fillStyle = style.color;
+      ctx.save();
+      ctx.fillStyle = style.color || '#FFFFFF';
+      ctx.globalAlpha = 1;
       ctx.fillText(line, x, lineY);
+      ctx.restore();
     });
+
+    // Restore context state
+    ctx.restore();
 
     // Copy from offscreen canvas if used
     if (this.offscreenCanvas && this.offscreenCtx && ctx === this.offscreenCtx) {
@@ -211,18 +249,19 @@ export class SubtitleRenderer {
 
   private getDefaultStyle(): SubtitleStyle {
     return {
-      fontFamily: 'Arial',
-      fontSize: 24,
+      fontFamily: 'Arial, sans-serif',
+      fontSize: 28,
       fontWeight: 'bold',
       fontStyle: 'normal',
       color: '#FFFFFF',
       backgroundColor: '#000000',
       backgroundOpacity: 0.75,
+      backgroundBlur: 0,
       strokeColor: '#000000',
-      strokeWidth: 2,
+      strokeWidth: 3,
       shadowColor: '#000000',
-      shadowBlur: 3,
-      padding: 10
+      shadowBlur: 4,
+      padding: 12
     };
   }
 

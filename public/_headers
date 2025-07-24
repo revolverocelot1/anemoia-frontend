@@ -17,10 +17,27 @@
   Content-Type: application/javascript
   Cache-Control: public, max-age=31536000, immutable
 
+/ffmpeg/*.wasm
+  Cross-Origin-Embedder-Policy: require-corp
+  Cross-Origin-Opener-Policy: same-origin
+  Cross-Origin-Resource-Policy: cross-origin
+  Access-Control-Allow-Origin: *
+  Content-Type: application/wasm
+  Cache-Control: public, max-age=31536000, immutable
+
 /ort-wasm/*
   Cross-Origin-Embedder-Policy: require-corp
   Cross-Origin-Opener-Policy: same-origin
   Cross-Origin-Resource-Policy: cross-origin
+  Access-Control-Allow-Origin: *
+  Cache-Control: public, max-age=31536000, immutable
+
+/ort-wasm/*.wasm
+  Cross-Origin-Embedder-Policy: require-corp
+  Cross-Origin-Opener-Policy: same-origin
+  Cross-Origin-Resource-Policy: cross-origin
+  Access-Control-Allow-Origin: *
+  Content-Type: application/wasm
   Cache-Control: public, max-age=31536000, immutable
 
 /*.wasm
@@ -28,6 +45,7 @@
   Cross-Origin-Opener-Policy: same-origin
   Cross-Origin-Resource-Policy: cross-origin
   Content-Type: application/wasm
+  Content-Disposition: inline
   Cache-Control: public, max-age=31536000, immutable
 
 /models/*

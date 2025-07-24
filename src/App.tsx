@@ -33,9 +33,13 @@ import { detectGPU, logDeploymentInfo } from './utils/gpuUtils';
 import FaceSwapPage from './pages/FaceSwapPage';
 import { AnimatePresence } from 'framer-motion';
 import ASCIIVideoConverter from './pages/ASCIIVideoConverter'
+import SupportPage from './pages/SupportPage'
+import AdminSupportPage from './pages/AdminSupportPage'
 
 // Lazy load SubtitlePage to prevent ONNX runtime conflicts on app startup
 const SubtitlePage = lazy(() => import('./pages/SubtitlePageEnhanced'));
+const SubtitleEmbedTestPage = lazy(() => import('./pages/SubtitleEmbedTestPage'));
+const SubtitleBenchmarkPage = lazy(() => import('./pages/SubtitleBenchmarkPage'));
 const DemoLoginPage = lazy(() => import('./pages/DemoLoginPage'));
 const LoginPage = lazy(() => import('./pages/LoginPage'));
 const OAuthCallbackPage = lazy(() => import('./pages/OAuthCallbackPage'));
@@ -378,6 +382,22 @@ function App() {
               }
             />
             <Route
+              path="/support"
+              element={
+                <AnimatedPage>
+                  <SupportPage />
+                </AnimatedPage>
+              }
+            />
+            <Route
+              path="/admin/support"
+              element={
+                <AnimatedPage>
+                  <AdminSupportPage />
+                </AnimatedPage>
+              }
+            />
+            <Route
               path="/pose-estimation"
               element={
                 <AnimatedPage>
@@ -460,6 +480,26 @@ function App() {
                     </Suspense>
                   </AnimatedPage>
                 </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/subtitle-embed-test"
+              element={
+                <AnimatedPage>
+                  <Suspense fallback={<LoadingFallback />}>
+                    <SubtitleEmbedTestPage />
+                  </Suspense>
+                </AnimatedPage>
+              }
+            />
+            <Route
+              path="/subtitle-benchmark"
+              element={
+                <AnimatedPage>
+                  <Suspense fallback={<LoadingFallback />}>
+                    <SubtitleBenchmarkPage />
+                  </Suspense>
+                </AnimatedPage>
               }
             />
             <Route

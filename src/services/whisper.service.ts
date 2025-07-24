@@ -1,8 +1,9 @@
 import * as ort from 'onnxruntime-web';
 import { TranscriptionOptions, TranscriptionResult } from '../types/subtitle';
+import { whisperLoader } from '../lib/whisper-loader';
 
 // Configure ONNX Runtime
-  ort.env.wasm.wasmPaths = '/ort-wasm/';
+ort.env.wasm.wasmPaths = '/ort-wasm/';
 ort.env.wasm.numThreads = navigator.hardwareConcurrency || 4;
 
 interface WhisperModel {
@@ -56,6 +57,43 @@ class WhisperService {
       downloaded: this.models.has(id),
       downloadProgress: this.downloadProgress.get(id) || 0
     }));
+  }
+
+  public async loadModel(
+    modelId: string,
+    onProgress?: (progress: number, status?: string) => void
+  ): Promise<void> {
+    // Use whisperLoader to load the model
+    if (whisperLoader.isModelLoaded(modelId)) {
+      onProgress?.(100, 'Model already loaded');
+      return;
+    }
+    
+    const progressHandler = (event: MessageEvent) => {
+      const { type, progress, status } = event.data;
+      if (type === 'progress') {
+        onProgress?.(progress, status);
+      }
+    };
+    
+    whisperLoader.addMessageListener(progressHandler);
+    
+    try {
+      await whisperLoader.loadModel(modelId);
+      onProgress?.(100, 'Model loaded successfully');
+    } finally {
+      whisperLoader.removeMessageListener(progressHandler);
+    }
+  }
+
+  public isModelLoaded(modelId?: string): boolean {
+    if (modelId) {
+      return whisperLoader.isModelLoaded(modelId);
+    }
+    // Check if any model is loaded
+    return whisperLoader.isModelLoaded('whisper-tiny') || 
+           whisperLoader.isModelLoaded('whisper-base') || 
+           whisperLoader.isModelLoaded('whisper-small');
   }
 
   public async downloadModel(
@@ -153,13 +191,9 @@ class WhisperService {
     onProgress?: (progress: number, status: string) => void
   ): Promise<TranscriptionResult> {
     const modelId = options.model || 'whisper-base';
-    const model = this.models.get(modelId);
     
-    if (!model) {
-      console.error(`[Whisper] Model ${modelId} not loaded`);
-      throw new Error(`Model ${modelId} not loaded. Please download the model first.`);
-    }
-
+    console.log(`[WhisperService] Starting transcription with model: ${modelId}`);
+    
     try {
       onProgress?.(10, 'Checking audio data...');
       
@@ -167,56 +201,135 @@ class WhisperService {
         throw new Error('No audio data provided');
       }
       
-      console.log(`[Whisper] Processing audio data: ${(audioData.byteLength / 1024 / 1024).toFixed(2)}MB`);
+      console.log(`[WhisperService] Processing audio data: ${(audioData.byteLength / 1024 / 1024).toFixed(2)}MB`);
       
       onProgress?.(20, 'Processing audio...');
       
-      // Process audio to get proper format
+      // Process audio to get proper format for Whisper
       const audioFloat32 = await this.processAudio(audioData);
       
       if (!audioFloat32 || audioFloat32.length === 0) {
         throw new Error('Failed to process audio data');
       }
       
-      console.log(`[Whisper] Audio processed: ${audioFloat32.length} samples`);
+      console.log(`[WhisperService] Audio processed: ${audioFloat32.length} samples (${(audioFloat32.length / 16000).toFixed(2)}s at 16kHz)`);
       
-      onProgress?.(40, 'Running inference...');
+      onProgress?.(30, 'Loading AI model...');
       
-      // For now, return mock data since we need proper ONNX model integration
-      // This prevents the transcription from failing completely
-      console.warn('[Whisper] Using mock transcription - proper model integration needed');
-      
-      // Simulate processing delay
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      onProgress?.(80, 'Processing results...');
-      
-      // Return mock transcription result
-      const mockResult: TranscriptionResult = {
-        text: "This is a sample transcription. The actual Whisper model integration needs to be properly configured.",
-        segments: [
-          {
-            start: 0,
-            end: 3,
-            text: "This is a sample transcription.",
-            confidence: 0.9
-          },
-          {
-            start: 3,
-            end: 7,
-            text: "The actual Whisper model integration needs to be properly configured.",
-            confidence: 0.85
+      // Load the model if not already loaded
+      if (!whisperLoader.isModelLoaded(modelId)) {
+        console.log(`[WhisperService] Model ${modelId} not loaded, loading now...`);
+        
+        // Set up progress listener for model loading
+        const modelProgressHandler = (event: MessageEvent) => {
+          const { type, progress, status } = event.data;
+          if (type === 'progress' && progress < 100) {
+            // Scale model loading progress from 30-50%
+            const scaledProgress = 30 + (progress * 0.2);
+            onProgress?.(scaledProgress, status || 'Loading model...');
           }
-        ],
-        language: options.language || 'en'
-      };
+        };
+        
+        whisperLoader.addMessageListener(modelProgressHandler);
+        
+        try {
+          await whisperLoader.loadModel(modelId);
+          console.log(`[WhisperService] Model ${modelId} loaded successfully`);
+        } finally {
+          whisperLoader.removeMessageListener(modelProgressHandler);
+        }
+      }
       
-      onProgress?.(100, 'Transcription complete');
+      onProgress?.(50, 'Running AI transcription...');
       
-      return mockResult;
+      // Create a promise to handle the transcription result
+      return new Promise<TranscriptionResult>((resolve, reject) => {
+        let transcriptionStarted = false;
+        const timeoutDuration = 300000; // 5 minutes timeout
+        
+        const timeout = setTimeout(() => {
+          whisperLoader.removeMessageListener(messageHandler);
+          reject(new Error('Transcription timeout. The audio might be too long or the model might be struggling.'));
+        }, timeoutDuration);
+        
+        const messageHandler = (event: MessageEvent) => {
+          const { type, progress, status, result, error } = event.data;
+          
+          console.log(`[WhisperService] Worker message:`, { type, progress, status });
+          
+          if (type === 'transcribe-progress') {
+            transcriptionStarted = true;
+            // Scale transcription progress from 50-90%
+            const scaledProgress = 50 + (progress * 0.4);
+            onProgress?.(scaledProgress, status || 'Transcribing...');
+            
+          } else if (type === 'transcribe-complete' && result) {
+            clearTimeout(timeout);
+            whisperLoader.removeMessageListener(messageHandler);
+            
+            console.log('[WhisperService] Transcription complete:', result);
+            onProgress?.(95, 'Processing results...');
+            
+            // Format the result properly
+            const formattedResult: TranscriptionResult = {
+              text: result.text || '',
+              segments: result.segments || [],
+              language: result.language || options.language || 'en'
+            };
+            
+            // Ensure segments have proper format
+            if (formattedResult.segments.length === 0 && formattedResult.text) {
+              // If no segments but we have text, create a single segment
+              formattedResult.segments = [{
+                start: 0,
+                end: audioFloat32.length / 16000, // Duration in seconds
+                text: formattedResult.text,
+                confidence: 0.9
+              }];
+            }
+            
+            onProgress?.(100, 'Transcription complete');
+            resolve(formattedResult);
+            
+          } else if (type === 'error') {
+            clearTimeout(timeout);
+            whisperLoader.removeMessageListener(messageHandler);
+            
+            console.error('[WhisperService] Transcription error:', error);
+            reject(new Error(error || 'Transcription failed'));
+          }
+        };
+        
+        // Add message listener
+        whisperLoader.addMessageListener(messageHandler);
+        
+        try {
+          // Start transcription
+          console.log('[WhisperService] Sending audio to worker for transcription...');
+          whisperLoader.transcribe(audioFloat32, {
+            language: options.language || 'auto',
+            task: options.task || 'transcribe',
+            return_timestamps: true,
+            chunk_length_s: 30,
+            stride_length_s: 5
+          });
+          
+          // Give it a moment to check if transcription starts
+          setTimeout(() => {
+            if (!transcriptionStarted) {
+              console.warn('[WhisperService] Transcription may not have started properly');
+            }
+          }, 5000);
+          
+        } catch (error) {
+          clearTimeout(timeout);
+          whisperLoader.removeMessageListener(messageHandler);
+          throw error;
+        }
+      });
       
     } catch (error) {
-      console.error('[Whisper] Transcription failed:', error);
+      console.error('[WhisperService] Transcription failed:', error);
       onProgress?.(0, `Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
       throw error;
     }
@@ -365,41 +478,100 @@ class WhisperService {
   }
 
   public async extractAudioFromVideo(videoFile: File): Promise<ArrayBuffer> {
+    console.log('[WhisperService] Starting audio extraction from video:', {
+      fileName: videoFile.name,
+      fileSize: `${(videoFile.size / 1024 / 1024).toFixed(2)}MB`,
+      fileType: videoFile.type
+    });
+    
     try {
-      // Use FFmpeg to extract audio from video
-      const { FFmpeg } = await import('@ffmpeg/ffmpeg');
-      const { fetchFile, toBlobURL } = await import('@ffmpeg/util');
+      // Dynamic imports with proper error handling
+      console.log('[WhisperService] Loading FFmpeg modules...');
+      let FFmpeg: any;
+      let fetchFile: any;
+      let toBlobURL: any;
+      
+      try {
+        const ffmpegModule = await import('@ffmpeg/ffmpeg');
+        FFmpeg = ffmpegModule.FFmpeg;
+        console.log('[WhisperService] FFmpeg module loaded successfully');
+      } catch (error) {
+        console.error('[WhisperService] Failed to import FFmpeg module:', error);
+        throw new Error('Failed to load FFmpeg module. Please ensure @ffmpeg/ffmpeg is installed.');
+      }
+      
+      try {
+        const utilModule = await import('@ffmpeg/util');
+        fetchFile = utilModule.fetchFile;
+        toBlobURL = utilModule.toBlobURL;
+        console.log('[WhisperService] FFmpeg util module loaded successfully');
+      } catch (error) {
+        console.error('[WhisperService] Failed to import FFmpeg util module:', error);
+        throw new Error('Failed to load FFmpeg util module. Please ensure @ffmpeg/util is installed.');
+      }
       
       const ffmpeg = new FFmpeg();
       
-      // Load FFmpeg with improved error handling and fallback
+      // Add FFmpeg logging
+      ffmpeg.on('log', ({ message }: { message: string }) => {
+        console.log('[FFmpeg Log]:', message);
+      });
+      
+      ffmpeg.on('progress', ({ progress, time }: { progress: number; time: number }) => {
+        console.log(`[FFmpeg Progress]: ${(progress * 100).toFixed(2)}% (time: ${time}ms)`);
+      });
+      
+      // Load FFmpeg with improved error handling
       if (!ffmpeg.loaded) {
+        console.log('[WhisperService] FFmpeg not loaded, attempting to load...');
+        
         try {
-          // Try loading from CDN first
+          // Try CDN first (more reliable)
+          console.log('[WhisperService] Attempting to load FFmpeg from CDN...');
           const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd';
           await ffmpeg.load({
             coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
             wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
           });
+          console.log('[WhisperService] FFmpeg loaded successfully from CDN');
         } catch (cdnError) {
-          console.warn('Failed to load FFmpeg from CDN, trying local files:', cdnError);
+          console.error('[WhisperService] Failed to load FFmpeg from CDN:', cdnError);
           
-          // Fallback to local files
+          // Try local files as fallback
+          console.log('[WhisperService] Attempting to load FFmpeg from local files...');
           try {
+            const origin = window.location.origin;
+            const ffmpegCoreResponse = await fetch(`${origin}/ffmpeg/ffmpeg-core.js`);
+            const ffmpegWasmResponse = await fetch(`${origin}/ffmpeg/ffmpeg-core.wasm`);
+            
+            if (!ffmpegCoreResponse.ok || !ffmpegWasmResponse.ok) {
+              throw new Error('Failed to fetch FFmpeg files');
+            }
+            
+            const coreBlob = await ffmpegCoreResponse.blob();
+            const wasmBlob = await ffmpegWasmResponse.blob();
+            
             await ffmpeg.load({
-              coreURL: '/ffmpeg/ffmpeg-core.js',
-              wasmURL: '/ffmpeg/ffmpeg-core.wasm',
+              coreURL: URL.createObjectURL(coreBlob),
+              wasmURL: URL.createObjectURL(wasmBlob)
             });
+            
+            console.log('[WhisperService] FFmpeg loaded successfully from local files');
           } catch (localError) {
-            console.error('Failed to load FFmpeg from local files:', localError);
-            throw new Error('FFmpeg failed to load. Please check your internet connection or ensure FFmpeg files are available locally.');
+            console.error('[WhisperService] Failed to load FFmpeg from local:', localError);
+            throw new Error('FFmpeg failed to load from both CDN and local files. Please check your internet connection.');
           }
         }
+      } else {
+        console.log('[WhisperService] FFmpeg already loaded');
       }
 
+      console.log('[WhisperService] Writing video file to FFmpeg filesystem...');
       // Write video file to FFmpeg filesystem
       await ffmpeg.writeFile('input.mp4', await fetchFile(videoFile));
+      console.log('[WhisperService] Video file written successfully');
       
+      console.log('[WhisperService] Extracting audio with FFmpeg...');
       // Extract audio as WAV with 16kHz sample rate (required for Whisper)
       await ffmpeg.exec([
         '-i', 'input.mp4',
@@ -410,12 +582,19 @@ class WhisperService {
         'output.wav'
       ]);
       
+      console.log('[WhisperService] Audio extraction completed');
+      
       // Read the output audio file
       const audioData = await ffmpeg.readFile('output.wav');
+      console.log('[WhisperService] Audio data read:', {
+        type: typeof audioData,
+        size: audioData instanceof Uint8Array ? `${(audioData.byteLength / 1024).toFixed(2)}KB` : 'unknown'
+      });
       
       // Clean up
       await ffmpeg.deleteFile('input.mp4');
       await ffmpeg.deleteFile('output.wav');
+      console.log('[WhisperService] Cleanup completed');
       
       // Convert to ArrayBuffer (audioData is Uint8Array)
       let buffer: ArrayBuffer;
@@ -423,7 +602,7 @@ class WhisperService {
         buffer = audioData.buffer.slice(audioData.byteOffset, audioData.byteOffset + audioData.byteLength);
       } else {
         // If it's a string (base64), convert it
-        const binaryString = atob(audioData);
+        const binaryString = atob(audioData as string);
         const len = binaryString.length;
         const bytes = new Uint8Array(len);
         for (let i = 0; i < len; i++) {
@@ -432,12 +611,27 @@ class WhisperService {
         buffer = bytes.buffer;
       }
       
+      console.log('[WhisperService] Audio buffer prepared:', {
+        totalSize: `${(buffer.byteLength / 1024).toFixed(2)}KB`,
+        pcmSize: `${((buffer.byteLength - 44) / 1024).toFixed(2)}KB` // Minus WAV header
+      });
+      
       // Skip WAV header (44 bytes) and return raw PCM data
       return buffer.slice(44);
       
     } catch (error) {
-      console.error('Error extracting audio from video:', error);
-      throw new Error('Failed to extract audio from video. Please ensure FFmpeg is loaded correctly.');
+      console.error('[WhisperService] Error in extractAudioFromVideo:', error);
+      
+      // Provide more specific error messages
+      if (error instanceof Error) {
+        if (error.message.includes('SharedArrayBuffer')) {
+          throw new Error('FFmpeg requires SharedArrayBuffer which is not available. Please ensure your site is served with proper CORS headers or try a different browser.');
+        } else if (error.message.includes('fetch')) {
+          throw new Error('Failed to load FFmpeg files. Please check your internet connection and ensure the files exist in /public/ffmpeg/');
+        }
+      }
+      
+      throw new Error(`Failed to extract audio from video: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 

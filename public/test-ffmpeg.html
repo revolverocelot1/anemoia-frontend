@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FFmpeg Subtitle Embed Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #1a1a1a;
+            color: #fff;
+        }
+        .container {
+            background: #2a2a2a;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        button:disabled {
+            background: #666;
+            cursor: not-allowed;
+        }
+        #status {
+            margin: 20px 0;
+            padding: 10px;
+            background: #333;
+            border-radius: 4px;
+            font-family: monospace;
+            white-space: pre-wrap;
+        }
+        #video-container {
+            margin: 20px 0;
+        }
+        video {
+            width: 100%;
+            max-width: 600px;
+            border-radius: 4px;
+        }
+        .success {
+            color: #4CAF50;
+        }
+        .error {
+            color: #f44336;
+        }
+        .progress {
+            width: 100%;
+            height: 20px;
+            background: #333;
+            border-radius: 4px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        .progress-bar {
+            height: 100%;
+            background: #4CAF50;
+            transition: width 0.3s;
+        }
+    </style>
+</head>
+<body>
+    <h1>FFmpeg Subtitle Embed Test</h1>
+    
+    <div class="container">
+        <h2>Step 1: Load FFmpeg</h2>
+        <button id="loadFFmpegBtn" onclick="loadFFmpeg()">Load FFmpeg</button>
+        <div id="ffmpegStatus"></div>
+    </div>
+    
+    <div class="container">
+        <h2>Step 2: Create Test Video with Subtitles</h2>
+        <button id="createVideoBtn" onclick="createTestVideo()" disabled>Create Test Video</button>
+        <div class="progress" id="progressContainer" style="display: none;">
+            <div class="progress-bar" id="progressBar" style="width: 0%"></div>
+        </div>
+        <div id="videoStatus"></div>
+    </div>
+    
+    <div class="container">
+        <h2>Result</h2>
+        <div id="video-container"></div>
+        <div id="status"></div>
+    </div>
+    
+    <script type="module">
+        import { FFmpeg } from 'https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/esm/index.js';
+        import { fetchFile, toBlobURL } from 'https://cdn.jsdelivr.net/npm/@ffmpeg/util@0.12.1/dist/esm/index.js';
+        
+        let ffmpeg = null;
+        let loaded = false;
+        
+        window.loadFFmpeg = async function() {
+            const statusEl = document.getElementById('ffmpegStatus');
+            const loadBtn = document.getElementById('loadFFmpegBtn');
+            const createBtn = document.getElementById('createVideoBtn');
+            
+            try {
+                loadBtn.disabled = true;
+                statusEl.innerHTML = '<span class="info">Loading FFmpeg...</span>';
+                
+                ffmpeg = new FFmpeg();
+                
+                ffmpeg.on('log', ({ message }) => {
+                    console.log('[FFmpeg]', message);
+                });
+                
+                // Try loading from local files first
+                try {
+                    await ffmpeg.load({
+                        coreURL: '/ffmpeg/ffmpeg-core.js',
+                        wasmURL: '/ffmpeg/ffmpeg-core.wasm',
+                    });
+                    statusEl.innerHTML = '<span class="success">✓ FFmpeg loaded from local files!</span>';
+                } catch (localError) {
+                    console.error('Failed to load from local:', localError);
+                    statusEl.innerHTML = '<span class="info">Local load failed, trying CDN...</span>';
+                    
+                    // Fallback to CDN with toBlobURL
+                    const cdnCoreURL = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/umd/ffmpeg-core.js';
+                    const cdnWasmURL = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/umd/ffmpeg-core.wasm';
+                    
+                    await ffmpeg.load({
+                        coreURL: await toBlobURL(cdnCoreURL, 'text/javascript'),
+                        wasmURL: await toBlobURL(cdnWasmURL, 'application/wasm'),
+                    });
+                    statusEl.innerHTML = '<span class="success">✓ FFmpeg loaded from CDN!</span>';
+                }
+                
+                loaded = true;
+                createBtn.disabled = false;
+                
+            } catch (error) {
+                console.error('FFmpeg loading error:', error);
+                statusEl.innerHTML = '<span class="error">✗ Failed to load FFmpeg: ' + error.message + '</span>';
+                loadBtn.disabled = false;
+            }
+        };
+        
+        window.createTestVideo = async function() {
+            if (!loaded || !ffmpeg) {
+                alert('Please load FFmpeg first!');
+                return;
+            }
+            
+            const statusEl = document.getElementById('videoStatus');
+            const progressContainer = document.getElementById('progressContainer');
+            const progressBar = document.getElementById('progressBar');
+            const createBtn = document.getElementById('createVideoBtn');
+            
+            try {
+                createBtn.disabled = true;
+                progressContainer.style.display = 'block';
+                statusEl.innerHTML = '<span class="info">Creating test video with subtitles...</span>';
+                
+                // Set up progress tracking
+                ffmpeg.on('progress', ({ progress }) => {
+                    progressBar.style.width = (progress * 100) + '%';
+                });
+                
+                // Create a simple test video (black screen with counter)
+                statusEl.innerHTML = '<span class="info">Creating base video...</span>';
+                await ffmpeg.exec([
+                    '-f', 'lavfi',
+                    '-i', 'color=c=black:s=640x480:d=10',
+                    '-f', 'lavfi',
+                    '-i', 'sine=frequency=1000:duration=10',
+                    '-pix_fmt', 'yuv420p',
+                    '-c:v', 'libx264',
+                    '-preset', 'ultrafast',
+                    '-c:a', 'aac',
+                    'test_video.mp4'
+                ]);
+                
+                // Create subtitles
+                statusEl.innerHTML = '<span class="info">Creating subtitles...</span>';
+                const vttContent = `WEBVTT
+
+1
+00:00:01.000 --> 00:00:03.000
+This is the first subtitle
+
+2
+00:00:04.000 --> 00:00:06.000
+This is the second subtitle
+
+3
+00:00:07.000 --> 00:00:09.000
+This is the third subtitle`;
+                
+                await ffmpeg.writeFile('subtitles.vtt', vttContent);
+                
+                // Embed subtitles
+                statusEl.innerHTML = '<span class="info">Embedding subtitles...</span>';
+                await ffmpeg.exec([
+                    '-i', 'test_video.mp4',
+                    '-f', 'webvtt',
+                    '-i', 'subtitles.vtt',
+                    '-map', '0:v',
+                    '-map', '0:a',
+                    '-map', '1:s',
+                    '-c:v', 'copy',
+                    '-c:a', 'copy',
+                    '-c:s', 'mov_text',
+                    '-metadata:s:s:0', 'language=eng',
+                    '-metadata:s:s:0', 'handler_name=English',
+                    '-disposition:s:0', 'default',
+                    'output.mp4'
+                ]);
+                
+                // Read the output file
+                statusEl.innerHTML = '<span class="info">Reading output file...</span>';
+                const data = await ffmpeg.readFile('output.mp4');
+                const blob = new Blob([data], { type: 'video/mp4' });
+                const url = URL.createObjectURL(blob);
+                
+                // Display the video
+                const videoContainer = document.getElementById('video-container');
+                videoContainer.innerHTML = `
+                    <video controls>
+                        <source src="${url}" type="video/mp4">
+                        Your browser does not support the video tag.
+                    </video>
+                    <br>
+                    <button onclick="downloadVideo('${url}')">Download Video</button>
+                `;
+                
+                statusEl.innerHTML = '<span class="success">✓ Video created with embedded subtitles!</span>';
+                document.getElementById('status').innerHTML = `
+<span class="success">Success! Video created with embedded subtitles.</span>
+
+To verify subtitles are embedded:
+1. Download the video
+2. Open in VLC Media Player
+3. Check Subtitle menu - you should see the embedded track
+4. Or use ffprobe: ffprobe -i output.mp4
+
+Note: Browser video players may not show subtitle tracks.
+Use VLC or similar players to see subtitles.`;
+                
+                progressBar.style.width = '100%';
+                
+            } catch (error) {
+                console.error('Video creation error:', error);
+                statusEl.innerHTML = '<span class="error">✗ Failed to create video: ' + error.message + '</span>';
+            } finally {
+                createBtn.disabled = false;
+            }
+        };
+        
+        window.downloadVideo = function(url) {
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'test_video_with_subtitles.mp4';
+            a.click();
+        };
+    </script>
+</body>
+</html> 

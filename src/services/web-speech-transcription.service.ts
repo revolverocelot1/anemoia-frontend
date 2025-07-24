@@ -143,6 +143,44 @@ export class WebSpeechTranscriptionService {
   public clearSegments() {
     this.currentSegments = [];
   }
+
+  // Convenience methods
+  public isAvailable(): boolean {
+    return this.isSupported();
+  }
+
+  public startTranscription(options?: WebSpeechTranscriptionOptions) {
+    return this.start(options);
+  }
+
+  public stopTranscription() {
+    return this.stop();
+  }
+
+  public createTimedSegments(text: string, totalDuration: number): Array<{start: number, end: number, text: string}> {
+    // Simple implementation that splits text into segments based on duration
+    const words = text.split(' ');
+    const wordsPerSegment = Math.max(5, Math.floor(words.length / Math.ceil(totalDuration / 3))); // ~3 seconds per segment
+    const segments: Array<{start: number, end: number, text: string}> = [];
+    
+    let currentTime = 0;
+    const segmentDuration = totalDuration / Math.ceil(words.length / wordsPerSegment);
+    
+    for (let i = 0; i < words.length; i += wordsPerSegment) {
+      const segmentWords = words.slice(i, i + wordsPerSegment);
+      const segmentText = segmentWords.join(' ');
+      
+      segments.push({
+        start: currentTime,
+        end: Math.min(currentTime + segmentDuration, totalDuration),
+        text: segmentText
+      });
+      
+      currentTime += segmentDuration;
+    }
+    
+    return segments;
+  }
 }
 
 // Singleton instance
@@ -154,3 +192,6 @@ export function getWebSpeechTranscriptionService(): WebSpeechTranscriptionServic
   }
   return instance;
 } 
+
+// Export singleton instance
+export const webSpeechService = getWebSpeechTranscriptionService(); 

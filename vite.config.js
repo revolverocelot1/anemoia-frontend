@@ -30,6 +30,7 @@ export default defineConfig({
     plugins: [react(), onnxWasmPlugin()],
     base: '/',
     assetsInclude: ['**/*.wasm'],
+    publicDir: 'public',
     optimizeDeps: {
         exclude: [
             '@ffmpeg/ffmpeg',
@@ -62,7 +63,6 @@ export default defineConfig({
             'Cross-Origin-Resource-Policy': 'cross-origin',
             'Access-Control-Allow-Origin': '*',
             'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-            'Access-Control-Allow-Headers': 'Content-Type'
         },
         fs: {
             allow: ['..']

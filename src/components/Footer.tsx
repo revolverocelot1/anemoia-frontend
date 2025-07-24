@@ -30,7 +30,7 @@ const Footer = () => {
               FAQ
             </a>
             <a 
-              href="mailto:support@anemoias.me" 
+              href="/support" 
               className="text-sm text-gray-400 hover:text-blue-400 transition-colors duration-200"
             >
               Support

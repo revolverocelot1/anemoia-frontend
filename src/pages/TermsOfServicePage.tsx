@@ -249,7 +249,7 @@ const TermsOfServicePage: React.FC = () => {
                 <ul className="list-disc pl-6 space-y-2">
                   <li>Email: <a href="mailto:legal@anemoias.me" className="text-blue-400 hover:text-blue-300">legal@anemoias.me</a></li>
                   <li>Website: <a href="https://anemoias.me" className="text-blue-400 hover:text-blue-300">https://anemoias.me</a></li>
-                  <li>Support: <a href="mailto:support@anemoias.me" className="text-blue-400 hover:text-blue-300">support@anemoias.me</a></li>
+                  <li>Support: <a href="/support" className="text-blue-400 hover:text-blue-300">support@anemoias.me</a></li>
                 </ul>
               </div>
             </motion.section>

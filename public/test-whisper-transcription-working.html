@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Whisper Transcription Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f0f0f0;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        .upload-area {
+            border: 2px dashed #007bff;
+            border-radius: 5px;
+            padding: 40px;
+            text-align: center;
+            margin: 20px 0;
+            background: #f8f9fa;
+            cursor: pointer;
+        }
+        .upload-area:hover {
+            background: #e9ecef;
+        }
+        #status {
+            margin: 20px 0;
+            padding: 15px;
+            border-radius: 5px;
+            display: none;
+        }
+        .info { background: #d1ecf1; color: #0c5460; }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        #transcript {
+            margin-top: 20px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 5px;
+            min-height: 100px;
+            white-space: pre-wrap;
+            font-family: monospace;
+            display: none;
+        }
+        .progress-bar {
+            width: 100%;
+            height: 30px;
+            background: #e9ecef;
+            border-radius: 15px;
+            overflow: hidden;
+            margin: 20px 0;
+            display: none;
+        }
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(45deg, #007bff, #0056b3);
+            width: 0%;
+            transition: width 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        button:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎤 Whisper Transcription Test</h1>
+        
+        <div class="upload-area" id="uploadArea">
+            <p>📁 Click to select or drag & drop a video/audio file here</p>
+            <input type="file" id="fileInput" accept="video/*,audio/*" style="display: none;">
+        </div>
+        
+        <div id="fileInfo" style="display: none; margin: 20px 0;">
+            <strong>Selected file:</strong> <span id="fileName"></span>
+        </div>
+        
+        <div style="text-align: center; margin: 20px 0;">
+            <button id="transcribeBtn" disabled>Start Transcription</button>
+            <button id="clearBtn" onclick="clearAll()">Clear</button>
+        </div>
+        
+        <div id="status"></div>
+        
+        <div class="progress-bar" id="progressBar">
+            <div class="progress-fill" id="progressFill">0%</div>
+        </div>
+        
+        <div id="transcript"></div>
+    </div>
+
+    <script type="module">
+        import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2';
+        
+        // Configure environment
+        env.allowLocalModels = false;
+        env.remoteURL = 'https://huggingface.co/';
+        
+        let selectedFile = null;
+        const fileInput = document.getElementById('fileInput');
+        const uploadArea = document.getElementById('uploadArea');
+        const transcribeBtn = document.getElementById('transcribeBtn');
+        const statusDiv = document.getElementById('status');
+        const transcriptDiv = document.getElementById('transcript');
+        const progressBar = document.getElementById('progressBar');
+        const progressFill = document.getElementById('progressFill');
+        
+        // File selection
+        uploadArea.onclick = () => fileInput.click();
+        fileInput.onchange = (e) => handleFileSelect(e.target.files[0]);
+        
+        // Drag and drop
+        uploadArea.ondragover = (e) => {
+            e.preventDefault();
+            uploadArea.style.borderColor = '#28a745';
+        };
+        uploadArea.ondragleave = () => {
+            uploadArea.style.borderColor = '#007bff';
+        };
+        uploadArea.ondrop = (e) => {
+            e.preventDefault();
+            uploadArea.style.borderColor = '#007bff';
+            handleFileSelect(e.dataTransfer.files[0]);
+        };
+        
+        function handleFileSelect(file) {
+            if (!file) return;
+            
+            selectedFile = file;
+            document.getElementById('fileName').textContent = `${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`;
+            document.getElementById('fileInfo').style.display = 'block';
+            transcribeBtn.disabled = false;
+            showStatus('info', `File selected: ${file.name}`);
+        }
+        
+        function showStatus(type, message) {
+            statusDiv.className = type;
+            statusDiv.textContent = message;
+            statusDiv.style.display = 'block';
+        }
+        
+        function updateProgress(percent, status = '') {
+            progressBar.style.display = 'block';
+            progressFill.style.width = percent + '%';
+            progressFill.textContent = status || percent + '%';
+        }
+        
+        async function extractAudio(file) {
+            showStatus('info', 'Extracting audio from file...');
+            updateProgress(10, 'Loading FFmpeg...');
+            
+            const { createFFmpeg, fetchFile } = FFmpeg;
+            const ffmpeg = createFFmpeg({ log: true });
+            
+            await ffmpeg.load();
+            updateProgress(20, 'FFmpeg loaded');
+            
+            ffmpeg.FS('writeFile', 'input', await fetchFile(file));
+            updateProgress(40, 'Processing audio...');
+            
+            await ffmpeg.run('-i', 'input', '-ar', '16000', '-ac', '1', '-f', 'wav', 'output.wav');
+            updateProgress(60, 'Audio extracted');
+            
+            const data = ffmpeg.FS('readFile', 'output.wav');
+            return new Blob([data.buffer], { type: 'audio/wav' });
+        }
+        
+        transcribeBtn.onclick = async () => {
+            if (!selectedFile) return;
+            
+            try {
+                transcribeBtn.disabled = true;
+                transcriptDiv.style.display = 'none';
+                transcriptDiv.textContent = '';
+                
+                showStatus('info', 'Initializing Whisper model...');
+                updateProgress(0, 'Loading model...');
+                
+                // Create transcription pipeline
+                const transcriber = await pipeline('automatic-speech-recognition', 'Xenova/whisper-tiny');
+                
+                updateProgress(30, 'Model loaded');
+                showStatus('info', 'Processing audio...');
+                
+                // Extract audio if video file
+                let audioBlob = selectedFile;
+                if (selectedFile.type.startsWith('video/')) {
+                    audioBlob = await extractAudio(selectedFile);
+                }
+                
+                updateProgress(70, 'Transcribing...');
+                showStatus('info', 'Transcribing audio...');
+                
+                // Convert audio to base64
+                const reader = new FileReader();
+                const audioData = await new Promise((resolve) => {
+                    reader.onloadend = () => resolve(reader.result);
+                    reader.readAsDataURL(audioBlob);
+                });
+                
+                // Perform transcription
+                const result = await transcriber(audioData, {
+                    chunk_length_s: 30,
+                    stride_length_s: 5,
+                    language: 'english',
+                    task: 'transcribe',
+                });
+                
+                updateProgress(100, 'Complete!');
+                showStatus('success', 'Transcription completed successfully!');
+                
+                // Display transcript
+                transcriptDiv.textContent = result.text;
+                transcriptDiv.style.display = 'block';
+                
+            } catch (error) {
+                console.error('Transcription error:', error);
+                showStatus('error', `Error: ${error.message}`);
+            } finally {
+                transcribeBtn.disabled = false;
+                setTimeout(() => {
+                    progressBar.style.display = 'none';
+                }, 2000);
+            }
+        };
+        
+        window.clearAll = () => {
+            selectedFile = null;
+            fileInput.value = '';
+            document.getElementById('fileInfo').style.display = 'none';
+            statusDiv.style.display = 'none';
+            transcriptDiv.style.display = 'none';
+            transcriptDiv.textContent = '';
+            progressBar.style.display = 'none';
+            progressFill.style.width = '0%';
+            transcribeBtn.disabled = true;
+        };
+    </script>
+    
+    <!-- Load FFmpeg -->
+    <script src="https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js"></script>
+    <script>
+        const { createFFmpeg } = FFmpeg;
+    </script>
+</body>
+</html> 
