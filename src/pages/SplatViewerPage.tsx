@@ -295,18 +295,39 @@ const TriangleSplatRenderer = ({ url, onStatsUpdate }: { url: string; onStatsUpd
 
 const parseOFF = async (file: File) => {
   const text = await file.text();
-  const lines = text.split(/\r?\n/).filter(Boolean);
-  if (lines[0].trim() !== 'OFF') throw new Error('Not a valid OFF file');
-  const [numVertices, numFaces] = lines[1].trim().split(/\s+/).map(Number);
+  const lines = text.split(/\r?\n/);
+  // Skip blank lines and comments
+  let headerLine = 0;
+  while (headerLine < lines.length && (lines[headerLine].trim() === '' || lines[headerLine].trim().startsWith('#'))) {
+    headerLine++;
+  }
+  const header = lines[headerLine].trim();
+  if (header !== 'OFF' && header !== 'COFF') throw new Error('Not a valid OFF file');
+  let idx = headerLine + 1;
+  // Skip blank/comment lines before counts
+  while (idx < lines.length && (lines[idx].trim() === '' || lines[idx].trim().startsWith('#'))) idx++;
+  const [numVertices, numFaces] = lines[idx].trim().split(/\s+/).map(Number);
   const vertices: number[][] = [];
-  for (let i = 0; i < numVertices; i++) {
-    const parts = lines[2 + i].trim().split(/\s+/).map(Number);
-    vertices.push(parts);
+  let v = 0;
+  while (v < numVertices) {
+    let vline = lines[idx + 1 + v];
+    if (!vline) { v++; continue; }
+    vline = vline.trim();
+    if (vline === '' || vline.startsWith('#')) { v++; continue; }
+    const parts = vline.split(/\s+/).map(Number);
+    vertices.push(parts.slice(0, 3));
+    v++;
   }
   const faces: number[][] = [];
-  for (let i = 0; i < numFaces; i++) {
-    const parts = lines[2 + numVertices + i].trim().split(/\s+/).map(Number);
-    if (parts[0] === 3) faces.push(parts.slice(1, 4)); // Only triangles
+  let f = 0;
+  while (f < numFaces) {
+    let fline = lines[idx + 1 + numVertices + f];
+    if (!fline) { f++; continue; }
+    fline = fline.trim();
+    if (fline === '' || fline.startsWith('#')) { f++; continue; }
+    const parts = fline.split(/\s+/).map(Number);
+    if (parts[0] === 3) faces.push(parts.slice(1, 4));
+    f++;
   }
   return { vertices, faces };
 };
