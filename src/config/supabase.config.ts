@@ -8,8 +8,8 @@ const getRedirectUrl = () => {
 };
 
 export const supabaseConfig = {
-  url: 'https://qvqxkgescavccwgwttsp.supabase.co',
-  anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF2cXhrZ2VzY2F2Y2N3Z3d0dHNwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE2NDI2NDAsImV4cCI6MjA2NzIxODY0MH0.ikL-yWy8t3pYo03FxA7QDV9PRavPLH1dt01KYZ8NsFE',
+  url: import.meta.env.VITE_SUPABASE_URL || 'https://qvqxkgescavccwgwttsp.supabase.co',
+  anonKey: import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF2cXhrZ2VzY2F2Y2N3Z3d0dHNwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE2NDI2NDAsImV4cCI6MjA2NzIxODY0MH0.ikL-yWy8t3pYo03FxA7QDV9PRavPLH1dt01KYZ8NsFE',
   auth: {
     redirectTo: getRedirectUrl(),
     flowType: 'implicit', // Explicitly set flow type
