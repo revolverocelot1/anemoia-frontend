@@ -8,17 +8,25 @@ interface DraggableSubtitleProps {
   videoWidth: number;
   videoHeight: number;
   onUpdate: (updates: Partial<SubtitleSegment>) => void;
+  onTextUpdate?: (text: string) => void;
+  isEditing?: boolean;
+  onEditingChange?: (editing: boolean) => void;
 }
 
 const DraggableSubtitle: React.FC<DraggableSubtitleProps> = ({
   subtitle,
   videoWidth,
   videoHeight,
-  onUpdate
+  onUpdate,
+  onTextUpdate,
+  isEditing = false,
+  onEditingChange
 }) => {
   const [isDragging, setIsDragging] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
   const [showControls, setShowControls] = useState(true);
+  const [localIsEditing, setLocalIsEditing] = useState(isEditing);
+  const [editingText, setEditingText] = useState(subtitle.text);
   const [localPosition, setLocalPosition] = useState<SubtitlePosition>(
     subtitle.position || {
       x: 50,
@@ -181,7 +189,58 @@ const DraggableSubtitle: React.FC<DraggableSubtitleProps> = ({
             maxWidth: `${videoWidth * 0.8}px`
           }}
         >
-          {subtitle.text}
+          {localIsEditing ? (
+            <input
+              type="text"
+              value={editingText}
+              onChange={(e) => {
+                setEditingText(e.target.value);
+                if (onTextUpdate) {
+                  onTextUpdate(e.target.value);
+                }
+              }}
+              onBlur={() => {
+                setLocalIsEditing(false);
+                if (onEditingChange) {
+                  onEditingChange(false);
+                }
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  setLocalIsEditing(false);
+                  if (onEditingChange) {
+                    onEditingChange(false);
+                  }
+                }
+              }}
+              onClick={(e) => e.stopPropagation()}
+              onMouseDown={(e) => e.stopPropagation()}
+              className="bg-transparent border-none outline-none w-full text-center"
+              style={{
+                fontFamily: 'inherit',
+                fontSize: 'inherit',
+                fontWeight: 'inherit',
+                fontStyle: 'inherit',
+                color: 'inherit',
+                textShadow: 'inherit',
+                WebkitTextStroke: 'inherit'
+              }}
+              autoFocus
+            />
+          ) : (
+            <span
+              onDoubleClick={(e) => {
+                e.stopPropagation();
+                setLocalIsEditing(true);
+                if (onEditingChange) {
+                  onEditingChange(true);
+                }
+              }}
+              style={{ cursor: 'text' }}
+            >
+              {subtitle.text}
+            </span>
+          )}
         </div>
 
         {/* Drag handle indicator */}

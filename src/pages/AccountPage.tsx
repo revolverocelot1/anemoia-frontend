@@ -5,10 +5,17 @@ import Header from '../components/Header';
 import Footer from '../components/Footer';
 import AnimatedPage from '../components/AnimatedPage';
 import { useNavigate } from 'react-router-dom';
+import { useState } from 'react';
 
 export default function AccountPage() {
   const navigate = useNavigate();
   const { isAuthenticated, user, signOut, isLoading: authLoading } = useSupabaseAuth();
+  
+  // Admin email addresses - same as in AdminSupportPage
+  const ADMIN_EMAILS = ['srushtiraj.patil20@vit.edu'];
+  const isAdmin = user && ADMIN_EMAILS.includes(user.email || '');
+  
+  const [isSigningOut, setIsSigningOut] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -191,6 +198,21 @@ export default function AccountPage() {
                 </svg>
                 <span>Settings</span>
               </motion.button>
+
+              {/* Admin Support Dashboard Link - Only visible to admins */}
+              {isAdmin && (
+                <motion.button
+                  onClick={() => navigate('/admin/support')}
+                  className="flex items-center space-x-3 px-6 py-4 bg-red-600/20 text-red-400 border border-red-600/30 rounded-xl font-semibold hover:bg-red-600/30 transition-colors duration-300"
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-5 0a4 4 0 11-8 0 4 4 0 018 0z" />
+                  </svg>
+                  <span>Admin Dashboard</span>
+                </motion.button>
+              )}
             </div>
           </motion.div>
 

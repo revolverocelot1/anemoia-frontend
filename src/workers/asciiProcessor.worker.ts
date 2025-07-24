@@ -145,39 +145,51 @@ const processFrame = (request: ProcessingRequest) => {
   const asciiChars = getCharacterSet(charDensity, config.asciiChars);
   
   // Calculate optimal character dimensions based on input size and density
-  const baseWidth = 120; // Base width for high quality
-  const targetCharWidth = Math.floor(baseWidth * charDensity);
-  const charWidth = Math.min(targetCharWidth, 200); // Cap at 200 for performance
+  // Reduced base width for better performance
+  const baseWidth = 60; // Reduced from 80 for better performance
+  const targetCharWidth = Math.floor(baseWidth * Math.min(charDensity, 1.2)); // Lower cap
+  const charWidth = Math.min(targetCharWidth, 80); // Reduced cap from 120
   const charHeight = Math.ceil((height / width) * charWidth * 0.5); // Adjust for character aspect ratio
   
   const asciiLines: string[] = [];
   const colorData: number[] = [];
   
-  // Apply brightness and contrast adjustments
-  const adjustedPixels = new Uint8ClampedArray(pixels.length);
+  // Pre-calculate adjustment factors
   const contrastFactor = contrast;
+  const brightnessMultiplier = brightness;
   
-  for (let i = 0; i < pixels.length; i += 4) {
-    let r = pixels[i];
-    let g = pixels[i + 1];
-    let b = pixels[i + 2];
+  // Apply brightness and contrast adjustments only if needed
+  const needsAdjustment = brightness !== 1.0 || contrast !== 1.0 || negative;
+  const adjustedPixels = needsAdjustment ? new Uint8ClampedArray(pixels.length) : pixels;
+  
+  if (needsAdjustment) {
+    // Use typed arrays for better performance
+    const pixelView = new Uint32Array(pixels.buffer);
+    const adjustedView = new Uint32Array(adjustedPixels.buffer);
     
-    // Apply negative filter if needed
-    if (negative) {
-      r = 255 - r;
-      g = 255 - g;
-      b = 255 - b;
+    for (let i = 0; i < pixelView.length; i++) {
+      const pixel = pixelView[i];
+      let r = pixel & 0xFF;
+      let g = (pixel >> 8) & 0xFF;
+      let b = (pixel >> 16) & 0xFF;
+      const a = (pixel >> 24) & 0xFF;
+      
+      // Apply negative filter if needed
+      if (negative) {
+        r = 255 - r;
+        g = 255 - g;
+        b = 255 - b;
+      }
+      
+      // Apply contrast and brightness
+      if (contrast !== 1.0 || brightness !== 1.0) {
+        r = Math.max(0, Math.min(255, ((r - 128) * contrastFactor + 128) * brightnessMultiplier));
+        g = Math.max(0, Math.min(255, ((g - 128) * contrastFactor + 128) * brightnessMultiplier));
+        b = Math.max(0, Math.min(255, ((b - 128) * contrastFactor + 128) * brightnessMultiplier));
+      }
+      
+      adjustedView[i] = (a << 24) | (b << 16) | (g << 8) | r;
     }
-    
-    // Apply contrast and brightness
-    r = Math.max(0, Math.min(255, ((r - 128) * contrastFactor + 128) * brightness));
-    g = Math.max(0, Math.min(255, ((g - 128) * contrastFactor + 128) * brightness));
-    b = Math.max(0, Math.min(255, ((b - 128) * contrastFactor + 128) * brightness));
-    
-    adjustedPixels[i] = r;
-    adjustedPixels[i + 1] = g;
-    adjustedPixels[i + 2] = b;
-    adjustedPixels[i + 3] = pixels[i + 3];
   }
   
   // Detect edges if needed
@@ -190,25 +202,29 @@ const processFrame = (request: ProcessingRequest) => {
   const blockWidth = width / charWidth;
   const blockHeight = height / charHeight;
   const numChars = asciiChars.length;
+  const numCharsMinusOne = numChars - 1;
+  
+  // Use adaptive sampling based on block size
+  const sampleStep = Math.max(1, Math.floor(Math.min(blockWidth, blockHeight) / 4));
   
   // Process each character position
   for (let y = 0; y < charHeight; y++) {
     let line = '';
     
     for (let x = 0; x < charWidth; x++) {
-      // Calculate block boundaries with sub-pixel accuracy
-      const startX = Math.floor(x * blockWidth);
-      const endX = Math.ceil((x + 1) * blockWidth);
-      const startY = Math.floor(y * blockHeight);
-      const endY = Math.ceil((y + 1) * blockHeight);
+      // Calculate block bounds
+      const blockStartX = Math.floor(x * blockWidth);
+      const blockEndX = Math.floor((x + 1) * blockWidth);
+      const blockStartY = Math.floor(y * blockHeight);
+      const blockEndY = Math.floor((y + 1) * blockHeight);
       
       let totalBrightness = 0;
       let totalR = 0, totalG = 0, totalB = 0;
       let samples = 0;
       
-      // Sample pixels in block with better coverage
-      for (let sy = startY; sy < endY && sy < height; sy++) {
-        for (let sx = startX; sx < endX && sx < width; sx++) {
+      // Sample pixels with adaptive step
+      for (let sy = blockStartY; sy < blockEndY && sy < height; sy += sampleStep) {
+        for (let sx = blockStartX; sx < blockEndX && sx < width; sx += sampleStep) {
           const idx = (sy * width + sx) * 4;
           
           const r = adjustedPixels[idx];
@@ -219,36 +235,43 @@ const processFrame = (request: ProcessingRequest) => {
             const edgeValue = edges[sy * width + sx] / 255;
             totalBrightness += edgeValue > edgeThreshold ? 1 : 0;
           } else {
-            const pixelBrightness = calculateBrightness(r, g, b) / 255;
+            // Use faster brightness calculation with bit shifting
+            const pixelBrightness = ((r * 77 + g * 150 + b * 29) >> 8) / 255;
             totalBrightness += pixelBrightness;
           }
           
-          totalR += r;
-          totalG += g;
-          totalB += b;
+          if (colored || config.colorMode !== 'mono') {
+            totalR += r;
+            totalG += g;
+            totalB += b;
+          }
           samples++;
         }
       }
       
       if (samples > 0) {
         const avgBrightness = totalBrightness / samples;
-        // Use a smoother mapping function for better gradients
-        const charIndex = Math.floor(avgBrightness * avgBrightness * (numChars - 1));
-        const clampedIndex = Math.max(0, Math.min(numChars - 1, charIndex));
-        line += asciiChars[clampedIndex];
+        // Use bit shifting for faster calculation
+        const charIndex = Math.min(numCharsMinusOne, (avgBrightness * numChars) | 0);
+        line += asciiChars[charIndex];
         
-        // Store color data for colored output
+        // Store color data only if needed
         if (colored || config.colorMode !== 'mono') {
-          const avgR = Math.floor(totalR / samples);
-          const avgG = Math.floor(totalG / samples);
-          const avgB = Math.floor(totalB / samples);
-          
           if (colored) {
             // For true color mode, use actual pixel colors
-            colorData.push(avgR, avgG, avgB);
+            colorData.push(
+              (totalR / samples) | 0,
+              (totalG / samples) | 0,
+              (totalB / samples) | 0
+            );
           } else {
             // For themed modes, apply color theme
-            const [r, g, b] = getColorForMode(avgR, avgG, avgB, config.colorMode);
+            const [r, g, b] = getColorForMode(
+              (totalR / samples) | 0,
+              (totalG / samples) | 0,
+              (totalB / samples) | 0,
+              config.colorMode
+            );
             colorData.push(r, g, b);
           }
         }

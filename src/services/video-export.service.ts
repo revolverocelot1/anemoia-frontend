@@ -225,40 +225,86 @@ export class VideoExportService {
     frameDuration: number,
     options: VideoExportOptions
   ): Promise<void> {
-    // Seek to the target time
-    video.currentTime = currentTime;
-    
-    // Wait for seek to complete with timeout
-    await new Promise<void>((resolve) => {
-      const timeoutId = setTimeout(() => {
-        resolve();
-      }, 100); // Short timeout since we're processing many frames
+    // Seek to the target time with proper waiting
+    if (Math.abs(video.currentTime - currentTime) > 0.001) {
+      video.currentTime = currentTime;
       
-      const seekHandler = () => {
-        clearTimeout(timeoutId);
-        resolve();
-      };
+      // Wait for seek to complete properly
+      await new Promise<void>((resolve) => {
+        let seekComplete = false;
+        const maxWaitTime = 500; // Maximum wait time in ms
+        const startTime = Date.now();
+        
+        const checkSeek = () => {
+          // Check if seek is complete or if we've waited too long
+          if (seekComplete || Date.now() - startTime > maxWaitTime) {
+            resolve();
+            return;
+          }
+          
+          // Check if video time is close enough to target
+          if (Math.abs(video.currentTime - currentTime) < 0.01) {
+            seekComplete = true;
+            resolve();
+            return;
+          }
+          
+          // Continue checking
+          requestAnimationFrame(checkSeek);
+        };
+        
+        const seekHandler = () => {
+          seekComplete = true;
+          resolve();
+        };
+        
+        video.addEventListener('seeked', seekHandler, { once: true });
+        
+        // Start checking immediately
+        checkSeek();
+      });
       
-      video.addEventListener('seeked', seekHandler, { once: true });
-    });
+      // Additional wait to ensure frame is rendered
+      await new Promise(resolve => setTimeout(resolve, 50));
+    }
     
-    // Draw video frame
-    ctx.drawImage(video, 0, 0);
+    // Clear canvas first
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    // Draw video frame with proper scaling
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
     // Draw subtitles if burning is enabled
     if (options.burnSubtitles) {
-      renderer.renderSubtitles(subtitles, video.videoWidth, video.videoHeight, currentTime);
-      ctx.drawImage(subtitleCanvas, 0, 0);
+      // Find active subtitles at current time
+      const activeSubtitles = subtitles.filter(
+        sub => currentTime >= sub.startTime && currentTime <= sub.endTime
+      );
+      
+      if (activeSubtitles.length > 0) {
+        // Clear subtitle canvas first
+        const subtitleCtx = subtitleCanvas.getContext('2d');
+        if (subtitleCtx) {
+          subtitleCtx.clearRect(0, 0, subtitleCanvas.width, subtitleCanvas.height);
+        }
+        
+        // Render subtitles with proper styling
+        renderer.renderSubtitles(subtitles, canvas.width, canvas.height, currentTime);
+        
+        // Draw subtitle canvas on main canvas
+        ctx.drawImage(subtitleCanvas, 0, 0);
+      }
     }
 
-    // Create video frame
+    // Create video frame with current canvas content
     const frame = new VideoFrame(canvas, {
       timestamp: currentTime * 1000000, // microseconds
       duration: frameDuration * 1000000
     });
 
-    // Encode frame
-    encoder.encode(frame, { keyFrame: frameIndex % 30 === 0 });
+    // Encode frame (keyframe every second for better quality)
+    const isKeyFrame = frameIndex % options.fps === 0;
+    encoder.encode(frame, { keyFrame: isKeyFrame });
     
     // Important: close frame to free memory
     frame.close();
@@ -271,11 +317,17 @@ export class VideoExportService {
     options: VideoExportOptions,
     onProgress?: (progress: number) => void
   ): Promise<Blob> {
+    console.log('[VideoExport] Starting MediaRecorder export');
+    
     // Create canvas for rendering
     const canvas = document.createElement('canvas');
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext('2d', {
+      alpha: false,
+      desynchronized: false,
+      willReadFrequently: false
+    });
     if (!ctx) throw new Error('Failed to get canvas context');
 
     const subtitleCanvas = document.createElement('canvas');
@@ -283,78 +335,162 @@ export class VideoExportService {
     subtitleCanvas.height = video.videoHeight;
     const renderer = new SubtitleRenderer(subtitleCanvas);
 
-    // Get canvas stream
-    const stream = canvas.captureStream(options.fps || 30);
+    // Configure canvas for better rendering
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
 
-    // Add audio track from video
-    const audioContext = new AudioContext();
-    const source = audioContext.createMediaElementSource(video);
-    const destination = audioContext.createMediaStreamDestination();
-    source.connect(destination);
+    // Get canvas stream with proper frame rate
+    const fps = options.fps || 30;
+    const stream = canvas.captureStream(fps);
+
+    // Create audio context for audio handling
+    let audioTrack: MediaStreamTrack | null = null;
     
-    if (destination.stream.getAudioTracks().length > 0) {
-      stream.addTrack(destination.stream.getAudioTracks()[0]);
+    try {
+      // Try to get audio from the video element
+      const videoElement = video as any;
+      if (videoElement.captureStream) {
+        const videoStream = videoElement.captureStream();
+        const audioTracks = videoStream.getAudioTracks();
+        if (audioTracks.length > 0) {
+          audioTrack = audioTracks[0];
+          if (audioTrack) {
+            stream.addTrack(audioTrack);
+            console.log('[VideoExport] Audio track added from video element');
+          }
+        }
+      }
+    } catch (error) {
+      console.warn('[VideoExport] Could not capture audio from video element:', error);
     }
 
-    // Configure MediaRecorder
-    const mimeType = options.format === 'webm' ? 'video/webm;codecs=vp9' : 'video/mp4';
+    // Configure MediaRecorder with better settings
+    const mimeTypes = [
+      'video/webm;codecs=vp9,opus',
+      'video/webm;codecs=vp8,opus', 
+      'video/webm;codecs=vp9',
+      'video/webm;codecs=vp8',
+      'video/webm',
+      'video/mp4'
+    ];
+    
+    let selectedMimeType = 'video/webm';
+    for (const mimeType of mimeTypes) {
+      if (MediaRecorder.isTypeSupported(mimeType)) {
+        selectedMimeType = mimeType;
+        break;
+      }
+    }
+    
+    console.log('[VideoExport] Using MIME type:', selectedMimeType);
+    
     const recorder = new MediaRecorder(stream, {
-      mimeType: MediaRecorder.isTypeSupported(mimeType) ? mimeType : 'video/webm',
+      mimeType: selectedMimeType,
       videoBitsPerSecond: options.bitrate || 5000000
     });
 
     const chunks: Blob[] = [];
     recorder.ondataavailable = (e) => {
-      if (e.data.size > 0) {
+      if (e.data && e.data.size > 0) {
         chunks.push(e.data);
       }
     };
 
     // Start recording
-    recorder.start();
+    recorder.start(100); // Get data every 100ms for smoother playback
 
-    // Play video and render frames
+    // Reset video to start
     video.currentTime = 0;
-    video.play();
+    video.pause(); // Don't auto-play, we'll control playback manually
+
+    let frameCount = 0;
+    const totalFrames = Math.ceil(video.duration * fps);
+    let lastTime = 0;
+    let animationId: number;
 
     // Animation loop for rendering
-    const renderFrame = () => {
-      if (video.ended || video.paused) {
+    const renderFrame = async () => {
+      const currentTime = frameCount / fps;
+      
+      if (currentTime >= video.duration) {
+        // Stop recording when done
+        cancelAnimationFrame(animationId);
         recorder.stop();
         return;
       }
 
-      // Draw video frame
-      ctx.drawImage(video, 0, 0);
+      // Seek video to current time if needed
+      if (Math.abs(video.currentTime - currentTime) > 0.1) {
+        video.currentTime = currentTime;
+        // Wait a bit for seek to complete
+        await new Promise(resolve => setTimeout(resolve, 50));
+      }
+
+      // Clear and draw video frame
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
       // Draw subtitles if burning is enabled
       if (options.burnSubtitles) {
-        renderer.renderSubtitles(subtitles, video.videoWidth, video.videoHeight, video.currentTime);
-        ctx.drawImage(subtitleCanvas, 0, 0);
+        const activeSubtitles = subtitles.filter(
+          sub => currentTime >= sub.startTime && currentTime <= sub.endTime
+        );
+        
+        if (activeSubtitles.length > 0) {
+          renderer.renderSubtitles(subtitles, canvas.width, canvas.height, currentTime);
+          ctx.drawImage(subtitleCanvas, 0, 0);
+        }
       }
 
       // Update progress
       if (onProgress) {
-        onProgress((video.currentTime / video.duration) * 100);
+        onProgress((frameCount / totalFrames) * 100);
       }
 
-      requestAnimationFrame(renderFrame);
+      frameCount++;
+      
+      // Schedule next frame with proper timing
+      const nextFrameTime = (frameCount / fps) * 1000;
+      const currentRealTime = performance.now();
+      const delay = Math.max(0, nextFrameTime - (currentRealTime - lastTime));
+      
+      if (frameCount === 1) {
+        lastTime = currentRealTime;
+      }
+      
+      setTimeout(() => {
+        animationId = requestAnimationFrame(renderFrame);
+      }, delay);
     };
 
-    renderFrame();
+    // Start rendering
+    animationId = requestAnimationFrame(renderFrame);
 
     // Wait for recording to finish
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
       recorder.onstop = () => {
-        const blob = new Blob(chunks, { type: recorder.mimeType });
+        console.log('[VideoExport] Recording stopped, creating final blob');
         
         // Clean up
-        source.disconnect();
-        audioContext.close();
+        if (audioTrack) {
+          audioTrack.stop();
+        }
         canvas.remove();
         subtitleCanvas.remove();
         
+        // Create final blob
+        const blob = new Blob(chunks, { type: selectedMimeType });
+        console.log('[VideoExport] Final blob created:', {
+          size: `${(blob.size / 1024 / 1024).toFixed(2)}MB`,
+          type: blob.type
+        });
+        
         resolve(blob);
+      };
+      
+      recorder.onerror = (event) => {
+        console.error('[VideoExport] MediaRecorder error:', event);
+        reject(new Error('Failed to record video'));
       };
     });
   }

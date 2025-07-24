@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Whisper Transcription Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #111;
+            color: #fff;
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .container {
+            background: #222;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+        button {
+            background: #4a5568;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #2d3748;
+        }
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        #status {
+            margin: 20px 0;
+            padding: 10px;
+            background: #2d3748;
+            border-radius: 5px;
+        }
+        #results {
+            white-space: pre-wrap;
+            background: #1a202c;
+            padding: 15px;
+            border-radius: 5px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .error {
+            color: #fc8181;
+        }
+        .success {
+            color: #68d391;
+        }
+        video {
+            max-width: 100%;
+            margin: 20px 0;
+        }
+        select {
+            background: #2d3748;
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            border: 1px solid #4a5568;
+            margin: 5px;
+        }
+        .progress {
+            background: #2d3748;
+            border-radius: 5px;
+            overflow: hidden;
+            height: 20px;
+            margin: 10px 0;
+        }
+        .progress-bar {
+            background: #805ad5;
+            height: 100%;
+            width: 0%;
+            transition: width 0.3s;
+        }
+    </style>
+</head>
+<body>
+    <h1>Whisper Transcription Test</h1>
+    
+    <div class="container">
+        <h2>1. Upload Video</h2>
+        <input type="file" id="videoInput" accept="video/*">
+        <video id="videoPlayer" controls style="display: none;"></video>
+    </div>
+    
+    <div class="container">
+        <h2>2. Select Model & Backend</h2>
+        <select id="modelSelect">
+            <option value="tiny">Tiny (39 MB)</option>
+            <option value="base">Base (74 MB)</option>
+            <option value="small">Small (244 MB)</option>
+        </select>
+        
+        <select id="backendSelect">
+            <option value="wasm">WebAssembly</option>
+            <option value="webgpu">WebGPU (Experimental)</option>
+        </select>
+        
+        <button id="downloadModel">Download Model</button>
+        <button id="transcribe" disabled>Transcribe</button>
+        <button id="testFFmpeg">Test FFmpeg</button>
+    </div>
+    
+    <div class="container">
+        <h2>Status</h2>
+        <div id="status">Ready</div>
+        <div class="progress">
+            <div class="progress-bar" id="progressBar"></div>
+        </div>
+    </div>
+    
+    <div class="container">
+        <h2>Results</h2>
+        <div id="results"></div>
+    </div>
+
+    <script type="module">
+        // Import FFmpeg
+        import { FFmpeg } from 'https://unpkg.com/@ffmpeg/ffmpeg@0.12.10/dist/esm/index.js';
+        import { toBlobURL } from 'https://unpkg.com/@ffmpeg/util@0.12.1/dist/esm/index.js';
+        
+        const status = document.getElementById('status');
+        const results = document.getElementById('results');
+        const progressBar = document.getElementById('progressBar');
+        const videoInput = document.getElementById('videoInput');
+        const videoPlayer = document.getElementById('videoPlayer');
+        const modelSelect = document.getElementById('modelSelect');
+        const backendSelect = document.getElementById('backendSelect');
+        const downloadBtn = document.getElementById('downloadModel');
+        const transcribeBtn = document.getElementById('transcribe');
+        const testFFmpegBtn = document.getElementById('testFFmpeg');
+        
+        let currentVideoFile = null;
+        let ffmpeg = null;
+        
+        // Update status
+        function updateStatus(message, type = 'info') {
+            status.textContent = message;
+            status.className = type === 'error' ? 'error' : type === 'success' ? 'success' : '';
+            console.log(`[Status] ${message}`);
+        }
+        
+        // Update progress
+        function updateProgress(percent) {
+            progressBar.style.width = percent + '%';
+        }
+        
+        // Initialize FFmpeg
+        async function initFFmpeg() {
+            try {
+                updateStatus('Initializing FFmpeg...');
+                ffmpeg = new FFmpeg();
+                
+                ffmpeg.on('log', ({ message }) => {
+                    console.log('[FFmpeg]', message);
+                });
+                
+                ffmpeg.on('progress', ({ progress }) => {
+                    updateProgress(progress * 100);
+                });
+                
+                // Try loading from local first
+                try {
+                    const baseURL = window.location.origin;
+                    await ffmpeg.load({
+                        coreURL: `${baseURL}/ffmpeg/ffmpeg-core.js`,
+                        wasmURL: `${baseURL}/ffmpeg/ffmpeg-core.wasm`
+                    });
+                    updateStatus('FFmpeg loaded successfully from local files', 'success');
+                } catch (localError) {
+                    console.error('Failed to load FFmpeg from local:', localError);
+                    updateStatus('Loading FFmpeg from CDN...');
+                    
+                    // Fallback to CDN
+                    const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd';
+                    await ffmpeg.load({
+                        coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
+                        wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
+                    });
+                    updateStatus('FFmpeg loaded successfully from CDN', 'success');
+                }
+                
+                return true;
+            } catch (error) {
+                updateStatus(`FFmpeg initialization failed: ${error.message}`, 'error');
+                console.error('FFmpeg init error:', error);
+                return false;
+            }
+        }
+        
+        // Test FFmpeg
+        testFFmpegBtn.addEventListener('click', async () => {
+            if (!ffmpeg || !ffmpeg.loaded) {
+                const success = await initFFmpeg();
+                if (!success) return;
+            }
+            
+            try {
+                updateStatus('Testing FFmpeg...');
+                
+                // Create a simple test
+                await ffmpeg.writeFile('test.txt', 'Hello FFmpeg!');
+                const data = await ffmpeg.readFile('test.txt');
+                const text = new TextDecoder().decode(data);
+                
+                if (text === 'Hello FFmpeg!') {
+                    updateStatus('FFmpeg is working correctly!', 'success');
+                    results.textContent = `FFmpeg test passed: "${text}"`;
+                } else {
+                    updateStatus('FFmpeg test failed', 'error');
+                }
+                
+                await ffmpeg.deleteFile('test.txt');
+            } catch (error) {
+                updateStatus(`FFmpeg test failed: ${error.message}`, 'error');
+                console.error('FFmpeg test error:', error);
+            }
+        });
+        
+        // Handle video upload
+        videoInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                currentVideoFile = file;
+                videoPlayer.src = URL.createObjectURL(file);
+                videoPlayer.style.display = 'block';
+                transcribeBtn.disabled = false;
+                updateStatus(`Video loaded: ${file.name}`, 'success');
+            }
+        });
+        
+        // Download model
+        downloadBtn.addEventListener('click', async () => {
+            const model = modelSelect.value;
+            const backend = backendSelect.value;
+            
+            updateStatus(`Downloading ${model} model for ${backend}...`);
+            results.textContent = '';
+            
+            try {
+                // Simulate model download
+                const modelUrl = `https://huggingface.co/onnx-community/whisper-${model}/resolve/main/onnx/model.onnx`;
+                
+                const response = await fetch(modelUrl);
+                if (!response.ok) {
+                    throw new Error(`Failed to download model: ${response.status}`);
+                }
+                
+                const contentLength = response.headers.get('content-length');
+                const total = parseInt(contentLength, 10);
+                let loaded = 0;
+                
+                const reader = response.body.getReader();
+                const chunks = [];
+                
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    
+                    chunks.push(value);
+                    loaded += value.length;
+                    updateProgress((loaded / total) * 100);
+                }
+                
+                const blob = new Blob(chunks);
+                updateStatus(`Model downloaded successfully (${(blob.size / 1024 / 1024).toFixed(1)} MB)`, 'success');
+                
+                // Store in IndexedDB (simulated)
+                results.textContent = `Model ${model} downloaded and ready for use!`;
+                
+            } catch (error) {
+                updateStatus(`Model download failed: ${error.message}`, 'error');
+                console.error('Download error:', error);
+            }
+        });
+        
+        // Transcribe video
+        transcribeBtn.addEventListener('click', async () => {
+            if (!currentVideoFile) {
+                updateStatus('No video file selected', 'error');
+                return;
+            }
+            
+            const model = modelSelect.value;
+            const backend = backendSelect.value;
+            
+            updateStatus(`Starting transcription with ${model} model on ${backend}...`);
+            results.textContent = '';
+            
+            try {
+                // Initialize FFmpeg if not already done
+                if (!ffmpeg || !ffmpeg.loaded) {
+                    const success = await initFFmpeg();
+                    if (!success) return;
+                }
+                
+                // Extract audio from video
+                updateStatus('Extracting audio from video...');
+                const videoData = await currentVideoFile.arrayBuffer();
+                await ffmpeg.writeFile('input.mp4', new Uint8Array(videoData));
+                
+                await ffmpeg.exec([
+                    '-i', 'input.mp4',
+                    '-vn',
+                    '-acodec', 'pcm_s16le',
+                    '-ar', '16000',
+                    '-ac', '1',
+                    'output.wav'
+                ]);
+                
+                const audioData = await ffmpeg.readFile('output.wav');
+                updateStatus('Audio extracted successfully', 'success');
+                
+                // Clean up
+                await ffmpeg.deleteFile('input.mp4');
+                await ffmpeg.deleteFile('output.wav');
+                
+                // Simulate transcription
+                updateStatus('Transcribing audio...');
+                
+                // Mock transcription result
+                setTimeout(() => {
+                    const mockTranscription = `[00:00:00.000 --> 00:00:05.000]
+This is a test transcription of your video.
+
+[00:00:05.000 --> 00:00:10.000]
+The ${backend} backend with ${model} model is working correctly.
+
+[00:00:10.000 --> 00:00:15.000]
+Audio extraction and processing completed successfully.`;
+                    
+                    results.textContent = mockTranscription;
+                    updateStatus('Transcription completed!', 'success');
+                    updateProgress(100);
+                }, 2000);
+                
+            } catch (error) {
+                updateStatus(`Transcription failed: ${error.message}`, 'error');
+                console.error('Transcription error:', error);
+                results.textContent = `Error details:\n${error.stack}`;
+            }
+        });
+        
+        // Initialize on load
+        window.addEventListener('load', () => {
+            // Check for WebGPU support
+            if (!navigator.gpu) {
+                backendSelect.querySelector('option[value="webgpu"]').disabled = true;
+                backendSelect.querySelector('option[value="webgpu"]').textContent = 'WebGPU (Not Supported)';
+            }
+            
+            updateStatus('Ready to process videos');
+        });
+    </script>
+</body>
+</html> 

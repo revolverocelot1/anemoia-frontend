@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live Subtitle Export Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #0a0a0a;
+            color: #e0e0e0;
+        }
+        
+        .test-section {
+            background: #1a1a1a;
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        
+        .status {
+            display: inline-block;
+            padding: 6px 12px;
+            border-radius: 4px;
+            font-weight: bold;
+            margin: 5px 0;
+        }
+        
+        .status.success {
+            background: #065f46;
+            color: #10b981;
+        }
+        
+        .status.error {
+            background: #7f1d1d;
+            color: #ef4444;
+        }
+        
+        .status.info {
+            background: #1e3a8a;
+            color: #3b82f6;
+        }
+        
+        button {
+            padding: 10px 20px;
+            background: #6366f1;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+            font-size: 14px;
+        }
+        
+        button:hover {
+            background: #4f46e5;
+        }
+        
+        button:disabled {
+            background: #4a4a4a;
+            cursor: not-allowed;
+        }
+        
+        video {
+            width: 100%;
+            max-width: 600px;
+            margin: 20px 0;
+            border: 2px solid #333;
+            border-radius: 4px;
+        }
+        
+        pre {
+            background: #2a2a2a;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+            font-size: 12px;
+        }
+        
+        .log-entry {
+            padding: 4px 8px;
+            margin: 2px 0;
+            border-radius: 3px;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        
+        .log-entry.error {
+            background: #7f1d1d;
+            color: #ef4444;
+        }
+        
+        .log-entry.success {
+            background: #065f46;
+            color: #10b981;
+        }
+        
+        .log-entry.info {
+            background: #1e3a8a;
+            color: #3b82f6;
+        }
+        
+        #console-log {
+            max-height: 300px;
+            overflow-y: auto;
+            background: #1a1a1a;
+            padding: 10px;
+            border-radius: 5px;
+            border: 1px solid #333;
+        }
+    </style>
+</head>
+<body>
+    <h1>🎬 Live Subtitle Export Test</h1>
+    
+    <div class="test-section">
+        <h2>Test Setup</h2>
+        <div>
+            <input type="file" id="videoInput" accept="video/*" />
+            <button onclick="createTestSubtitles()">Create Test Subtitles</button>
+        </div>
+        <div id="setup-status" class="status info">Upload a video to begin testing</div>
+    </div>
+    
+    <div class="test-section">
+        <h2>Export Tests</h2>
+        <div>
+            <button onclick="testBurnedExport()" id="burnBtn" disabled>Test Burned Subtitles</button>
+            <button onclick="testEmbeddedExport()" id="embedBtn" disabled>Test Embedded Subtitles</button>
+            <button onclick="clearLogs()">Clear Logs</button>
+        </div>
+        
+        <h3>Console Output:</h3>
+        <div id="console-log"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>Video Preview</h2>
+        <video id="resultVideo" controls></video>
+        <div id="track-info"></div>
+    </div>
+    
+    <script type="module">
+        // Store original console methods
+        const originalLog = console.log;
+        const originalError = console.error;
+        const originalWarn = console.warn;
+        
+        // Override console methods to capture output
+        function addLogEntry(message, type = 'info') {
+            const logDiv = document.getElementById('console-log');
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            entry.textContent = message;
+            logDiv.appendChild(entry);
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+        
+        console.log = function(...args) {
+            originalLog.apply(console, args);
+            addLogEntry(args.join(' '), 'info');
+        };
+        
+        console.error = function(...args) {
+            originalError.apply(console, args);
+            addLogEntry(args.join(' '), 'error');
+        };
+        
+        console.warn = function(...args) {
+            originalWarn.apply(console, args);
+            addLogEntry(args.join(' '), 'info');
+        };
+        
+        // Import services
+        import { optimizedVideoExportService } from '/src/services/optimized-video-export.service.ts';
+        import { videoVerificationService } from '/src/services/video-verification.service.ts';
+        
+        window.optimizedVideoExportService = optimizedVideoExportService;
+        window.videoVerificationService = videoVerificationService;
+        
+        let currentVideo = null;
+        let testSubtitles = [];
+        
+        // Handle video upload
+        document.getElementById('videoInput').addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            const video = document.createElement('video');
+            video.src = URL.createObjectURL(file);
+            
+            video.onloadedmetadata = () => {
+                currentVideo = video;
+                document.getElementById('setup-status').textContent = `Video loaded: ${video.videoWidth}x${video.videoHeight}, ${video.duration.toFixed(2)}s`;
+                document.getElementById('setup-status').className = 'status success';
+                document.getElementById('burnBtn').disabled = false;
+                document.getElementById('embedBtn').disabled = false;
+                
+                console.log(`Video loaded: ${video.videoWidth}x${video.videoHeight}, duration: ${video.duration}s`);
+            };
+        });
+        
+        // Create test subtitles
+        window.createTestSubtitles = function() {
+            if (!currentVideo) {
+                alert('Please upload a video first');
+                return;
+            }
+            
+            testSubtitles = [
+                {
+                    id: '1',
+                    startTime: 1,
+                    endTime: 3,
+                    text: 'First test subtitle',
+                    style: { color: '#FFFFFF', fontSize: 32 },
+                    position: { x: 50, y: 90 }
+                },
+                {
+                    id: '2',
+                    startTime: 4,
+                    endTime: 6,
+                    text: 'Second subtitle with longer text',
+                    style: { color: '#FFFF00', fontSize: 32 },
+                    position: { x: 50, y: 90 }
+                },
+                {
+                    id: '3',
+                    startTime: 7,
+                    endTime: 9,
+                    text: 'Final subtitle',
+                    style: { color: '#00FF00', fontSize: 32 },
+                    position: { x: 50, y: 90 }
+                }
+            ];
+            
+            console.log('Created test subtitles:', testSubtitles);
+            addLogEntry('✅ Created 3 test subtitles', 'success');
+        };
+        
+        // Test burned export
+        window.testBurnedExport = async function() {
+            if (!currentVideo || testSubtitles.length === 0) {
+                alert('Please upload a video and create subtitles first');
+                return;
+            }
+            
+            try {
+                console.log('[TEST] Starting burned subtitle export...');
+                
+                const blob = await optimizedVideoExportService.exportVideo(
+                    currentVideo,
+                    testSubtitles,
+                    {
+                        format: 'mp4',
+                        quality: 'high',
+                        burnSubtitles: true,
+                        embedSubtitles: false,
+                        embedType: 'burn',
+                        fps: 30
+                    },
+                    (progress) => {
+                        console.log(`Export progress: ${progress}%`);
+                    }
+                );
+                
+                console.log('[TEST] Export complete, verifying...');
+                
+                // Run verification
+                const subtitleTimes = testSubtitles.map(s => ({ start: s.startTime, end: s.endTime }));
+                const results = await videoVerificationService.runComprehensiveTest(
+                    blob,
+                    subtitleTimes,
+                    currentVideo.duration,
+                    true,  // expect burned
+                    false  // don't expect embedded
+                );
+                
+                console.log('[TEST] Verification results:', results.summary);
+                
+                // Display video
+                const video = document.getElementById('resultVideo');
+                video.src = URL.createObjectURL(blob);
+                
+                // Download link
+                const a = document.createElement('a');
+                a.href = video.src;
+                a.download = 'test-burned-subtitles.mp4';
+                a.click();
+                
+                addLogEntry('✅ Burned subtitle export complete! Check downloaded video in VLC.', 'success');
+                
+            } catch (error) {
+                console.error('[TEST] Burned export failed:', error);
+                addLogEntry(`❌ Burned export failed: ${error.message}`, 'error');
+            }
+        };
+        
+        // Test embedded export
+        window.testEmbeddedExport = async function() {
+            if (!currentVideo || testSubtitles.length === 0) {
+                alert('Please upload a video and create subtitles first');
+                return;
+            }
+            
+            try {
+                console.log('[TEST] Starting embedded subtitle export...');
+                
+                const blob = await optimizedVideoExportService.exportVideo(
+                    currentVideo,
+                    testSubtitles,
+                    {
+                        format: 'mp4',
+                        quality: 'high',
+                        burnSubtitles: false,
+                        embedSubtitles: true,
+                        embedType: 'track',
+                        fps: 30
+                    },
+                    (progress) => {
+                        console.log(`Export progress: ${progress}%`);
+                    }
+                );
+                
+                console.log('[TEST] Export complete, verifying...');
+                
+                // Run verification
+                const subtitleTimes = testSubtitles.map(s => ({ start: s.startTime, end: s.endTime }));
+                const results = await videoVerificationService.runComprehensiveTest(
+                    blob,
+                    subtitleTimes,
+                    currentVideo.duration,
+                    false, // don't expect burned
+                    true   // expect embedded
+                );
+                
+                console.log('[TEST] Verification results:', results.summary);
+                
+                // Display video
+                const video = document.getElementById('resultVideo');
+                video.src = URL.createObjectURL(blob);
+                
+                // Check for text tracks
+                video.onloadedmetadata = () => {
+                    const trackInfo = document.getElementById('track-info');
+                    if (video.textTracks && video.textTracks.length > 0) {
+                        trackInfo.innerHTML = `<div class="status success">✅ Found ${video.textTracks.length} subtitle track(s)</div>`;
+                        for (let i = 0; i < video.textTracks.length; i++) {
+                            const track = video.textTracks[i];
+                            trackInfo.innerHTML += `<div>Track ${i + 1}: ${track.kind} - ${track.label} (${track.language})</div>`;
+                        }
+                    } else {
+                        trackInfo.innerHTML = '<div class="status error">❌ No subtitle tracks found in video element</div>';
+                    }
+                };
+                
+                // Download link
+                const a = document.createElement('a');
+                a.href = video.src;
+                a.download = 'test-embedded-subtitles.mp4';
+                a.click();
+                
+                addLogEntry('✅ Embedded subtitle export complete! Check downloaded video in VLC > Subtitle > Subtitle Track.', 'success');
+                
+            } catch (error) {
+                console.error('[TEST] Embedded export failed:', error);
+                addLogEntry(`❌ Embedded export failed: ${error.message}`, 'error');
+            }
+        };
+        
+        // Clear logs
+        window.clearLogs = function() {
+            document.getElementById('console-log').innerHTML = '';
+        };
+        
+        // Initialize
+        console.log('Test page loaded. Upload a video to begin testing.');
+    </script>
+</body>
+</html> 

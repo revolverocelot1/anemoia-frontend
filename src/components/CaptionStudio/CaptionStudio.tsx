@@ -38,7 +38,11 @@ import { whisperService } from '../../services/whisper.service';
 import { webSpeechService } from '../../services/web-speech-transcription.service';
 import { SubtitleRenderer } from '../../services/subtitle-renderer.service';
 import { subtitleExportService } from '../../services/subtitle-export.service';
-import { videoExportService } from '../../services/video-export.service';
+import { optimizedVideoExportService } from '../../services/optimized-video-export.service';
+import { videoVerificationService } from '../../services/video-verification.service';
+import { subtitleVerificationService } from '../../services/subtitle-verification.service';
+import { createOffscreenSubtitleRenderer } from '../../services/offscreen-subtitle-renderer.service';
+import { TranscriptionLoadingOverlay } from '../TranscriptionLoadingOverlay';
 import VideoPlayer from './VideoPlayer';
 import SubtitleTimeline from './SubtitleTimeline';
 import SubtitleEditor from './SubtitleEditor';
@@ -79,39 +83,63 @@ const CaptionStudio: React.FC<CaptionStudioProps> = ({ className = '' }) => {
   const [showTemplateDialog, setShowTemplateDialog] = useState(false);
   const [isDraggingSubtitle, setIsDraggingSubtitle] = useState(false);
   const [notification, setNotification] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportProgress, setExportProgress] = useState(0);
+  const [exportError, setExportError] = useState<string | null>(null);
   
   // Refs
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const rendererRef = useRef<SubtitleRenderer | null>(null);
+  const subtitleCanvasRef = useRef<HTMLCanvasElement>(null);
+  const subtitleRendererRef = useRef<SubtitleRenderer | null>(null);
 
-  // Initialize subtitle renderer
+  // Initialize subtitle renderer with optimized settings
   useEffect(() => {
-    if (canvasRef.current && videoRef.current) {
-      rendererRef.current = new SubtitleRenderer(canvasRef.current);
-      rendererRef.current.setSize(videoRef.current.videoWidth || 1920, videoRef.current.videoHeight || 1080);
+    if (subtitleCanvasRef.current) {
+      const renderer = new SubtitleRenderer(subtitleCanvasRef.current);
+      subtitleRendererRef.current = renderer;
     }
-  }, [videoUrl]);
+  }, []);
 
-  // Render subtitles on canvas
+  // Render subtitles on canvas with optimized animation frame
   useEffect(() => {
-    if (rendererRef.current && videoRef.current) {
-      const render = () => {
-        rendererRef.current?.renderSubtitles(
-          subtitles,
-          videoRef.current!.videoWidth,
-          videoRef.current!.videoHeight,
-          currentTime
-        );
+    if (subtitleRendererRef.current && videoRef.current && videoRef.current.videoWidth > 0) {
+      let animationId: number;
+      let lastRenderTime = 0;
+      const targetFps = 24; // Lower FPS for smoother performance
+      const frameDelay = 1000 / targetFps;
+      
+      const render = (timestamp: number) => {
+        // Only render if enough time has passed
+        if (timestamp - lastRenderTime >= frameDelay) {
+          // Only render if we have valid video dimensions
+          if (videoRef.current && videoRef.current.videoWidth > 0) {
+            subtitleRendererRef.current?.renderSubtitles(
+              subtitles,
+              videoRef.current.videoWidth,
+              videoRef.current.videoHeight,
+              currentTime
+            );
+          }
+          lastRenderTime = timestamp;
+        }
+        
+        animationId = requestAnimationFrame(render);
       };
       
-      render();
-      const interval = setInterval(render, 1000 / 30); // 30 FPS
+      // Start render loop only if video is playing
+      if (isPlaying || subtitles.length > 0) {
+        animationId = requestAnimationFrame(render);
+      }
       
-      return () => clearInterval(interval);
+      return () => {
+        if (animationId) {
+          cancelAnimationFrame(animationId);
+        }
+      };
     }
-  }, [subtitles, currentTime]);
+  }, [subtitles, currentTime, isPlaying]);
 
   // Handle video upload
   const handleVideoUpload = useCallback(async (file: File) => {
@@ -153,8 +181,14 @@ const CaptionStudio: React.FC<CaptionStudioProps> = ({ className = '' }) => {
 
   // Transcribe video
   const handleTranscribe = useCallback(async () => {
-    if (!videoFile || !whisperService.isModelLoaded()) {
-      showNotification('error', 'Please upload a video and load a model first');
+    // Early return if no video or model
+    if (!videoFile) {
+      showNotification('error', 'Please upload a video first');
+      return;
+    }
+    
+    if (!whisperService.isModelLoaded()) {
+      showNotification('error', 'Please load a model first');
       return;
     }
 
@@ -166,17 +200,26 @@ const CaptionStudio: React.FC<CaptionStudioProps> = ({ className = '' }) => {
       showNotification('info', 'Extracting audio from video...');
       const audioData = await whisperService.extractAudioFromVideo(videoFile);
       
-      // Transcribe
+      // Update progress to show extraction complete
+      setTranscriptionProgress(20);
+      
+      // Transcribe with progress updates
       showNotification('info', 'Transcribing audio...');
       const result = await whisperService.transcribe(audioData, {
-        returnTimestamps: 'word',
-        onProgress: (progress) => {
-          setTranscriptionProgress(progress);
+        language: 'auto',
+        model: selectedModel || 'whisper-base',
+        task: 'transcribe',
+        return_timestamps: true
+      }, (progress: number, status: string) => {
+        setTranscriptionProgress(progress);
+        // Update the loading overlay message if needed
+        if (status && status !== 'Transcribing...') {
+          showNotification('info', status);
         }
       });
       
       // Convert transcription segments to subtitles
-      const newSubtitles: SubtitleSegment[] = result.segments.map((seg, index) => ({
+      const newSubtitles: SubtitleSegment[] = result.segments.map((seg: any, index: number) => ({
         id: `whisper-${Date.now()}-${index}`,
         startTime: seg.start,
         endTime: seg.end,
@@ -188,12 +231,13 @@ const CaptionStudio: React.FC<CaptionStudioProps> = ({ className = '' }) => {
       setSubtitles(prev => [...prev, ...newSubtitles]);
       showNotification('success', `Transcription complete! Added ${newSubtitles.length} subtitles`);
     } catch (error) {
+      console.error('[CaptionStudio] Transcription error:', error);
       showNotification('error', `Transcription failed: ${error}`);
     } finally {
       setIsTranscribing(false);
       setTranscriptionProgress(0);
     }
-  }, [videoFile, defaultStyle, defaultPosition]);
+  }, [videoFile, defaultStyle, defaultPosition, selectedModel]);
 
   // Web Speech API transcription
   const handleWebSpeechTranscribe = useCallback(async () => {
@@ -213,21 +257,24 @@ const CaptionStudio: React.FC<CaptionStudioProps> = ({ className = '' }) => {
       
       let fullTranscript = '';
       
-      await webSpeechService.startTranscription(
-        videoRef.current,
-        (text: string, isFinal: boolean) => {
-          if (isFinal) {
-            fullTranscript += ' ' + text;
-          }
-          // Update progress based on video position
-          const progress = (currentTime / videoDuration) * 100;
-          setTranscriptionProgress(Math.round(progress));
-        },
-        (error: Error) => {
-          showNotification('error', `Speech recognition error: ${error.message}`);
-          setIsTranscribing(false);
-        }
-      );
+      // Set up event handlers
+      webSpeechService.onSegment = (segment) => {
+        fullTranscript += ' ' + segment.text;
+        // Update progress based on video position
+        const progress = (currentTime / videoDuration) * 100;
+        setTranscriptionProgress(progress);
+      };
+      
+      webSpeechService.onError = (error) => {
+        showNotification('error', `Speech recognition error: ${error}`);
+      };
+      
+      // Start transcription
+      await webSpeechService.startTranscription({
+        language: 'en-US',
+        continuous: true,
+        interimResults: true
+      });
       
       // Play the video to start transcription
       videoRef.current.play();
@@ -239,7 +286,7 @@ const CaptionStudio: React.FC<CaptionStudioProps> = ({ className = '' }) => {
         // Create timed segments from transcript
         const segments = webSpeechService.createTimedSegments(fullTranscript, videoDuration);
         
-        const newSubtitles: SubtitleSegment[] = segments.map((seg, index) => ({
+        const newSubtitles: SubtitleSegment[] = segments.map((seg: any, index: number) => ({
           id: `speech-${Date.now()}-${index}`,
           startTime: seg.start,
           endTime: seg.end,
@@ -339,41 +386,101 @@ const CaptionStudio: React.FC<CaptionStudioProps> = ({ className = '' }) => {
     showNotification('success', `Exported subtitles as ${format.toUpperCase()}`);
   }, [subtitles, videoFile]);
 
-  // Export video
+  // Export video with FFmpeg service
   const handleExportVideo = useCallback(async (options: any) => {
     if (!videoRef.current) return;
-    
+
     try {
-      showNotification('info', 'Starting video export...');
-      
-      const blob = await videoExportService.exportVideo(
+      setIsExporting(true);
+      setExportProgress(0);
+      setExportError(null);
+
+      console.log('[CaptionStudio] Starting video export with options:', options);
+
+      // Create a video blob from the current video element
+      const videoBlob = await videoVerificationService.getVideoBlob(videoRef.current);
+      if (!videoBlob) {
+        throw new Error('Failed to get video blob');
+      }
+
+      let exportedBlob: Blob;
+
+      // Use optimized export service
+      console.log('[CaptionStudio] Using optimized export service...');
+      exportedBlob = await optimizedVideoExportService.exportVideo(
         videoRef.current,
         subtitles,
         {
-          burnSubtitles: options.burnSubtitles,
-          format: options.format,
-          quality: options.quality,
-          fps: options.fps
+          format: options.format || 'mp4',
+          quality: options.quality || 'high',
+          resolution: options.resolution || '1080p',
+          burnSubtitles: options.embedType === 'burn',
+          embedSubtitles: options.embedType === 'track',
+          embedType: options.embedType || 'burn',
+          fps: 30
         },
-        (progress) => {
-          // Update progress UI
-          console.log(`Export progress: ${progress}%`);
+        (progress: number) => {
+          setExportProgress(Math.round(progress));
         }
       );
-      
-      // Download video
-      const url = URL.createObjectURL(blob);
+
+      console.log('[CaptionStudio] Export completed, running verification tests...');
+
+      // Run verification tests
+      const subtitleTimes = subtitles.map(sub => ({ start: sub.startTime, end: sub.endTime }));
+      const testResults = await videoVerificationService.runComprehensiveTest(
+        exportedBlob,
+        subtitleTimes,
+        videoDuration,
+        options.embedType === 'burn',
+        options.embedType === 'track'
+      );
+
+      console.log('[CaptionStudio] Test results:', testResults.summary);
+
+      if (!testResults.passed) {
+        showNotification('error', 'Export verification failed. Check console for details.');
+        console.error('[CaptionStudio] Export verification failed:', testResults);
+      } else {
+        showNotification('success', 'Export verified successfully!');
+      }
+
+      // Create test page for manual verification
+      const testPageUrl = await videoVerificationService.createTestPage(exportedBlob);
+
+      // Download the exported video
+      const url = URL.createObjectURL(exportedBlob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `${videoFile?.name.replace(/\.[^/.]+$/, '') || 'video'}_subtitled.${options.format}`;
+      a.download = `video-with-subtitles.${options.format || 'mp4'}`;
+      document.body.appendChild(a);
       a.click();
-      URL.revokeObjectURL(url);
+      document.body.removeChild(a);
       
-      showNotification('success', 'Video exported successfully!');
+      // Open test page in new tab for manual verification
+      if (testResults.passed) {
+        window.open(testPageUrl, '_blank');
+        showNotification('info', 'Test page opened in new tab for manual verification');
+      }
+
+      // Cleanup URLs after a delay
+      setTimeout(() => {
+      URL.revokeObjectURL(url);
+        URL.revokeObjectURL(testPageUrl);
+      }, 60000); // Clean up after 1 minute
+
+      console.log('[CaptionStudio] Export and verification completed');
+      // Show success notification
+      setShowExportDialog(false);
     } catch (error) {
-      showNotification('error', `Video export failed: ${error}`);
+      console.error('[CaptionStudio] Export failed:', error);
+      setExportError(error instanceof Error ? error.message : 'Export failed');
+      showNotification('error', `Export failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setIsExporting(false);
+      setExportProgress(0);
     }
-  }, [videoRef, subtitles, videoFile]);
+  }, [subtitles, videoDuration]);
 
   // Show notification
   const showNotification = (type: 'success' | 'error' | 'info', message: string) => {
@@ -643,6 +750,8 @@ const CaptionStudio: React.FC<CaptionStudioProps> = ({ className = '' }) => {
             onExportSubtitles={handleExportSubtitles}
             onExportVideo={handleExportVideo}
             onClose={() => setShowExportDialog(false)}
+            currentSubtitlesLength={subtitles.length}
+            videoDuration={videoDuration}
           />
         )}
       </AnimatePresence>
@@ -667,6 +776,13 @@ const CaptionStudio: React.FC<CaptionStudioProps> = ({ className = '' }) => {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Transcription Loading Overlay */}
+      <TranscriptionLoadingOverlay
+        isLoading={isTranscribing}
+        progress={transcriptionProgress}
+        message={transcriptionProgress > 0 ? 'Transcribing audio...' : 'Initializing transcription...'}
+      />
     </div>
   );
 };

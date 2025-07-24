@@ -331,16 +331,31 @@ export const SubtitleStyleControls: React.FC = () => {
 
             <div>
               <label className="block text-sm text-gray-400 mb-1">
-                Background Opacity: {Math.round(subtitleStyle.backgroundOpacity * 100)}%
+                Background Opacity: {Math.round((subtitleStyle.backgroundOpacity || 0) * 100)}%
               </label>
               <input
                 type="range"
                 min="0"
                 max="100"
-                value={subtitleStyle.backgroundOpacity * 100}
+                value={(subtitleStyle.backgroundOpacity || 0) * 100}
                 onChange={(e) => handleStyleChange({ backgroundOpacity: parseInt(e.target.value) / 100 })}
                 className="w-full"
               />
+            </div>
+
+            <div>
+              <label className="block text-sm text-gray-400 mb-1">
+                Background Blur: {subtitleStyle.backgroundBlur || 0}px
+              </label>
+              <input
+                type="range"
+                min="0"
+                max="20"
+                value={subtitleStyle.backgroundBlur || 0}
+                onChange={(e) => handleStyleChange({ backgroundBlur: parseInt(e.target.value) })}
+                className="w-full"
+              />
+              <p className="text-xs text-gray-500 mt-1">Adds a blur effect to the subtitle background</p>
             </div>
 
             <div>

@@ -72,7 +72,7 @@ class WhisperModelLoader {
       console.log('[WhisperLoader] Creating new worker instance');
       this.workerInstance = {
         worker: new Worker(
-          new URL('../workers/whisper.worker.ts', import.meta.url),
+          new URL('../workers/whisper-final.worker.ts', import.meta.url),
           { type: 'module' }
         ),
         isReady: false,
@@ -221,7 +221,7 @@ class WhisperModelLoader {
       const modelToReload = this.workerInstance.modelLoaded;
       this.workerInstance = {
         worker: new Worker(
-          new URL('../workers/whisper.worker.ts', import.meta.url),
+          new URL('../workers/whisper-final.worker.ts', import.meta.url),
           { type: 'module' }
         ),
         isReady: false,

@@ -22,6 +22,16 @@ export const SupabaseAuthProvider = ({ children }: { children: ReactNode }) => {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    // Check for demo user first
+    const demoUser = localStorage.getItem('demo_user');
+    if (demoUser) {
+      const mockUser = JSON.parse(demoUser);
+      setUser(mockUser as User);
+      setSession({} as Session); // Mock session
+      setIsLoading(false);
+      return;
+    }
+    
     // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);

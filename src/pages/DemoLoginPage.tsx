@@ -47,9 +47,25 @@ const DemoLoginPage: React.FC = () => {
     setError('');
 
     try {
-      await authService.demoLogin();
-      navigate('/subtitle');
-    } catch (err: any) {
+      setIsLoading(true);
+        // For demo purposes, create a mock session
+        const mockUser = {
+          id: 'demo-user-id',
+          email: 'demo@anemoia.dev',
+          user_metadata: {
+            name: 'Demo User',
+            full_name: 'Demo User'
+          }
+        };
+        
+        // Store in localStorage for demo purposes
+        localStorage.setItem('demo_user', JSON.stringify(mockUser));
+        
+        // Redirect back to the original page they were trying to access
+        const searchParams = new URLSearchParams(location.search);
+        const redirect = searchParams.get('redirect') || '/';
+        navigate(redirect);
+      } catch (err: any) {
       setError(err.message || 'Demo login failed');
     } finally {
       setIsLoading(false);

@@ -87,6 +87,11 @@ class AuthService {
     return { user, session: data.session };
   }
 
+  // Alias for signIn to maintain compatibility
+  async login(email: string, password: string): Promise<AuthResponse> {
+    return this.signIn(email, password);
+  }
+
   // Google OAuth login
   async googleLogin() {
     const { error } = await supabase.auth.signInWithOAuth({

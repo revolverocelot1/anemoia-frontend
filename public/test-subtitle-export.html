@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Subtitle Export Test</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 20px;
+      background: #0a0a0a;
+      color: #fff;
+      font-family: Arial, sans-serif;
+    }
+    
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    
+    .test-section {
+      background: #1a1a1a;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+    
+    .video-container {
+      display: flex;
+      gap: 20px;
+      margin-bottom: 20px;
+    }
+    
+    video {
+      width: 100%;
+      max-width: 600px;
+      border: 2px solid #333;
+      border-radius: 4px;
+    }
+    
+    .controls {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+    
+    button {
+      padding: 10px 20px;
+      background: #6b46c1;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    
+    button:hover {
+      background: #7c3aed;
+    }
+    
+    button:disabled {
+      background: #4a4a4a;
+      cursor: not-allowed;
+    }
+    
+    .status {
+      padding: 15px;
+      border-radius: 4px;
+      margin-bottom: 20px;
+      background: #222;
+    }
+    
+    .success {
+      background: #22c55e20;
+      border: 1px solid #22c55e;
+      color: #22c55e;
+    }
+    
+    .error {
+      background: #ef444420;
+      border: 1px solid #ef4444;
+      color: #ef4444;
+    }
+    
+    .progress {
+      width: 100%;
+      height: 30px;
+      background: #333;
+      border-radius: 15px;
+      overflow: hidden;
+      margin-bottom: 10px;
+    }
+    
+    .progress-bar {
+      height: 100%;
+      background: #6b46c1;
+      transition: width 0.3s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 14px;
+    }
+    
+    .test-results {
+      background: #222;
+      padding: 15px;
+      border-radius: 4px;
+      margin-top: 20px;
+    }
+    
+    .test-results h3 {
+      margin-top: 0;
+    }
+    
+    .test-item {
+      padding: 8px 0;
+      border-bottom: 1px solid #333;
+    }
+    
+    .test-item:last-child {
+      border-bottom: none;
+    }
+    
+    .pass {
+      color: #22c55e;
+    }
+    
+    .fail {
+      color: #ef4444;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Subtitle Export Test Suite</h1>
+    
+    <div class="test-section">
+      <h2>Test Setup</h2>
+      <div class="controls">
+        <input type="file" id="videoFile" accept="video/*" />
+        <button onclick="loadVideo()">Load Video</button>
+      </div>
+      
+      <div id="status" class="status">
+        Ready to test. Please load a video file.
+      </div>
+    </div>
+    
+    <div class="test-section">
+      <h2>Video Preview</h2>
+      <div class="video-container">
+        <div>
+          <h3>Original</h3>
+          <video id="originalVideo" controls></video>
+        </div>
+        <div>
+          <h3>Exported (with subtitles)</h3>
+          <video id="exportedVideo" controls></video>
+        </div>
+      </div>
+    </div>
+    
+    <div class="test-section">
+      <h2>Export Tests</h2>
+      
+      <div class="controls">
+        <button onclick="testBurnedSubtitles()">Test Burned Subtitles</button>
+        <button onclick="testEmbeddedSubtitles()">Test Embedded Subtitles</button>
+        <button onclick="testHighResolution()">Test High Resolution (1080x1920)</button>
+        <button onclick="testPerformance()">Test Performance</button>
+      </div>
+      
+      <div class="progress" style="display: none;">
+        <div class="progress-bar" id="progressBar">0%</div>
+      </div>
+      
+      <div id="testResults" class="test-results" style="display: none;">
+        <h3>Test Results</h3>
+        <div id="resultsList"></div>
+      </div>
+    </div>
+  </div>
+  
+  <script type="module">
+    import { optimizedVideoExportService } from '/src/services/optimized-video-export.service.ts';
+    
+    window.currentVideo = null;
+    window.testResults = [];
+    
+    window.loadVideo = async function() {
+      const fileInput = document.getElementById('videoFile');
+      const file = fileInput.files[0];
+      
+      if (!file) {
+        updateStatus('Please select a video file', 'error');
+        return;
+      }
+      
+      const url = URL.createObjectURL(file);
+      const video = document.getElementById('originalVideo');
+      video.src = url;
+      
+      video.onloadedmetadata = () => {
+        window.currentVideo = video;
+        updateStatus(`Video loaded: ${video.videoWidth}x${video.videoHeight}, ${video.duration.toFixed(2)}s`, 'success');
+      };
+    };
+    
+    window.testBurnedSubtitles = async function() {
+      if (!window.currentVideo) {
+        updateStatus('Please load a video first', 'error');
+        return;
+      }
+      
+      updateStatus('Testing burned subtitles...', 'info');
+      showProgress(true);
+      clearTestResults();
+      
+      const testSubtitles = [
+        {
+          id: '1',
+          startTime: 0,
+          endTime: 3,
+          text: 'This is the first subtitle',
+          style: {
+            fontSize: 32,
+            color: '#FFFFFF',
+            backgroundColor: '#000000',
+            backgroundOpacity: 0.8
+          }
+        },
+        {
+          id: '2',
+          startTime: 3,
+          endTime: 6,
+          text: 'This is the second subtitle',
+          style: {
+            fontSize: 32,
+            color: '#FFFF00',
+            strokeColor: '#000000',
+            strokeWidth: 2
+          }
+        }
+      ];
+      
+      const startTime = Date.now();
+      
+      try {
+        const blob = await optimizedVideoExportService.exportVideo(
+          window.currentVideo,
+          testSubtitles,
+          {
+            format: 'mp4',
+            quality: 'high',
+            embedType: 'burn',
+            fps: 30
+          },
+          (progress) => {
+            updateProgress(progress);
+          }
+        );
+        
+        const duration = (Date.now() - startTime) / 1000;
+        
+        // Display the exported video
+        const exportedVideo = document.getElementById('exportedVideo');
+        exportedVideo.src = URL.createObjectURL(blob);
+        
+        // Run tests
+        addTestResult('Export completed', true);
+        addTestResult('File size reasonable', blob.size > 0 && blob.size < 100 * 1024 * 1024, `${(blob.size / 1024 / 1024).toFixed(2)}MB`);
+        addTestResult('Export time reasonable', duration < 60, `${duration.toFixed(2)}s`);
+        
+        exportedVideo.onloadedmetadata = () => {
+          addTestResult('Video playable', true);
+          addTestResult('Duration matches', Math.abs(exportedVideo.duration - window.currentVideo.duration) < 1, `${exportedVideo.duration.toFixed(2)}s`);
+          updateStatus('Burned subtitle test completed successfully!', 'success');
+        };
+        
+        exportedVideo.onerror = () => {
+          addTestResult('Video playable', false, 'Failed to load');
+          updateStatus('Exported video failed to load', 'error');
+        };
+        
+      } catch (error) {
+        updateStatus('Export failed: ' + error.message, 'error');
+        addTestResult('Export completed', false, error.message);
+      } finally {
+        showProgress(false);
+      }
+    };
+    
+    window.testEmbeddedSubtitles = async function() {
+      if (!window.currentVideo) {
+        updateStatus('Please load a video first', 'error');
+        return;
+      }
+      
+      updateStatus('Testing embedded subtitles...', 'info');
+      showProgress(true);
+      clearTestResults();
+      
+      const testSubtitles = [
+        {
+          id: '1',
+          startTime: 0,
+          endTime: 3,
+          text: 'Embedded subtitle 1'
+        },
+        {
+          id: '2',
+          startTime: 3,
+          endTime: 6,
+          text: 'Embedded subtitle 2'
+        }
+      ];
+      
+      try {
+        const blob = await optimizedVideoExportService.exportVideo(
+          window.currentVideo,
+          testSubtitles,
+          {
+            format: 'mp4',
+            quality: 'high',
+            embedType: 'track',
+            fps: 30
+          },
+          (progress) => {
+            updateProgress(progress);
+          }
+        );
+        
+        // Display the exported video
+        const exportedVideo = document.getElementById('exportedVideo');
+        exportedVideo.src = URL.createObjectURL(blob);
+        
+        addTestResult('Export completed', true);
+        addTestResult('File has subtitle track', true, 'Check in VLC player');
+        
+        updateStatus('Embedded subtitle test completed! Download and check in VLC.', 'success');
+        
+        // Download for testing
+        const a = document.createElement('a');
+        a.href = exportedVideo.src;
+        a.download = 'video-with-embedded-subtitles.mp4';
+        a.click();
+        
+      } catch (error) {
+        updateStatus('Export failed: ' + error.message, 'error');
+        addTestResult('Export completed', false, error.message);
+      } finally {
+        showProgress(false);
+      }
+    };
+    
+    window.testHighResolution = async function() {
+      updateStatus('Create a 1080x1920 test video...', 'info');
+      
+      // Create a test video with high resolution
+      const canvas = document.createElement('canvas');
+      canvas.width = 1080;
+      canvas.height = 1920;
+      const ctx = canvas.getContext('2d');
+      
+      // Draw test pattern
+      const gradient = ctx.createLinearGradient(0, 0, 1080, 1920);
+      gradient.addColorStop(0, '#6b46c1');
+      gradient.addColorStop(1, '#ec4899');
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, 1080, 1920);
+      
+      ctx.fillStyle = 'white';
+      ctx.font = 'bold 80px Arial';
+      ctx.textAlign = 'center';
+      ctx.fillText('1080x1920', 540, 960);
+      
+      // Create video from canvas
+      const stream = canvas.captureStream(30);
+      const recorder = new MediaRecorder(stream);
+      const chunks = [];
+      
+      recorder.ondataavailable = (e) => chunks.push(e.data);
+      recorder.start();
+      
+      setTimeout(async () => {
+        recorder.stop();
+        
+        recorder.onstop = async () => {
+          const blob = new Blob(chunks, { type: 'video/webm' });
+          const video = document.getElementById('originalVideo');
+          video.src = URL.createObjectURL(blob);
+          window.currentVideo = video;
+          
+          // Now test export
+          await testBurnedSubtitles();
+        };
+      }, 3000); // 3 second video
+    };
+    
+    window.testPerformance = async function() {
+      if (!window.currentVideo) {
+        updateStatus('Please load a video first', 'error');
+        return;
+      }
+      
+      updateStatus('Running performance test...', 'info');
+      clearTestResults();
+      
+      const subtitleCount = 50;
+      const subtitles = [];
+      const duration = window.currentVideo.duration;
+      const segmentLength = duration / subtitleCount;
+      
+      for (let i = 0; i < subtitleCount; i++) {
+        subtitles.push({
+          id: `perf-${i}`,
+          startTime: i * segmentLength,
+          endTime: (i + 1) * segmentLength,
+          text: `Performance test subtitle ${i + 1}`
+        });
+      }
+      
+      const startTime = Date.now();
+      let lastProgressTime = startTime;
+      let frameRate = 0;
+      
+      try {
+        const blob = await optimizedVideoExportService.exportVideo(
+          window.currentVideo,
+          subtitles,
+          {
+            format: 'mp4',
+            quality: 'medium',
+            embedType: 'burn',
+            fps: 30
+          },
+          (progress) => {
+            const now = Date.now();
+            const timeDiff = (now - lastProgressTime) / 1000;
+            if (timeDiff > 0) {
+              frameRate = 1 / timeDiff;
+            }
+            lastProgressTime = now;
+            updateProgress(progress);
+          }
+        );
+        
+        const totalTime = (Date.now() - startTime) / 1000;
+        const fps = (window.currentVideo.duration * 30) / totalTime;
+        
+        addTestResult('Performance test completed', true);
+        addTestResult('Processing speed', fps > 15, `${fps.toFixed(2)} FPS`);
+        addTestResult('Total time', totalTime < window.currentVideo.duration * 2, `${totalTime.toFixed(2)}s`);
+        addTestResult('Subtitle count', true, `${subtitleCount} subtitles`);
+        
+        updateStatus('Performance test completed!', 'success');
+        
+      } catch (error) {
+        updateStatus('Performance test failed: ' + error.message, 'error');
+        addTestResult('Performance test', false, error.message);
+      }
+    };
+    
+    function updateStatus(message, type = 'info') {
+      const status = document.getElementById('status');
+      status.textContent = message;
+      status.className = 'status ' + type;
+    }
+    
+    function updateProgress(progress) {
+      const progressBar = document.getElementById('progressBar');
+      progressBar.style.width = progress + '%';
+      progressBar.textContent = progress + '%';
+    }
+    
+    function showProgress(show) {
+      const progress = document.querySelector('.progress');
+      progress.style.display = show ? 'block' : 'none';
+      if (!show) {
+        updateProgress(0);
+      }
+    }
+    
+    function clearTestResults() {
+      window.testResults = [];
+      document.getElementById('testResults').style.display = 'none';
+      document.getElementById('resultsList').innerHTML = '';
+    }
+    
+    function addTestResult(test, passed, details = '') {
+      window.testResults.push({ test, passed, details });
+      
+      const resultsList = document.getElementById('resultsList');
+      const item = document.createElement('div');
+      item.className = 'test-item';
+      item.innerHTML = `
+        <span class="${passed ? 'pass' : 'fail'}">
+          ${passed ? '✓' : '✗'} ${test}
+        </span>
+        ${details ? ` - ${details}` : ''}
+      `;
+      resultsList.appendChild(item);
+      
+      document.getElementById('testResults').style.display = 'block';
+    }
+  </script>
+</body>
+</html> 

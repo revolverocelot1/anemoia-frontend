@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Subtitle Export Verification Test</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+      background: #1a1a1a;
+      color: #fff;
+    }
+    
+    .test-section {
+      background: #2a2a2a;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+    
+    .test-controls {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+    
+    button {
+      padding: 10px 20px;
+      background: #6366f1;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    
+    button:hover {
+      background: #4f46e5;
+    }
+    
+    button:disabled {
+      background: #4a4a4a;
+      cursor: not-allowed;
+    }
+    
+    .status {
+      padding: 10px;
+      border-radius: 4px;
+      margin: 10px 0;
+      font-family: monospace;
+      font-size: 14px;
+    }
+    
+    .status.success {
+      background: #065f46;
+      color: #10b981;
+    }
+    
+    .status.error {
+      background: #7f1d1d;
+      color: #ef4444;
+    }
+    
+    .status.info {
+      background: #1e3a8a;
+      color: #3b82f6;
+    }
+    
+    video {
+      width: 100%;
+      max-width: 600px;
+      margin: 20px 0;
+      border: 2px solid #4a4a4a;
+      border-radius: 4px;
+    }
+    
+    .results {
+      background: #333;
+      padding: 15px;
+      border-radius: 4px;
+      margin-top: 20px;
+      white-space: pre-wrap;
+      font-family: monospace;
+      font-size: 12px;
+    }
+    
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+    
+    @media (max-width: 768px) {
+      .grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <h1>🎬 Subtitle Export Verification Test</h1>
+  
+  <div class="test-section">
+    <h2>📹 Manual Testing Instructions</h2>
+    <ol>
+      <li>Open the AI Subtitle Editor at <a href="http://localhost:5173/subtitle-page-enhanced" target="_blank" style="color: #6366f1;">http://localhost:5173/subtitle-page-enhanced</a></li>
+      <li>Upload a test video (preferably 10-30 seconds, resolution 1080x1920 or similar)</li>
+      <li>Add some subtitles manually or use auto-transcribe</li>
+      <li>Export with "Burn subtitles" option - verify in VLC that subtitles are visible</li>
+      <li>Export with "Add subtitle track" option - verify in VLC under Subtitle > Subtitle Track</li>
+      <li>Check browser console for test results and any errors</li>
+    </ol>
+  </div>
+  
+  <div class="test-section">
+    <h2>🔍 Expected Results</h2>
+    <div class="grid">
+      <div>
+        <h3>✅ Burned Subtitles</h3>
+        <ul>
+          <li>Subtitles permanently visible in video</li>
+          <li>Cannot be turned off in VLC</li>
+          <li>No choppiness (FPS > 25)</li>
+          <li>Works with high resolution (1080x1920)</li>
+        </ul>
+      </div>
+      <div>
+        <h3>✅ Embedded Track</h3>
+        <ul>
+          <li>Subtitle track available in VLC menu</li>
+          <li>Can be toggled on/off</li>
+          <li>Proper timing with video</li>
+          <li>Track labeled as "English"</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  
+  <div class="test-section">
+    <h2>📊 Console Commands for Testing</h2>
+    <pre style="background: #1a1a1a; padding: 10px; border-radius: 4px; overflow-x: auto;">
+// After export, check the console for these logs:
+// [OptimizedExport] Starting export with options...
+// [OptimizedExport] Video resolution: WIDTHxHEIGHT
+// [CaptionStudio] Test results: ...
+
+// To manually verify exported blob in console:
+const video = document.querySelector('video');
+const blob = await videoVerificationService.getVideoBlob(video);
+const results = await videoVerificationService.runComprehensiveTest(
+  blob,
+  [{start: 0, end: 2}], // subtitle times
+  video.duration,
+  true,  // expect burned
+  false  // expect embedded
+);
+console.log(results.summary);
+    </pre>
+  </div>
+  
+  <div class="test-section">
+    <h2>🐛 Common Issues & Solutions</h2>
+    <dl>
+      <dt><strong>WebCodecs resolution error:</strong></dt>
+      <dd>Should be fixed - high res videos are scaled down or use FFmpeg fallback</dd>
+      
+      <dt><strong>No loading overlay during transcription:</strong></dt>
+      <dd>Should be fixed - TranscriptionLoadingOverlay shows with progress</dd>
+      
+      <dt><strong>Choppy preview:</strong></dt>
+      <dd>Should be fixed - using requestAnimationFrame instead of setInterval</dd>
+      
+      <dt><strong>Embedded subtitles not working:</strong></dt>
+      <dd>Should be fixed - FFmpeg service properly embeds VTT tracks</dd>
+    </dl>
+  </div>
+  
+  <script>
+    console.log('%c🎬 Subtitle Export Test Page Loaded', 'color: #6366f1; font-size: 16px; font-weight: bold;');
+    console.log('Follow the manual testing instructions above to verify subtitle export functionality.');
+  </script>
+</body>
+</html> 
