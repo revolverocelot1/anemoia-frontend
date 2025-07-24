@@ -303,9 +303,7 @@ function App() {
               path="/login"
               element={
                 <AnimatedPage>
-                  <Suspense fallback={<LoadingFallback />}>
-                    <LoginPage />
-                  </Suspense>
+                  <SupabaseLoginPage />
                 </AnimatedPage>
               }
             />

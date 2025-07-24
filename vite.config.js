@@ -27,7 +27,10 @@ const onnxWasmPlugin = () => {
 };
 // https://vitejs.dev/config/
 export default defineConfig({
-    plugins: [react(), onnxWasmPlugin()],
+    plugins: [
+        react(),
+        onnxWasmPlugin(),
+    ],
     base: '/',
     assetsInclude: ['**/*.wasm'],
     publicDir: 'public',
@@ -85,13 +88,13 @@ export default defineConfig({
                         console.log('Received Response from the Target:', proxyRes.statusCode, req.url);
                     });
                 },
-            }
+            },
         },
         // Configure MIME types for WASM files
         middlewareMode: false,
         hmr: {
             overlay: false
-        }
+        },
     },
     preview: {
         headers: {
