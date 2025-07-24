@@ -293,6 +293,42 @@ const TriangleSplatRenderer = ({ url, onStatsUpdate }: { url: string; onStatsUpd
   return <mesh ref={meshRef} />;
 };
 
+const parseOFF = async (file: File) => {
+  const text = await file.text();
+  const lines = text.split(/\r?\n/).filter(Boolean);
+  if (lines[0].trim() !== 'OFF') throw new Error('Not a valid OFF file');
+  const [numVertices, numFaces] = lines[1].trim().split(/\s+/).map(Number);
+  const vertices: number[][] = [];
+  for (let i = 0; i < numVertices; i++) {
+    const parts = lines[2 + i].trim().split(/\s+/).map(Number);
+    vertices.push(parts);
+  }
+  const faces: number[][] = [];
+  for (let i = 0; i < numFaces; i++) {
+    const parts = lines[2 + numVertices + i].trim().split(/\s+/).map(Number);
+    if (parts[0] === 3) faces.push(parts.slice(1, 4)); // Only triangles
+  }
+  return { vertices, faces };
+};
+
+const OFFMeshRenderer = ({ offData }: { offData: { vertices: number[][], faces: number[][] } }) => {
+  const geometry = new THREE.BufferGeometry();
+  const vertices = offData.vertices.flat();
+  const indices = offData.faces.flat();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  return (
+    <Bounds fit clip observe margin={1.2}>
+      <Center>
+        <mesh geometry={geometry}>
+          <meshStandardMaterial color={'#00d4ff'} side={THREE.DoubleSide} metalness={0.2} roughness={0.8} />
+        </mesh>
+      </Center>
+    </Bounds>
+  );
+};
+
 
 const MeshRenderer = ({ url }: { url: string }) => {
   const geom = useLoader(PLYLoader, url);
@@ -315,9 +351,10 @@ const MeshRenderer = ({ url }: { url: string }) => {
 };
 
 
-const UnifiedRenderer = ({ fileType, fileUrl, onStatsUpdate }: { 
-  fileType: 'gaussian' | 'triangle' | 'mesh' | null; 
+const UnifiedRenderer = ({ fileType, fileUrl, offData, onStatsUpdate }: { 
+  fileType: 'gaussian' | 'triangle' | 'mesh' | 'off' | null; 
   fileUrl: string | null; 
+  offData?: { vertices: number[][], faces: number[][] } | null;
   onStatsUpdate: (stats: any) => void; 
 }) => {
   const { settings } = useViewerSettings();
@@ -375,6 +412,27 @@ const UnifiedRenderer = ({ fileType, fileUrl, onStatsUpdate }: {
           </button>
         </div>
       </>
+    );
+  }
+
+  if (fileType === 'off' && offData) {
+    return (
+      <Canvas 
+        style={{ background: settings.backgroundColor }}
+        camera={{ position: [0, 0, 5], fov: 60 }}
+        shadows={settings.quality !== 'Low'}
+        gl={{ preserveDrawingBuffer: true, antialias: settings.quality !== 'Low' }}
+        dpr={qualityToDPR(settings.quality)}
+      >
+        <Suspense fallback={<Loader />}>
+          <OFFMeshRenderer offData={offData} />
+          {/* Annotations, Measurement, CameraPath, etc. as before */}
+        </Suspense>
+        <ambientLight intensity={0.8} />
+        <directionalLight position={[5, 10, 7.5]} intensity={1.5} castShadow={settings.quality !== 'Low'} />
+        <OrbitControls makeDefault />
+        <Environment preset="city" />
+      </Canvas>
     );
   }
 
@@ -473,12 +531,13 @@ const UnifiedRenderer = ({ fileType, fileUrl, onStatsUpdate }: {
 const SplatViewerPage = () => {
   const [file, setFile] = useState<File | null>(null);
   const [fileUrl, setFileUrl] = useState<string | null>(null);
-  const [fileType, setFileType] = useState<'gaussian' | 'triangle' | 'mesh' | null>(null);
+  const [fileType, setFileType] = useState<'gaussian' | 'triangle' | 'mesh' | 'off' | null>(null);
   const [stats, setStats] = useState<any>({});
   const [error, setError] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [lumaUrl, setLumaUrl] = useState('');
   const [showLumaInput, setShowLumaInput] = useState(false);
+  const [offData, setOffData] = useState<{ vertices: number[][], faces: number[][] } | null>(null);
 
   // Unified file handler
   const handleFiles = useCallback(async (files: FileList | File[]) => {
@@ -489,7 +548,8 @@ const SplatViewerPage = () => {
     setError(null);
     setStats({});
 
-    let determinedType: 'gaussian' | 'triangle' | 'mesh' | null = null;
+    let determinedType: 'gaussian' | 'triangle' | 'mesh' | 'off' | null = null;
+    let parsedOFF: { vertices: number[][], faces: number[][] } | null = null;
     if (fileToProcess.name.endsWith('.ply')) {
       // Read the header to determine if it's gaussian or mesh
       const headerSlice = fileToProcess.slice(0, 1000);
@@ -502,14 +562,23 @@ const SplatViewerPage = () => {
       determinedType = hasGaussianProperties ? 'gaussian' : 'mesh';
     } else if (fileToProcess.name.endsWith('.tsf')) {
       determinedType = 'triangle';
+    } else if (fileToProcess.name.endsWith('.off')) {
+      try {
+        parsedOFF = await parseOFF(fileToProcess);
+        determinedType = 'off';
+      } catch (e) {
+        setError('Failed to parse OFF file: ' + (e as Error).message);
+        return;
+      }
     } else {
-      setError('Unsupported file type. Please upload a .ply or .tsf file.');
+      setError('Unsupported file type. Please upload a .ply, .tsf, or .off file.');
       return;
     }
     
     setFileType(determinedType);
     setFile(fileToProcess);
-    setFileUrl(URL.createObjectURL(fileToProcess));
+    setFileUrl(determinedType === 'off' ? '' : URL.createObjectURL(fileToProcess));
+    setOffData(parsedOFF);
   }, [fileUrl]);
 
   // Manual drag event handlers
@@ -635,7 +704,7 @@ const SplatViewerPage = () => {
                         id="splat-file-upload"
                         type="file"
                         className="hidden"
-                        accept=".ply,.tsf"
+                        accept=".ply,.tsf,.off"
                         onChange={(e) => handleFiles(e.target.files || [])}
                       />
                       <div className="space-y-4 flex flex-col items-center">
@@ -659,7 +728,7 @@ const SplatViewerPage = () => {
                 )
               ) : (
                 <motion.div key="renderer" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="w-full h-full">
-                  <UnifiedRenderer fileType={fileType} fileUrl={fileUrl} onStatsUpdate={handleStatsUpdate} />
+                  <UnifiedRenderer fileType={fileType} fileUrl={fileUrl} offData={offData} onStatsUpdate={handleStatsUpdate} />
                 </motion.div>
               )}
             </AnimatePresence>
