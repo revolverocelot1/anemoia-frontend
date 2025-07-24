@@ -74,6 +74,21 @@ function App() {
   const [toastMessage, setToastMessage] = useState('');
   const [modulesReady, setModulesReady] = useState(false);
 
+  // Check for authentication tokens in URL on app load
+  useEffect(() => {
+    const checkAuthTokensInUrl = () => {
+      // Check if we have authentication parameters in the URL hash
+      const hash = window.location.hash;
+      if (hash && hash.includes('access_token')) {
+        console.log('Auth tokens detected in URL, redirecting to auth callback');
+        // Redirect to auth callback page to handle the tokens
+        window.location.href = '/auth/callback' + hash;
+      }
+    };
+
+    checkAuthTokensInUrl();
+  }, []);
+
   useEffect(() => {
     // Log deployment info and GPU capabilities
     logDeploymentInfo();
