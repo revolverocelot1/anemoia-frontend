@@ -63,6 +63,106 @@ export class FastSubtitleEmbedService {
   }
 
   /**
+   * Enhanced subtitle embedding with validation and retry logic
+   */
+  async embedSubtitlesWithValidation(
+    videoBlob: Blob,
+    subtitles: SubtitleSegment[],
+    format: 'mp4' | 'mkv' = 'mp4',
+    onProgress?: (progress: number) => void
+  ): Promise<{ blob: Blob; isValid: boolean; metadata?: any }> {
+    let attempts = 0;
+    const maxAttempts = 3;
+    
+    while (attempts < maxAttempts) {
+      try {
+        attempts++;
+        console.log(`[FastEmbed] Embedding attempt ${attempts}/${maxAttempts}`);
+        
+        // Try embedding based on format
+        let resultBlob: Blob;
+        if (format === 'mkv') {
+          resultBlob = await this.embedSubtitlesInMKV(videoBlob, subtitles, onProgress);
+        } else {
+          resultBlob = await this.embedSubtitlesInMP4(videoBlob, subtitles, onProgress);
+        }
+        
+        // Validate the output
+        const isValid = await this.validateVideoOutput(resultBlob);
+        
+        if (isValid) {
+          console.log('[FastEmbed] Video validation passed');
+          return { blob: resultBlob, isValid: true, metadata: { format, attempts } };
+        } else {
+          console.warn('[FastEmbed] Video validation failed, retrying...');
+          if (attempts < maxAttempts) {
+            // Try with MKV format on next attempt if MP4 failed
+            if (format === 'mp4') {
+              format = 'mkv';
+              console.log('[FastEmbed] Switching to MKV format for next attempt');
+            }
+          }
+        }
+      } catch (error) {
+        console.error(`[FastEmbed] Attempt ${attempts} failed:`, error);
+        if (attempts >= maxAttempts) {
+          throw new Error(`Failed to embed subtitles after ${maxAttempts} attempts: ${error instanceof Error ? error.message : String(error)}`);
+        }
+      }
+    }
+    
+    throw new Error('Failed to produce valid video output');
+  }
+
+  /**
+   * Validate video output to ensure it's not corrupted
+   */
+  private async validateVideoOutput(blob: Blob): Promise<boolean> {
+    try {
+      // Basic validation: check size
+      if (blob.size < 1000) {
+        console.error('[FastEmbed] Video too small, likely corrupted');
+        return false;
+      }
+      
+      // Try to create a video element and check if it can load metadata
+      return new Promise((resolve) => {
+        const video = document.createElement('video');
+        const url = URL.createObjectURL(blob);
+        
+        const cleanup = () => {
+          URL.revokeObjectURL(url);
+          video.remove();
+        };
+        
+        video.onloadedmetadata = () => {
+          console.log('[FastEmbed] Video metadata loaded successfully');
+          console.log(`[FastEmbed] Duration: ${video.duration}s, Size: ${(blob.size / 1024 / 1024).toFixed(2)}MB`);
+          cleanup();
+          resolve(video.duration > 0);
+        };
+        
+        video.onerror = () => {
+          console.error('[FastEmbed] Video validation failed - cannot load metadata');
+          cleanup();
+          resolve(false);
+        };
+        
+        // Set timeout for validation
+        setTimeout(() => {
+          cleanup();
+          resolve(false);
+        }, 5000);
+        
+        video.src = url;
+      });
+    } catch (error) {
+      console.error('[FastEmbed] Video validation error:', error);
+      return false;
+    }
+  }
+
+  /**
    * Fast subtitle embedding for MKV using stream copy
    */
   async embedSubtitlesInMKV(
@@ -235,6 +335,15 @@ export class FastSubtitleEmbedService {
 
     try {
       console.log('[FastEmbed] Using compatibility mode with ultrafast preset...');
+      
+      // Clean up any existing files first
+      try {
+        await ffmpeg.deleteFile('input.mp4');
+        await ffmpeg.deleteFile('subtitles.vtt');
+        await ffmpeg.deleteFile('output_compat.mp4');
+      } catch (e) {
+        // Ignore cleanup errors
+      }
       
       // Re-write files if needed
       const videoData = await fetchFile(videoBlob);

@@ -79,7 +79,7 @@ const SubtitlePageEnhanced: React.FC = () => {
   const [currentVideoFile, setCurrentVideoFile] = useState<File | null>(null);
   const [showExportDialog, setShowExportDialog] = useState(false);
   const [exportOptions, setExportOptions] = useState({
-    mode: 'burn' as 'burn' | 'embed',
+    mode: 'embed-first' as 'burn' | 'embed' | 'embed-first',
     format: 'mp4' as 'mp4' | 'webm' | 'mkv',
     quality: 'high' as 'low' | 'medium' | 'high',
     removeBackground: false,
@@ -467,43 +467,31 @@ const SubtitlePageEnhanced: React.FC = () => {
       
       let blob: Blob;
       
+      // Determine embed type based on mode
+      let embedType: 'burn' | 'track' | 'embed-first' = 'track';
       if (exportOptions.mode === 'burn') {
-        // Use optimized service for burning subtitles
-        blob = await optimizedVideoExportService.exportVideo(
-          videoRef.current,
-          convertedSegments as any,
-          {
-            format: exportOptions.format,
-            quality: exportOptions.quality,
-            burnSubtitles: true,
-            embedSubtitles: false,
-            embedType: 'burn',
-            fps: 30,
-            bitrate: exportOptions.quality === 'high' ? 8000000 : exportOptions.quality === 'medium' ? 5000000 : 2500000
-          },
-          (progress) => {
-            setExportProgress(progress);
-          }
-        );
-      } else {
-        // Use optimized service for embedding subtitle track
-        blob = await optimizedVideoExportService.exportVideo(
-          videoRef.current,
-          convertedSegments as any,
-          {
-            format: exportOptions.format,
-            quality: exportOptions.quality,
-            burnSubtitles: false,
-            embedSubtitles: true,
-            embedType: 'track',
-            fps: 30,
-            bitrate: exportOptions.quality === 'high' ? 8000000 : exportOptions.quality === 'medium' ? 5000000 : 2500000
-          },
-          (progress) => {
-            setExportProgress(progress);
-          }
-        );
+        embedType = 'burn';
+      } else if (exportOptions.mode === 'embed-first') {
+        embedType = 'embed-first';
       }
+      
+      // Use optimized service with appropriate embed type
+      blob = await optimizedVideoExportService.exportVideo(
+        videoRef.current,
+        convertedSegments as any,
+        {
+          format: exportOptions.format,
+          quality: exportOptions.quality,
+          burnSubtitles: exportOptions.mode === 'burn',
+          embedSubtitles: exportOptions.mode === 'embed' || exportOptions.mode === 'embed-first',
+          embedType: embedType,
+          fps: 30,
+          bitrate: exportOptions.quality === 'high' ? 8000000 : exportOptions.quality === 'medium' ? 5000000 : 2500000
+        },
+        (progress) => {
+          setExportProgress(progress);
+        }
+      );
       
       // Download the video
       const url = URL.createObjectURL(blob);
@@ -1166,9 +1154,10 @@ const SubtitlePageEnhanced: React.FC = () => {
                           <label className="block text-sm font-medium text-gray-300 mb-2">Export Mode</label>
                           <select
                             value={exportOptions.mode}
-                            onChange={(e) => setExportOptions({...exportOptions, mode: e.target.value as 'burn' | 'embed'})}
+                            onChange={(e) => setExportOptions({...exportOptions, mode: e.target.value as 'burn' | 'embed' | 'embed-first'})}
                             className="w-full px-4 py-2 bg-gray-800 text-white rounded-lg border border-gray-700 focus:border-purple-500 focus:outline-none"
                           >
+                            <option value="embed-first">Try embed first, burn if needed (Recommended)</option>
                             <option value="burn">Burn subtitles into video</option>
                             <option value="embed">Embed subtitles (soft subs)</option>
                           </select>
