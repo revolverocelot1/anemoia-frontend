@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Subtitle Burn Performance Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #1a1a1a;
+            color: #fff;
+        }
+        .container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        video {
+            width: 100%;
+            max-width: 500px;
+            background: #000;
+            border: 2px solid #333;
+        }
+        .controls {
+            background: #2a2a2a;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin: 5px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        button:disabled {
+            background: #666;
+            cursor: not-allowed;
+        }
+        .progress {
+            width: 100%;
+            height: 30px;
+            background: #333;
+            border-radius: 5px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        .progress-bar {
+            height: 100%;
+            background: #4CAF50;
+            transition: width 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+        }
+        .log {
+            background: #2a2a2a;
+            padding: 10px;
+            border-radius: 5px;
+            max-height: 300px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .log-entry {
+            margin: 2px 0;
+            padding: 2px;
+        }
+        .log-info { color: #4CAF50; }
+        .log-error { color: #f44336; }
+        .log-warning { color: #ff9800; }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin: 20px 0;
+        }
+        .stat-box {
+            background: #2a2a2a;
+            padding: 15px;
+            border-radius: 5px;
+            text-align: center;
+        }
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #4CAF50;
+        }
+        .stat-label {
+            font-size: 12px;
+            color: #999;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔥 Subtitle Burn Performance Test</h1>
+    
+    <div class="controls">
+        <h2>Test Controls</h2>
+        <button onclick="loadTestVideo()">Load Test Video</button>
+        <button onclick="testSubtitleBurning()" id="burnBtn" disabled>Test Subtitle Burning</button>
+        <button onclick="downloadResult()" id="downloadBtn" disabled>Download Result</button>
+    </div>
+
+    <div class="stats">
+        <div class="stat-box">
+            <div class="stat-value" id="processingTime">--</div>
+            <div class="stat-label">Processing Time (s)</div>
+        </div>
+        <div class="stat-box">
+            <div class="stat-value" id="fileSize">--</div>
+            <div class="stat-label">Output Size (MB)</div>
+        </div>
+        <div class="stat-box">
+            <div class="stat-value" id="fps">--</div>
+            <div class="stat-label">Processing FPS</div>
+        </div>
+    </div>
+
+    <div class="progress">
+        <div class="progress-bar" id="progressBar" style="width: 0%">0%</div>
+    </div>
+
+    <div class="container">
+        <div>
+            <h3>Original Video</h3>
+            <video id="originalVideo" controls></video>
+        </div>
+        <div>
+            <h3>Processed Video (with burned subtitles)</h3>
+            <video id="processedVideo" controls></video>
+        </div>
+    </div>
+
+    <div class="log" id="log"></div>
+
+    <script type="module">
+        // Import the optimized export service
+        import { optimizedVideoExportService } from '../dist/services/optimized-video-export.service.js';
+        
+        let currentVideoBlob = null;
+        let processedBlob = null;
+        let startTime = null;
+        
+        const log = (message, type = 'info') => {
+            const logEl = document.getElementById('log');
+            const entry = document.createElement('div');
+            entry.className = `log-entry log-${type}`;
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            logEl.appendChild(entry);
+            logEl.scrollTop = logEl.scrollHeight;
+            console.log(`[${type.toUpperCase()}]`, message);
+        };
+        
+        window.loadTestVideo = async () => {
+            try {
+                log('Loading test video...');
+                const response = await fetch('/test file/test-video.mp4');
+                currentVideoBlob = await response.blob();
+                
+                const video = document.getElementById('originalVideo');
+                video.src = URL.createObjectURL(currentVideoBlob);
+                
+                video.onloadedmetadata = () => {
+                    log(`Video loaded: ${video.videoWidth}x${video.videoHeight}, duration: ${video.duration.toFixed(2)}s`);
+                    document.getElementById('burnBtn').disabled = false;
+                };
+                
+            } catch (error) {
+                log(`Failed to load test video: ${error.message}`, 'error');
+            }
+        };
+        
+        window.testSubtitleBurning = async () => {
+            const video = document.getElementById('originalVideo');
+            if (!video.src) {
+                log('Please load a video first', 'warning');
+                return;
+            }
+            
+            // Create test subtitles
+            const testSubtitles = [
+                {
+                    id: '1',
+                    startTime: 0,
+                    endTime: 3,
+                    text: 'This is the first subtitle',
+                    style: {
+                        fontSize: 24,
+                        color: '#FFFFFF',
+                        backgroundColor: '#000000',
+                        backgroundOpacity: 0.8,
+                        position: 'bottom'
+                    }
+                },
+                {
+                    id: '2',
+                    startTime: 3,
+                    endTime: 6,
+                    text: 'Performance test in progress...',
+                    style: {
+                        fontSize: 24,
+                        color: '#FFFF00',
+                        backgroundColor: '#000000',
+                        backgroundOpacity: 0.8,
+                        position: 'bottom'
+                    }
+                },
+                {
+                    id: '3',
+                    startTime: 6,
+                    endTime: 10,
+                    text: 'Verifying subtitle burning speed',
+                    style: {
+                        fontSize: 24,
+                        color: '#00FF00',
+                        backgroundColor: '#000000',
+                        backgroundOpacity: 0.8,
+                        position: 'bottom'
+                    }
+                }
+            ];
+            
+            try {
+                log('Starting subtitle burning test...');
+                startTime = Date.now();
+                
+                document.getElementById('burnBtn').disabled = true;
+                document.getElementById('downloadBtn').disabled = true;
+                
+                // Test the optimized export
+                processedBlob = await optimizedVideoExportService.exportVideo(
+                    video,
+                    testSubtitles,
+                    {
+                        format: 'mp4',
+                        quality: 'high',
+                        burnSubtitles: true,
+                        embedType: 'burn',
+                        fps: 30
+                    },
+                    (progress) => {
+                        const progressBar = document.getElementById('progressBar');
+                        progressBar.style.width = `${progress}%`;
+                        progressBar.textContent = `${progress}%`;
+                        
+                        // Calculate estimated time and FPS
+                        const elapsed = (Date.now() - startTime) / 1000;
+                        const estimatedTotal = elapsed / (progress / 100);
+                        const fps = (video.duration * 30 * (progress / 100)) / elapsed;
+                        
+                        document.getElementById('processingTime').textContent = elapsed.toFixed(1);
+                        document.getElementById('fps').textContent = fps.toFixed(1);
+                    }
+                );
+                
+                const processingTime = (Date.now() - startTime) / 1000;
+                const fileSizeMB = (processedBlob.size / 1024 / 1024).toFixed(2);
+                
+                document.getElementById('processingTime').textContent = processingTime.toFixed(1);
+                document.getElementById('fileSize').textContent = fileSizeMB;
+                
+                log(`✅ Subtitle burning completed in ${processingTime.toFixed(1)}s`, 'info');
+                log(`Output size: ${fileSizeMB}MB`, 'info');
+                
+                // Display processed video
+                const processedVideo = document.getElementById('processedVideo');
+                processedVideo.src = URL.createObjectURL(processedBlob);
+                
+                document.getElementById('downloadBtn').disabled = false;
+                document.getElementById('burnBtn').disabled = false;
+                
+            } catch (error) {
+                log(`❌ Subtitle burning failed: ${error.message}`, 'error');
+                console.error(error);
+                document.getElementById('burnBtn').disabled = false;
+            }
+        };
+        
+        window.downloadResult = () => {
+            if (!processedBlob) {
+                log('No processed video available', 'warning');
+                return;
+            }
+            
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(processedBlob);
+            a.download = `burned-subtitles-${Date.now()}.mp4`;
+            a.click();
+            log('Download started...', 'info');
+        };
+        
+        // Auto-load test video on page load
+        window.addEventListener('load', () => {
+            log('Page loaded, ready to test subtitle burning performance');
+        });
+    </script>
+</body>
+</html> 

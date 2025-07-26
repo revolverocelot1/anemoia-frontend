@@ -96,30 +96,12 @@ export class OptimizedVideoExportService {
     
       console.log(`[OptimizedExport] Video dimensions: ${width}x${height}`);
       
-      // For high resolutions or if canvas fails, use FFmpeg
-      if (width > 1920 || height > 1920) {
-        console.log('[OptimizedExport] High resolution detected, using FFmpeg for burning');
-        await ffmpegVideoExportService.loadFFmpeg();
-        const videoBlob = await this.getVideoBlob(videoElement);
-        return await ffmpegVideoExportService.exportVideoWithBurnedSubtitles(
-          videoBlob,
-          subtitles,
-          options,
-          onProgress
-        );
-      }
-      
-      // Use canvas for normal resolutions
-      console.log('[OptimizedExport] Using optimized canvas export');
-      
-      // Initialize offscreen renderer if not already done
-      if (!this.offscreenRenderer) {
-        this.offscreenRenderer = createOffscreenSubtitleRenderer();
-        }
-        
-      // Use canvas service with offscreen rendering
-      return await canvasVideoExportService.exportVideoWithBurnedSubtitles(
-        videoElement,
+      // Always use FFmpeg for burning subtitles - canvas method is too slow
+      console.log('[OptimizedExport] Using FFmpeg for burning subtitles (optimized for performance)');
+      await ffmpegVideoExportService.loadFFmpeg();
+      const videoBlob = await this.getVideoBlob(videoElement);
+      return await ffmpegVideoExportService.exportVideoWithBurnedSubtitles(
+        videoBlob,
         subtitles,
         options,
         onProgress

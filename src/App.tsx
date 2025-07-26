@@ -15,7 +15,7 @@ import AccountPage from './pages/AccountPage';
 import NewUpscalerPage from './pages/NewUpscalerPage';
 import DoomPage from './pages/DoomPage';
 import AnimeGalleryPage from './pages/AnimeGalleryPage';
-// import TriangleSplattingPage from './pages/TriangleSplattingPage';
+import TriangleSplattingPage from './pages/TriangleSplattingPage';
 // import GaussianSplattingPage from './pages/GaussianSplattingPage';
 // We will create these pages next
 // import PosePage from './pages/PosePage';
@@ -50,6 +50,7 @@ import DepthMapLanding from './pages/landing/DepthMapLanding';
 import UpscalerLanding from './pages/landing/UpscalerLanding';
 import PoseEstimationLanding from './pages/landing/PoseEstimationLanding';
 import SplatViewerLanding from './pages/landing/SplatViewerLanding';
+import TriangleSplattingLanding from './pages/landing/TriangleSplattingLanding';
 
 // Lazy load R3FCanvas to ensure proper module loading
 const R3FCanvas = lazy(() => import('./three/R3FCanvas'));
@@ -304,6 +305,14 @@ function App() {
                 </AnimatedPage>
               }
             />
+            <Route
+              path="/triangle-splatting/landing"
+              element={
+                <AnimatedPage>
+                  <TriangleSplattingLanding />
+                </AnimatedPage>
+              }
+            />
 
             
             <Route
@@ -540,6 +549,14 @@ function App() {
               }
             />
             <Route path="/ascii-video-converter" element={<ASCIIVideoConverter />} />
+            <Route
+              path="/triangle-splatting"
+              element={
+                <AnimatedPage>
+                  <TriangleSplattingPage />
+                </AnimatedPage>
+              }
+            />
             <Route path="/misc" element={<Navigate to="/" />} />
             {/* Catch-all route for non-existent pages */}
             <Route path="*" element={<Navigate to="/" replace />} />

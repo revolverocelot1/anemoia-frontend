@@ -104,7 +104,8 @@ export class FFmpegVideoExportService {
       let ffmpegArgs: string[] = [
         '-i', 'input.mp4',
         '-vf', `ass=subtitles.ass`,
-        '-c:a', 'copy'
+        '-c:a', 'copy',
+        '-threads', '0' // Use all available CPU threads for faster processing
       ];
 
       // Add video codec and quality settings based on output format
@@ -116,7 +117,7 @@ export class FFmpegVideoExportService {
       } else {
         ffmpegArgs.push('-c:v', 'libx264');
         ffmpegArgs.push('-crf', this.getQualityCRF(options.quality || 'high', 'h264'));
-        ffmpegArgs.push('-preset', 'medium');
+        ffmpegArgs.push('-preset', 'fast'); // Changed from 'medium' to 'fast' for better performance
         ffmpegArgs.push('-profile:v', 'high'); // High profile for better quality
         ffmpegArgs.push('-level', '4.2'); // Compatibility level
         ffmpegArgs.push('-pix_fmt', 'yuv420p'); // Pixel format for compatibility

@@ -8,6 +8,7 @@ import {
   Contrast, Aperture, Grid3x3, Activity, FileImage, ArrowLeft
 } from 'lucide-react';
 import GIF from 'gif.js';
+import { asciiVideoExportService } from '../services/asciiVideoExport';
 
 interface ProcessingConfig {
   asciiChars: string;
@@ -160,28 +161,28 @@ const ASCIIVideoConverter: React.FC = () => {
   // Improved frame buffer management
   const [frameBuffer, setFrameBuffer] = useState<Map<number, FrameData>>(new Map());
   const [processedColorFrames, setProcessedColorFrames] = useState<Map<number, string>>(new Map());
-  const CHUNK_SIZE = 30; // Reduced chunk size to prevent memory issues
-  const MAX_BUFFER_SIZE = 50; // Keep fewer frames in memory to prevent performance degradation
+  const CHUNK_SIZE = 10; // Reduced chunk size for better performance
+  const MAX_BUFFER_SIZE = 30; // Reduced buffer size to prevent memory issues
   
-  // Add frame ordering management
+  // Fixed frame ordering management
   const [orderedFrames, setOrderedFrames] = useState<FrameData[]>([]);
-  const nextExpectedFrameRef = useRef(0);
-  const pendingFramesRef = useRef<Map<number, FrameData>>(new Map());
+  const processedFramesMapRef = useRef<Map<number, FrameData>>(new Map());
+  const frameSequencerRef = useRef<number[]>([]);
 
   const [config, setConfig] = useState<ProcessingConfig>({
     asciiChars: ASCII_PRESETS.classic.chars,
     colorMode: 'mono',
     brightness: 1.0,
     contrast: 1.0,
-    scale: 0.5, // Reduced from 1.0 for better performance
-    fontSize: 12,
-    charDensity: 1.0,
-    frameRate: 15, // Default to 15 fps for better performance
-    quality: 'medium',
+    scale: 0.5, // Increased from 0.3 for better quality
+    fontSize: 14, // Increased from 10 for better visibility
+    charDensity: 1.5, // Increased from 1.0 for more detail
+    frameRate: 15, // Increased from 10 for smoother playback
+    quality: 'high', // Changed from 'medium' to 'high'
     outputMode: 'normal',
     edgeThreshold: 0.2,
-    workerCount: navigator.hardwareConcurrency || 4,
-    batchSize: 5 // Reduced from default for better memory usage
+    workerCount: Math.min(4, navigator.hardwareConcurrency || 4),
+    batchSize: 5 // Increased from 3 for better performance
   });
 
   const [metrics, setMetrics] = useState<ProcessingMetrics>({
@@ -266,108 +267,90 @@ const ASCIIVideoConverter: React.FC = () => {
       return;
     }
     
-    console.log(`Frame processed: ${frameNumber}, Next expected: ${nextExpectedFrameRef.current}, Pending: ${pendingFramesRef.current.size}`);
-    
     // Create frame data
     const frameData: FrameData = {
       frameNumber,
       ascii,
-      colors,
+      colors: colors ? new Uint8ClampedArray(colors) : null,
       width,
       height,
       timestamp
     };
     
-    // Add to pending frames
-    pendingFramesRef.current.set(frameNumber, frameData);
+    // Store in the map
+    processedFramesMapRef.current.set(frameNumber, frameData);
     
-    // Process frames in order
-    let currentExpected = nextExpectedFrameRef.current;
+    // Check if we can build a continuous sequence from frame 0
     const newOrderedFrames: FrameData[] = [];
+    let expectedFrame = orderedFrames.length;
     
-    while (pendingFramesRef.current.has(currentExpected)) {
-      const frame = pendingFramesRef.current.get(currentExpected)!;
-      pendingFramesRef.current.delete(currentExpected);
-      
-      // Add to ordered frames
+    while (processedFramesMapRef.current.has(expectedFrame)) {
+      const frame = processedFramesMapRef.current.get(expectedFrame)!;
       newOrderedFrames.push(frame);
-      
-      // Store in buffers
-      setFrameBuffer(prev => {
-        const newBuffer = new Map(prev);
-        newBuffer.set(frame.frameNumber, frame);
+      processedFramesMapRef.current.delete(expectedFrame);
+      expectedFrame++;
+    }
+    
+    if (newOrderedFrames.length > 0) {
+      // Update ordered frames
+      setOrderedFrames(prev => {
+        const updated = [...prev, ...newOrderedFrames];
         
-        // Clean up old frames to prevent memory leak
-        if (newBuffer.size > MAX_BUFFER_SIZE) {
-          const sortedKeys = Array.from(newBuffer.keys()).sort((a, b) => a - b);
-          const keysToRemove = sortedKeys.slice(0, sortedKeys.length - MAX_BUFFER_SIZE);
-          keysToRemove.forEach(key => newBuffer.delete(key));
+        // Limit total frames in memory
+        if (updated.length > MAX_BUFFER_SIZE * 2) {
+          // Keep only recent frames
+          return updated.slice(-MAX_BUFFER_SIZE);
         }
         
+        return updated;
+      });
+      
+      // Update processed frames array for display
+      setProcessedFrames(prev => {
+        const newFrames = [...prev];
+        newOrderedFrames.forEach(frame => {
+          newFrames[frame.frameNumber] = frame.ascii;
+        });
+        return newFrames;
+      });
+      
+      // Update frame buffer
+      setFrameBuffer(prev => {
+        const newBuffer = new Map(prev);
+        newOrderedFrames.forEach(frame => {
+          newBuffer.set(frame.frameNumber, frame);
+          
+          // Clean up old frames
+          if (newBuffer.size > MAX_BUFFER_SIZE) {
+            const sortedKeys = Array.from(newBuffer.keys()).sort((a, b) => a - b);
+            newBuffer.delete(sortedKeys[0]);
+          }
+        });
         return newBuffer;
       });
       
       // Handle colored output
-      if (config.outputMode === 'colored' && frame.colors) {
-        const coloredHtml = createColoredAscii(frame.ascii, frame.colors, frame.width);
+      if (config.outputMode === 'colored') {
         setProcessedColorFrames(prev => {
           const newMap = new Map(prev);
-          newMap.set(frame.frameNumber, coloredHtml);
+          newOrderedFrames.forEach(frame => {
+            if (frame.colors) {
+              const coloredHtml = createColoredAscii(frame.ascii, frame.colors, frame.width);
+              newMap.set(frame.frameNumber, coloredHtml);
+            }
+          });
           
           // Clean up old colored frames
           if (newMap.size > MAX_BUFFER_SIZE) {
             const sortedKeys = Array.from(newMap.keys()).sort((a, b) => a - b);
-            const keysToRemove = sortedKeys.slice(0, sortedKeys.length - MAX_BUFFER_SIZE);
-            keysToRemove.forEach(key => newMap.delete(key));
+            newMap.delete(sortedKeys[0]);
           }
           
           return newMap;
         });
       }
       
-      currentExpected++;
-    }
-    
-    // Update next expected frame
-    nextExpectedFrameRef.current = currentExpected;
-    
-    // Update ordered frames array
-    setOrderedFrames(prev => {
-      const updated = [...prev, ...newOrderedFrames];
-      
-      // Perform memory cleanup on ordered frames
-      if (updated.length > MAX_BUFFER_SIZE * 2) {
-        // Keep only the most recent frames and clear color data from older ones
-        updated.forEach((frame, index) => {
-          if (index < updated.length - MAX_BUFFER_SIZE) {
-            // Clear color data to save memory but keep ASCII for export
-            frame.colors = null;
-          }
-        });
-      }
-      
-      return updated;
-    });
-    
-    // Update processed frames for display
-    setProcessedFrames(prev => {
-      const newFrames = [...prev];
-      newOrderedFrames.forEach(frame => {
-        if (frame.frameNumber < metrics.totalFrames) {
-          newFrames[frame.frameNumber] = frame.ascii;
-        }
-      });
-      
-      // Limit array size to prevent memory issues
-      if (newFrames.length > MAX_BUFFER_SIZE * 3) {
-        return newFrames.slice(-MAX_BUFFER_SIZE * 2);
-      }
-      
-      return newFrames;
-    });
-    
-    // Update preview with the latest ordered frame
-    if (newOrderedFrames.length > 0) {
+      // Update preview with the latest frame
       const latestFrame = newOrderedFrames[newOrderedFrames.length - 1];
       if (config.outputMode === 'colored' && latestFrame.colors) {
         const coloredHtml = createColoredAscii(latestFrame.ascii, latestFrame.colors, latestFrame.width);
@@ -377,121 +360,70 @@ const ASCIIVideoConverter: React.FC = () => {
       }
     }
     
-    // Add frames to GIF if we're creating one
-    if (gifRef.current && exportFormat === 'gif' && newOrderedFrames.length > 0) {
-      const gifCanvas = document.createElement('canvas');
-      const gifCtx = gifCanvas.getContext('2d');
-      if (gifCtx) {
-        newOrderedFrames.forEach(frame => {
-          renderFrameToCanvas(gifCanvas, gifCtx, frame.ascii, frame.colors);
-          gifRef.current.addFrame(gifCanvas, { delay: 1000 / config.frameRate });
-        });
-      }
-    }
-    
-    // Update metrics based on actual processed frames
+    // Update metrics
     setMetrics(prev => {
-      const actualProcessedFrames = prev.processedFrames + newOrderedFrames.length;
-      const progress = prev.totalFrames > 0 ? (actualProcessedFrames / prev.totalFrames) * 100 : 0;
+      const totalProcessed = orderedFrames.length + newOrderedFrames.length;
+      const progress = prev.totalFrames > 0 ? (totalProcessed / prev.totalFrames) * 100 : 0;
       const elapsed = (performance.now() - processingStartTimeRef.current) / 1000;
-      const fps = elapsed > 0 ? actualProcessedFrames / elapsed : 0;
+      const fps = elapsed > 0 ? totalProcessed / elapsed : 0;
       
       const newMetrics = {
         ...prev,
-        processedFrames: actualProcessedFrames,
+        processedFrames: totalProcessed,
         progress,
         fps,
-        estimatedTime: fps > 0 ? (prev.totalFrames - actualProcessedFrames) / fps : 0
+        estimatedTime: fps > 0 ? (prev.totalFrames - totalProcessed) / fps : 0
       };
       
       // Check if all frames are processed
-      if (actualProcessedFrames >= prev.totalFrames && prev.totalFrames > 0) {
+      if (totalProcessed >= prev.totalFrames && prev.totalFrames > 0) {
         setTimeout(() => finishProcessing(), 100);
       }
       
       return newMetrics;
     });
-  }, [config.outputMode, config.frameRate, exportFormat, metrics.totalFrames]);
+  }, [config.outputMode, config.frameRate, exportFormat, orderedFrames.length]);
 
   const createColoredAscii = (ascii: string, colors: Uint8ClampedArray, width: number): string => {
     const lines = ascii.split('\n');
-    let html = '';
+    let html = '<div style="background-color: black; padding: 10px; font-family: monospace; white-space: pre; line-height: 1.2;">';
     
     let colorIndex = 0;
-    const totalChars = lines.reduce((sum, line) => sum + line.length, 0);
-    const expectedColorBytes = totalChars * 3;
-    
-    // Check if we have enough color data
-    if (colors.length < expectedColorBytes) {
-      console.warn(`Color data mismatch: expected ${expectedColorBytes} bytes, got ${colors.length}`);
-    }
-
-    // Build HTML more efficiently using array join
-    const htmlParts: string[] = [];
     
     for (let lineIndex = 0; lineIndex < lines.length; lineIndex++) {
       const line = lines[lineIndex];
-      if (lineIndex > 0) htmlParts.push('\n');
-      
-      // Process characters in batches with same color to reduce spans
-      let currentColor = '';
-      let currentChars = '';
+      if (lineIndex > 0) html += '<br/>';
       
       for (let charIndex = 0; charIndex < line.length; charIndex++) {
         const char = line[charIndex];
         
-        // Get color for this character
-        let color = '';
         if (colorIndex + 2 < colors.length) {
           const r = colors[colorIndex];
           const g = colors[colorIndex + 1];
           const b = colors[colorIndex + 2];
           colorIndex += 3;
           
-          // For spaces, use transparent color
           if (char === ' ') {
-            color = 'transparent';
+            html += '&nbsp;';
           } else {
-            color = `rgb(${r},${g},${b})`;
+            // Escape HTML entities
+            let escapedChar = char;
+            if (char === '&') escapedChar = '&amp;';
+            else if (char === '<') escapedChar = '&lt;';
+            else if (char === '>') escapedChar = '&gt;';
+            else if (char === '"') escapedChar = '&quot;';
+            else if (char === "'") escapedChar = '&#039;';
+            
+            html += `<span style="color:rgb(${r},${g},${b})">${escapedChar}</span>`;
           }
         } else {
-          // Fallback color
-          color = char === ' ' ? 'transparent' : theme.text;
-        }
-        
-        // If color changed, output the previous batch
-        if (color !== currentColor && currentChars) {
-          if (currentColor === 'transparent') {
-            htmlParts.push(`<span style="opacity:0">${currentChars}</span>`);
-          } else {
-            htmlParts.push(`<span style="color:${currentColor}">${currentChars}</span>`);
-          }
-          currentChars = '';
-        }
-        
-        currentColor = color;
-        
-        // Escape HTML entities more efficiently
-        if (char === '&') currentChars += '&amp;';
-        else if (char === '<') currentChars += '&lt;';
-        else if (char === '>') currentChars += '&gt;';
-        else if (char === '"') currentChars += '&quot;';
-        else if (char === "'") currentChars += '&#039;';
-        else if (char === ' ') currentChars += '█'; // Use block for spaces
-        else currentChars += char;
-      }
-      
-      // Output any remaining characters
-      if (currentChars) {
-        if (currentColor === 'transparent') {
-          htmlParts.push(`<span style="opacity:0">${currentChars}</span>`);
-        } else {
-          htmlParts.push(`<span style="color:${currentColor}">${currentChars}</span>`);
+          html += char === ' ' ? '&nbsp;' : char;
         }
       }
     }
-
-    return htmlParts.join('');
+    
+    html += '</div>';
+    return html;
   };
 
   const renderFrameToCanvas = (canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D, ascii: string, colors?: Uint8ClampedArray | null) => {
@@ -812,17 +744,15 @@ const ASCIIVideoConverter: React.FC = () => {
     setFrameBuffer(new Map());
     setProcessedColorFrames(new Map());
     setProcessedFrames([]);
-    
-    // Reset frame ordering state
     setOrderedFrames([]);
-    nextExpectedFrameRef.current = 0;
-    pendingFramesRef.current.clear();
+    processedFramesMapRef.current.clear();
+    frameSequencerRef.current = [];
     
     const video = videoRef.current;
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d', { 
       willReadFrequently: true,
-      desynchronized: true 
+      alpha: false // No alpha for better performance
     });
     
     if (!ctx) return;
@@ -838,160 +768,123 @@ const ASCIIVideoConverter: React.FC = () => {
       progress: 0
     }));
     
-    // Calculate dimensions
-    const maxWidth = config.quality === 'ultra' ? 1200 : 
-                    config.quality === 'high' ? 1000 : 
-                    config.quality === 'medium' ? 800 : 600;
-    const maxHeight = config.quality === 'ultra' ? 900 : 
-                     config.quality === 'high' ? 750 : 
-                     config.quality === 'medium' ? 600 : 450;
+    // Calculate dimensions with better aspect ratio handling
+    const maxWidth = config.quality === 'ultra' ? 1000 : 
+                    config.quality === 'high' ? 800 : 
+                    config.quality === 'medium' ? 640 : 480;
+    const maxHeight = config.quality === 'ultra' ? 750 : 
+                     config.quality === 'high' ? 600 : 
+                     config.quality === 'medium' ? 480 : 360;
     
     const videoAspectRatio = video.videoWidth / video.videoHeight;
     let processWidth, processHeight;
     
     if (videoAspectRatio > maxWidth / maxHeight) {
       processWidth = maxWidth;
-      processHeight = maxWidth / videoAspectRatio;
+      processHeight = Math.round(maxWidth / videoAspectRatio);
     } else {
       processHeight = maxHeight;
-      processWidth = maxHeight * videoAspectRatio;
+      processWidth = Math.round(maxHeight * videoAspectRatio);
     }
 
-    canvas.width = processWidth * config.scale;
-    canvas.height = processHeight * config.scale;
+    canvas.width = Math.round(processWidth * config.scale);
+    canvas.height = Math.round(processHeight * config.scale);
 
-    // Process frames sequentially with controlled parallelism
-    const workerCount = config.workerCount;
-    let activeWorkers = 0;
-    let nextFrameToProcess = 0;
+    // Sequential frame processing with proper timing
+    let currentFrameIndex = 0;
+    const frameInterval = 1 / fps;
     let workerIndex = 0;
     
-    // Track seek performance
-    let lastSeekTime = 0;
-    let frameProcessingDelay = 10; // Fixed initial delay
-    let processedInBatch = 0; // Track frames processed in current batch
-    
-    const processNextFrame = async () => {
-      if (nextFrameToProcess >= totalFrames || !isProcessingRef.current) {
+    const processNextBatch = async () => {
+      const batchSize = Math.min(config.batchSize, totalFrames - currentFrameIndex);
+      if (batchSize <= 0 || !isProcessingRef.current) {
         return;
       }
       
-      const frameNumber = nextFrameToProcess++;
-      const time = frameNumber / fps;
+      const batchPromises: Promise<void>[] = [];
       
-      // Add small delay between seeks to prevent browser buffer congestion
-      if (frameNumber > 0) {
-        await new Promise(resolve => setTimeout(resolve, frameProcessingDelay));
-      }
-      
-      // Seek to the frame time
-      return new Promise<void>((resolve) => {
-        video.currentTime = time;
+      for (let i = 0; i < batchSize && currentFrameIndex < totalFrames; i++) {
+        const frameNumber = currentFrameIndex;
+        const timestamp = frameNumber * frameInterval;
+        currentFrameIndex++;
         
-        const handleSeeked = () => {
-          if (!isProcessingRef.current) {
-            resolve();
-            return;
-          }
+        const promise = new Promise<void>((resolve) => {
+          // Create a video element for this specific frame
+          const frameVideo = document.createElement('video');
+          frameVideo.src = video.src;
+          frameVideo.muted = true;
           
-          // Adjust processing delay based on performance
-          const currentTime = performance.now();
-          if (lastSeekTime > 0) {
-            const seekDuration = currentTime - lastSeekTime;
-            // Maintain a consistent delay to prevent performance degradation
-            frameProcessingDelay = Math.min(Math.max(seekDuration * 0.5, 10), 50);
-          }
-          lastSeekTime = currentTime;
-          
-          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-          
-          // Track processed frames for performance monitoring
-          processedInBatch++;
-          
-          // Get next worker in round-robin fashion
-          const worker = workerPoolRef.current[workerIndex];
-          workerIndex = (workerIndex + 1) % workerPoolRef.current.length;
-          
-          // Send to worker
-          worker.postMessage({
-            type: 'processFrame',
-            data: {
-              frameData: {
-                frameNumber,
-                timestamp: time,
-                width: canvas.width,
-                height: canvas.height,
-                pixels: imageData.data
-              },
-              config: {
-                asciiChars: config.asciiChars,
-                colorMode: config.colorMode,
-                brightness: config.brightness,
-                contrast: config.contrast,
-                edgeDetection: config.outputMode === 'edge',
-                edgeThreshold: config.edgeThreshold,
-                negative: config.outputMode === 'negative',
-                fontSize: config.fontSize,
-                charDensity: config.charDensity,
-                colored: config.outputMode === 'colored'
-              }
+          frameVideo.onseeked = () => {
+            try {
+              ctx.drawImage(frameVideo, 0, 0, canvas.width, canvas.height);
+              const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+              
+              // Get worker for this frame
+              const worker = workerPoolRef.current[workerIndex];
+              workerIndex = (workerIndex + 1) % workerPoolRef.current.length;
+              
+              // Send to worker
+              worker.postMessage({
+                type: 'processFrame',
+                data: {
+                  frameData: {
+                    frameNumber,
+                    timestamp,
+                    width: canvas.width,
+                    height: canvas.height,
+                    pixels: imageData.data
+                  },
+                  config: {
+                    asciiChars: config.asciiChars,
+                    colorMode: config.colorMode,
+                    brightness: config.brightness,
+                    contrast: config.contrast,
+                    edgeDetection: config.outputMode === 'edge',
+                    edgeThreshold: config.edgeThreshold,
+                    negative: config.outputMode === 'negative',
+                    fontSize: config.fontSize,
+                    charDensity: config.charDensity,
+                    colored: config.outputMode === 'colored'
+                  }
+                }
+              });
+              
+              // Clean up
+              frameVideo.remove();
+              resolve();
+            } catch (error) {
+              console.error('Error processing frame:', error);
+              frameVideo.remove();
+              resolve();
             }
-          });
+          };
           
-          video.removeEventListener('seeked', handleSeeked);
-          resolve();
-        };
-        
-        video.addEventListener('seeked', handleSeeked);
-      });
-    };
-    
-    // Start processing with controlled parallelism
-    const activePromises = new Set<Promise<void>>();
-    
-    // Function to process frames with proper tracking
-    const processFramesInParallel = async () => {
-      while (nextFrameToProcess < totalFrames || activePromises.size > 0) {
-        if (!isProcessingRef.current) break;
-        
-        // Adjust concurrent limit based on performance and available workers
-        const maxConcurrent = Math.max(2, Math.min(workerCount, 8)); // Increased from 3 to 8
-        
-        while (activePromises.size < maxConcurrent && nextFrameToProcess < totalFrames && isProcessingRef.current) {
-          const framePromise = processNextFrame();
-          activePromises.add(framePromise);
+          frameVideo.onerror = () => {
+            console.error('Error seeking video frame');
+            frameVideo.remove();
+            resolve();
+          };
           
-          // Remove from active set when complete
-          framePromise.then(() => {
-            activePromises.delete(framePromise);
-          }).catch((error) => {
-            console.error('Frame processing error:', error);
-            activePromises.delete(framePromise);
-          });
-          
-          // Reduced delay for better throughput
-          await new Promise(resolve => setTimeout(resolve, Math.max(10, frameProcessingDelay / 2)));
-        }
+          frameVideo.currentTime = timestamp;
+        });
         
-        // Wait for at least one to complete before continuing
-        if (activePromises.size > 0) {
-          await Promise.race(activePromises);
-        }
-        
-        // Small delay to prevent UI blocking
-        if (nextFrameToProcess % 10 === 0) { // Changed from 5 to 10
-          await new Promise(resolve => setTimeout(resolve, 5)); // Reduced from 10ms to 5ms
-        }
-        
-        // Force garbage collection hint every 200 frames (increased from 100)
-        if (nextFrameToProcess % 200 === 0 && (global as any).gc) {
-          (global as any).gc();
-        }
+        batchPromises.push(promise);
+      }
+      
+      // Wait for batch to complete
+      await Promise.all(batchPromises);
+      
+      // Add delay between batches to prevent overload
+      await new Promise(resolve => setTimeout(resolve, 50));
+      
+      // Process next batch
+      if (currentFrameIndex < totalFrames && isProcessingRef.current) {
+        requestAnimationFrame(() => processNextBatch());
       }
     };
     
-    await processFramesInParallel();
+    // Start processing
+    processNextBatch();
   };
 
   const finishProcessing = () => {
@@ -1005,100 +898,66 @@ const ASCIIVideoConverter: React.FC = () => {
   const handleExportVideo = async () => {
     if (orderedFrames.length === 0) return;
     
-    const firstFrame = orderedFrames[0];
-    const lines = firstFrame.ascii.split('\n');
-    const maxLineLength = Math.max(...lines.map(line => line.length));
-    const lineCount = lines.length;
-    
-    const charWidth = config.fontSize * 0.6;
-    const charHeight = config.fontSize * 1.2;
-    
-    const exportCanvas = document.createElement('canvas');
-    exportCanvas.width = maxLineLength * charWidth;
-    exportCanvas.height = lineCount * charHeight;
-    const ctx = exportCanvas.getContext('2d', { 
-      willReadFrequently: true,
-      alpha: false, // Opaque background for better color
-      colorSpace: 'srgb', // Ensure consistent color space
-      desynchronized: false // Better color accuracy
-    });
-    
-    if (!ctx) return;
-    
-    // Set up video recording - try MP4 first, fallback to WebM
-    const stream = exportCanvas.captureStream(config.frameRate);
-    
-    // Check for MP4 support
-    const mp4MimeType = 'video/mp4;codecs=h264';
-    const webmMimeType = 'video/webm;codecs=vp9';
-    
-    let mimeType = mp4MimeType;
-    let fileExtension = 'mp4';
-    
-    // Check if MP4 is supported
-    if (!MediaRecorder.isTypeSupported(mp4MimeType)) {
-      // Try WebM as fallback
-      if (MediaRecorder.isTypeSupported(webmMimeType)) {
-        mimeType = webmMimeType;
-        fileExtension = 'webm';
-        console.warn('MP4 not supported, falling back to WebM');
-      } else {
-        console.error('Neither MP4 nor WebM is supported');
-        return;
-      }
-    }
-    
-    const mediaRecorder = new MediaRecorder(stream, {
-      mimeType,
-      videoBitsPerSecond: 8000000, // 8 Mbps for good quality
-      audioBitsPerSecond: 0 // No audio
-    });
-    
-    const chunks: Blob[] = [];
-    mediaRecorder.ondataavailable = (e) => {
-      if (e.data.size > 0) chunks.push(e.data);
-    };
-    
-    mediaRecorder.onstop = () => {
-      const blob = new Blob(chunks, { type: mimeType });
-      const url = URL.createObjectURL(blob);
+    try {
+      setIsProcessing(true);
+      setMetrics(prev => ({ ...prev, progress: 0 }));
+      
+      const firstFrame = orderedFrames[0];
+      const lines = firstFrame.ascii.split('\n');
+      const maxLineLength = Math.max(...lines.map(line => line.length));
+      const lineCount = lines.length;
+      
+      const charWidth = config.fontSize * 0.6;
+      const charHeight = config.fontSize * 1.2;
+      
+      const exportCanvas = document.createElement('canvas');
+      exportCanvas.width = maxLineLength * charWidth;
+      exportCanvas.height = lineCount * charHeight;
+      const ctx = exportCanvas.getContext('2d', { 
+        willReadFrequently: false,
+        alpha: false
+      });
+      
+      if (!ctx) return;
+      
+      // Use FFmpeg export service
+      const outputBlob = await asciiVideoExportService.exportVideo(
+        orderedFrames,
+        exportCanvas,
+        ctx,
+        {
+          frameRate: config.frameRate,
+          fontSize: config.fontSize,
+          backgroundColor: theme.background,
+          format: 'mp4',
+          quality: config.quality
+        },
+        renderFrameToCanvas,
+        (progress) => {
+          setMetrics(prev => ({ ...prev, progress }));
+        }
+      );
+      
+      // Download the video
+      const url = URL.createObjectURL(outputBlob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `ascii-video-${config.outputMode}-${Date.now()}.${fileExtension}`;
+      a.download = `ascii-video-${config.outputMode}-${Date.now()}.mp4`;
       a.click();
       URL.revokeObjectURL(url);
-    };
-    
-    mediaRecorder.start();
-    
-    // Render frames with proper timing
-    let frameIndex = 0;
-    const frameInterval = 1000 / config.frameRate;
-    let lastFrameTime = performance.now();
-    
-    const renderNextFrame = () => {
-      if (frameIndex >= orderedFrames.length) {
-        // Add a small delay before stopping to ensure last frames are captured
-        setTimeout(() => mediaRecorder.stop(), 500);
-        return;
-      }
       
-      const frame = orderedFrames[frameIndex];
-      renderFrameToCanvas(exportCanvas, ctx, frame.ascii, frame.colors);
-      
-      frameIndex++;
-      
-      // Schedule next frame
-      const currentTime = performance.now();
-      const elapsed = currentTime - lastFrameTime;
-      const delay = Math.max(0, frameInterval - elapsed);
-      
-      lastFrameTime = currentTime + delay;
-      setTimeout(renderNextFrame, delay);
-    };
-    
-    // Start rendering
-    renderNextFrame();
+    } catch (error) {
+      console.error('Export failed:', error);
+      setError('Failed to export video. Please try again.');
+      setTimeout(() => setError(null), 5000);
+    } finally {
+      setIsProcessing(false);
+      setMetrics(prev => ({ ...prev, progress: 100 }));
+    }
+  };
+  
+  const exportUsingVideoEncoder = async (canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D, frameRate: number) => {
+    // Removed - using FFmpeg instead
   };
 
   const playAnimation = useCallback(() => {
@@ -1161,37 +1020,53 @@ const ASCIIVideoConverter: React.FC = () => {
     const charWidth = config.fontSize * 0.6;
     const charHeight = config.fontSize;
     
-    // Initialize GIF with correct worker path
-    gifRef.current = new GIF({
-      workers: 4,
+    // Initialize GIF with correct settings
+    const gif = new GIF({
+      workers: 2, // Reduced worker count
       quality: 10,
       width: maxLineLength * charWidth,
       height: lineCount * charHeight,
-      workerScript: '/gif.worker.js' // Ensure this file exists in public folder
+      workerScript: '/gif.worker.js'
     });
     
-    gifRef.current.on('finished', (blob: Blob) => {
+    gif.on('finished', (blob: Blob) => {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = 'ascii-animation.gif';
+      a.download = `ascii-animation-${Date.now()}.gif`;
       a.click();
       URL.revokeObjectURL(url);
     });
     
-    // Add frames to GIF
+    // Create canvas for rendering frames
     const gifCanvas = document.createElement('canvas');
     gifCanvas.width = maxLineLength * charWidth;
     gifCanvas.height = lineCount * charHeight;
-    const ctx = gifCanvas.getContext('2d');
+    const ctx = gifCanvas.getContext('2d', { alpha: false });
     
     if (ctx) {
-      orderedFrames.forEach(frame => {
+      // Set background color
+      ctx.fillStyle = theme.background;
+      ctx.fillRect(0, 0, gifCanvas.width, gifCanvas.height);
+      
+      // Add frames to GIF with proper delay
+      const frameDelay = Math.round(1000 / config.frameRate);
+      
+      orderedFrames.forEach((frame, index) => {
         renderFrameToCanvas(gifCanvas, ctx, frame.ascii, frame.colors);
-        gifRef.current.addFrame(gifCanvas, { delay: 1000 / config.frameRate });
+        
+        // Clone canvas for each frame
+        const frameCanvas = document.createElement('canvas');
+        frameCanvas.width = gifCanvas.width;
+        frameCanvas.height = gifCanvas.height;
+        const frameCtx = frameCanvas.getContext('2d');
+        if (frameCtx) {
+          frameCtx.drawImage(gifCanvas, 0, 0);
+          gif.addFrame(frameCanvas, { delay: frameDelay });
+        }
       });
       
-      gifRef.current.render();
+      gif.render();
     }
   };
 
@@ -1222,26 +1097,253 @@ const ASCIIVideoConverter: React.FC = () => {
     }
   };
 
-  const processVideo = () => {
-    // Reset all processing states before starting
-    setProcessedFrames([]);
-    setFrameBuffer(new Map());
-    setProcessedColorFrames(new Map());
-    setOrderedFrames([]);
-    setCurrentFrame(0);
-    setMetrics({
-      fps: 0,
-      processedFrames: 0,
-      totalFrames: 0,
-      estimatedTime: 0,
-      progress: 0,
-      cpuUsage: 0,
-      memoryUsage: 0
+  const processVideo = async () => {
+    if (!file) return;
+    
+    setIsProcessing(true);
+    setMetrics(prev => ({ ...prev, progress: 0 }));
+    setError('');
+    
+    const startTime = Date.now();
+    console.log('Starting video processing with config:', config);
+    
+    // Create video element to extract frames
+    const video = document.createElement('video');
+    video.src = URL.createObjectURL(file);
+    video.muted = true;
+    
+    // Wait for video metadata to load
+    await new Promise((resolve) => {
+      video.onloadedmetadata = resolve;
     });
     
-    // Start processing
-    isProcessingRef.current = true;
-    processVideoInBatches();
+    const fps = config.frameRate;
+    const duration = video.duration;
+    const totalFrames = Math.floor(duration * fps);
+    console.log(`Video loaded: duration=${duration}s, fps=${fps}, totalFrames=${totalFrames}`);
+    
+    // Set the total frames for progress tracking
+    setMetrics(prev => ({ ...prev, totalFrames }));
+    
+    // Create canvas for frame extraction
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    if (!ctx) {
+      setError('Failed to create canvas context');
+      setIsProcessing(false);
+      return;
+    }
+    
+    const frames: FrameData[] = [];
+    const frameInterval = 1 / fps;
+    
+    // Extract frames
+    for (let i = 0; i < totalFrames; i++) {
+      const currentTime = i * frameInterval;
+      video.currentTime = currentTime;
+      
+      await new Promise((resolve) => {
+        video.onseeked = resolve;
+      });
+      
+      ctx.drawImage(video, 0, 0);
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      
+      // Process the frame immediately to test
+      const processedFrame = await processFrameWithWorker(imageData, config, i);
+      if (processedFrame) {
+        frames.push(processedFrame);
+        setMetrics(prev => ({ 
+          ...prev, 
+          progress: Math.floor(((i + 1) / totalFrames) * 100),
+          processedFrames: i + 1
+        }));
+      }
+    }
+    
+    const processingTime = (Date.now() - startTime) / 1000;
+    console.log(`Processing completed in ${processingTime}s`);
+    
+    setOrderedFrames(frames);
+    setIsProcessing(false);
+    
+    // Generate output based on format
+    if (exportFormat === 'video') {
+      await generateVideo(frames);
+    } else if (exportFormat === 'gif') {
+      await generateGIF(frames);
+    } else {
+      generateTextFile(frames);
+    }
+  };
+
+  // Process a single frame with worker
+  const processFrameWithWorker = async (
+    imageData: ImageData,
+    config: ProcessingConfig,
+    frameIndex: number
+  ): Promise<FrameData | null> => {
+    try {
+      // Send frame to worker
+      const result = await new Promise<FrameData>((resolve, reject) => {
+        const worker = workerPoolRef.current[frameIndex % workerPoolRef.current.length];
+        
+        const handleMessage = (e: MessageEvent) => {
+          if (e.data.frameIndex === frameIndex) {
+            worker.removeEventListener('message', handleMessage);
+            if (e.data.error) {
+              reject(new Error(e.data.error));
+            } else {
+              resolve(e.data as FrameData);
+            }
+          }
+        };
+        
+        worker.addEventListener('message', handleMessage);
+        
+        // Send the processing request
+        worker.postMessage({
+          type: 'process',
+          frameData: {
+            width: imageData.width,
+            height: imageData.height,
+            pixels: Array.from(imageData.data)
+          },
+          config: {
+            ...config,
+            colored: config.outputMode === 'colored'
+          },
+          frameIndex
+        });
+      });
+      
+      return result;
+    } catch (error) {
+      console.error('Frame processing error:', error);
+      return null;
+    }
+  };
+
+  const generateVideo = async (frames: FrameData[]) => {
+    if (!canvasRef.current) return;
+
+    const firstFrame = frames[0];
+    const lines = firstFrame.ascii.split('\n');
+    const maxLineLength = Math.max(...lines.map(line => line.length));
+    const lineCount = lines.length;
+    
+    const charWidth = config.fontSize * 0.6;
+    const charHeight = config.fontSize * 1.2;
+    
+    const exportCanvas = document.createElement('canvas');
+    exportCanvas.width = maxLineLength * charWidth;
+    exportCanvas.height = lineCount * charHeight;
+    const ctx = exportCanvas.getContext('2d', { 
+      willReadFrequently: false,
+      alpha: false
+    });
+    
+    if (!ctx) return;
+
+    const outputBlob = await asciiVideoExportService.exportVideo(
+      frames,
+      exportCanvas,
+      ctx,
+      {
+        frameRate: config.frameRate,
+        fontSize: config.fontSize,
+        backgroundColor: theme.background,
+        format: 'mp4',
+        quality: config.quality
+      },
+      renderFrameToCanvas,
+      (progress) => {
+        setMetrics(prev => ({ ...prev, progress }));
+      }
+    );
+
+    const url = URL.createObjectURL(outputBlob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `ascii-video-${config.outputMode}-${Date.now()}.mp4`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const generateGIF = async (frames: FrameData[]) => {
+    if (frames.length === 0) return;
+
+    const firstFrame = frames[0];
+    const lines = firstFrame.ascii.split('\n');
+    const maxLineLength = Math.max(...lines.map(line => line.length));
+    const lineCount = lines.length;
+    
+    const charWidth = config.fontSize * 0.6;
+    const charHeight = config.fontSize;
+    
+    // Initialize GIF with correct settings
+    const gif = new GIF({
+      workers: 2, // Reduced worker count
+      quality: 10,
+      width: maxLineLength * charWidth,
+      height: lineCount * charHeight,
+      workerScript: '/gif.worker.js'
+    });
+    
+    gif.on('finished', (blob: Blob) => {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `ascii-animation-${Date.now()}.gif`;
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+    
+    // Create canvas for rendering frames
+    const gifCanvas = document.createElement('canvas');
+    gifCanvas.width = maxLineLength * charWidth;
+    gifCanvas.height = lineCount * charHeight;
+    const ctx = gifCanvas.getContext('2d', { alpha: false });
+    
+    if (ctx) {
+      // Set background color
+      ctx.fillStyle = theme.background;
+      ctx.fillRect(0, 0, gifCanvas.width, gifCanvas.height);
+      
+      // Add frames to GIF with proper delay
+      const frameDelay = Math.round(1000 / config.frameRate);
+      
+      frames.forEach((frame, index) => {
+        renderFrameToCanvas(gifCanvas, ctx, frame.ascii, frame.colors);
+        
+        // Clone canvas for each frame
+        const frameCanvas = document.createElement('canvas');
+        frameCanvas.width = gifCanvas.width;
+        frameCanvas.height = gifCanvas.height;
+        const frameCtx = frameCanvas.getContext('2d');
+        if (frameCtx) {
+          frameCtx.drawImage(gifCanvas, 0, 0);
+          gif.addFrame(frameCanvas, { delay: frameDelay });
+        }
+      });
+      
+      gif.render();
+    }
+  };
+
+  const generateTextFile = (frames: ProcessedFrame[]) => {
+    if (frames.length === 0) return;
+
+    const text = frames.map(f => f.ascii).join('\n\n' + '='.repeat(80) + '\n\n');
+    const blob = new Blob([text], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'ascii-frames.txt';
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   const stopProcessing = () => {
@@ -1720,8 +1822,8 @@ const ASCIIVideoConverter: React.FC = () => {
                     </label>
                       <input
                         type="range"
-                      min="6"
-                      max="20"
+                      min="8"
+                      max="24"
                       step="1"
                         value={config.fontSize}
                         onChange={(e) => setConfig(prev => ({ ...prev, fontSize: parseInt(e.target.value) }))}
@@ -1737,8 +1839,8 @@ const ASCIIVideoConverter: React.FC = () => {
                     </label>
                     <input
                       type="range"
-                      min="0.05"
-                      max="0.5"
+                      min="0.1"
+                      max="1.0"
                       step="0.05"
                       value={config.scale}
                       onChange={(e) => setConfig(prev => ({ ...prev, scale: parseFloat(e.target.value) }))}
@@ -1755,7 +1857,7 @@ const ASCIIVideoConverter: React.FC = () => {
                     <input
                       type="range"
                       min="0.5"
-                      max="2.0"
+                      max="3.0"
                       step="0.1"
                       value={config.charDensity}
                       onChange={(e) => setConfig(prev => ({ ...prev, charDensity: parseFloat(e.target.value) }))}
@@ -1836,17 +1938,14 @@ const ASCIIVideoConverter: React.FC = () => {
               {previewFrame ? (
                 <div className="w-full h-full flex items-center justify-center p-4">
                   {config.outputMode === 'colored' ? (
-                    <pre
-                      className="leading-none text-center ascii-preview"
+                    <div
+                      className="ascii-preview-colored"
                       style={{ 
-                        fontFamily: 'Consolas, Monaco, monospace',
                         fontSize: `${config.fontSize}px`,
-                        whiteSpace: 'pre',
-                        lineHeight: 1,
+                        lineHeight: 1.2,
                         maxWidth: '100%',
                         maxHeight: '100%',
-                        overflow: 'auto',
-                        backgroundColor: theme.background
+                        overflow: 'auto'
                       }}
                       dangerouslySetInnerHTML={{ __html: previewFrame }}
                     />
@@ -1858,11 +1957,12 @@ const ASCIIVideoConverter: React.FC = () => {
                       fontSize: `${config.fontSize}px`,
                       color: theme.text,
                       whiteSpace: 'pre',
-                      lineHeight: 1,
+                      lineHeight: 1.2,
                       maxWidth: '100%',
                       maxHeight: '100%',
                       overflow: 'auto',
-                      textShadow: `0 0 10px ${theme.glow}`
+                      textShadow: `0 0 10px ${theme.glow}`,
+                      letterSpacing: '0.05em'
                     }}
                   >
                     {previewFrame}
@@ -1871,68 +1971,68 @@ const ASCIIVideoConverter: React.FC = () => {
                 </div>
               ) : (
                 <div className="flex items-center justify-center h-full p-8">
-                    <div className="text-center">
+                  <div className="text-center">
                     <Activity className="w-16 h-16 mx-auto mb-4 opacity-30" />
                     <p className="opacity-50">Upload media to see the ASCII preview</p>
-                    </div>
                   </div>
-                )}
-              </div>
-
-              {/* Loading State */}
-              {isLoading && (
-                <div className="absolute inset-0 bg-black/50 backdrop-blur-sm rounded-lg flex items-center justify-center">
-                  <motion.div
-                    animate={{ rotate: 360 }}
-                    transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
-                  >
-                    <RefreshCw className="w-8 h-8" style={{ color: theme.primary }} />
-                  </motion.div>
                 </div>
               )}
+            </div>
 
-              {/* Progress Bar */}
-              {isProcessing && (
+            {/* Loading State */}
+            {isLoading && (
+              <div className="absolute inset-0 bg-black/50 backdrop-blur-sm rounded-lg flex items-center justify-center">
+                <motion.div
+                  animate={{ rotate: 360 }}
+                  transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
+                >
+                  <RefreshCw className="w-8 h-8" style={{ color: theme.primary }} />
+                </motion.div>
+              </div>
+            )}
+
+            {/* Progress Bar */}
+            {isProcessing && (
               <div className="mt-4">
-                  <div className="flex justify-between text-sm mb-2">
+                <div className="flex justify-between text-sm mb-2">
                   <span>Processing... {metrics.processedFrames} / {metrics.totalFrames}</span>
-                    <span>{metrics.progress.toFixed(1)}%</span>
-                  </div>
+                  <span>{metrics.progress.toFixed(1)}%</span>
+                </div>
                 <div className="w-full h-2 bg-white/10 rounded-full overflow-hidden">
-                    <motion.div
-                      className="h-full rounded-full"
-                      style={{
+                  <motion.div
+                    className="h-full rounded-full"
+                    style={{
                       background: `linear-gradient(90deg, ${theme.primary}, ${theme.secondary})`,
                       width: `${metrics.progress}%`
-                      }}
-                      initial={{ width: 0 }}
-                      animate={{ width: `${metrics.progress}%` }}
-                    />
-                  </div>
+                    }}
+                    initial={{ width: 0 }}
+                    animate={{ width: `${metrics.progress}%` }}
+                  />
                 </div>
-              )}
+              </div>
+            )}
 
             {/* Action Buttons */}
             <div className="mt-6 flex gap-4">
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => {
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => {
                   if (isImage) {
                     processFile(file!);
                   } else {
-                      processVideo();
-                    }
-                  }}
+                    processVideo();
+                  }
+                }}
                 disabled={!videoLoaded || isProcessing || isLoading}
                 className="flex-1 px-6 py-3 rounded-lg font-bold flex items-center justify-center gap-2 border transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                  style={{
+                style={{
                   borderColor: theme.primary,
                   color: theme.primary,
                   background: theme.primary + '22',
                   boxShadow: !videoLoaded || isProcessing || isLoading ? 'none' : `0 0 20px ${theme.glow}44`
-                  }}
-                >
+                }}
+              >
                 {isProcessing ? (
                   <>
                     <RefreshCw className="w-5 h-5 animate-spin" />
@@ -1940,48 +2040,48 @@ const ASCIIVideoConverter: React.FC = () => {
                   </>
                 ) : (
                   <>
-                <Sparkles className="w-5 h-5" />
-                {isImage ? 'Process Image' : 'Process Video'}
+                    <Sparkles className="w-5 h-5" />
+                    {isImage ? 'Process Image' : 'Process Video'}
                   </>
                 )}
-                </motion.button>
+              </motion.button>
 
               {orderedFrames.length > 1 && (
-                  <>
-                    <motion.button
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
-                      onClick={() => setIsPlaying(!isPlaying)}
-                      className="px-6 py-3 rounded-lg font-bold flex items-center gap-2 border transition-all"
-                      style={{
-                        borderColor: theme.primary,
-                        color: theme.primary,
-                        background: theme.primary + '22'
-                      }}
-                    >
-                      {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
-                      {isPlaying ? 'Stop' : 'Play'}
-                    </motion.button>
+                <>
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => setIsPlaying(!isPlaying)}
+                    className="px-6 py-3 rounded-lg font-bold flex items-center gap-2 border transition-all"
+                    style={{
+                      borderColor: theme.primary,
+                      color: theme.primary,
+                      background: theme.primary + '22'
+                    }}
+                  >
+                    {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
+                    {isPlaying ? 'Stop' : 'Play'}
+                  </motion.button>
 
-                    <motion.button
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
-                      onClick={handleExport}
-                      className="px-6 py-3 rounded-lg font-bold flex items-center gap-2 border transition-all"
-                      style={{
-                        borderColor: theme.primary,
-                        color: theme.primary,
-                        background: theme.primary + '22'
-                      }}
-                    >
-                      <Download className="w-5 h-5" />
-                      Export
-                    </motion.button>
-                  </>
-                )}
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={handleExport}
+                    className="px-6 py-3 rounded-lg font-bold flex items-center gap-2 border transition-all"
+                    style={{
+                      borderColor: theme.primary,
+                      color: theme.primary,
+                      background: theme.primary + '22'
+                    }}
+                  >
+                    <Download className="w-5 h-5" />
+                    Export
+                  </motion.button>
+                </>
+              )}
             </div>
 
-                          {/* Stats */}
+            {/* Stats */}
             {metrics.processedFrames > 0 && (
               <div className="grid grid-cols-4 gap-4 mt-6">
                 {[

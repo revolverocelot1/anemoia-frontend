@@ -1,19 +1,118 @@
 import { useState, useRef, Suspense, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Canvas, useLoader, useFrame, useThree } from '@react-three/fiber';
-import { OrbitControls, Environment, Html, useProgress, Center, Bounds, Line, PivotControls } from '@react-three/drei';
+import { OrbitControls, Environment, Html, useProgress, Center, Bounds, Line, PivotControls, Grid, TransformControls, PerspectiveCamera } from '@react-three/drei';
 import * as SPLAT from 'gsplat';
 import * as THREE from 'three';
 import { PLYLoader } from 'three/examples/jsm/loaders/PLYLoader.js';
 
 import { loadTSF } from '../viewers/triangle/loader';
-import { createTriangleMaterial } from '../viewers/triangle/material';
+import { createTriangleSplattingMaterial, TriangleSplattingMaterialOptions } from '../viewers/triangle/triangleSplattingMaterial';
+import { loadOFF, OFFGeometry, OFFStats } from '../viewers/triangle/offLoader';
 import { ViewerSettingsProvider, useViewerSettings, QualitySetting } from '../viewers/ViewerSettingsContext';
 import SplatViewerControls from '../components/SplatViewerControls';
 import CardGlass from '../components/CardGlass';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import HolographicStats from '../components/HolographicStats';
+import EnhancedButton from '../components/EnhancedButton';
+import NavigationBreadcrumb from '../components/NavigationBreadcrumb';
+
+// Add viewer type
+type ViewerType = 'gaussian' | 'triangle';
+
+// Enhanced Camera Control Component with Keyboard Support
+const EnhancedCameraControls = () => {
+  const { camera, gl } = useThree();
+  const [moveSpeed, setMoveSpeed] = useState(0.5);
+  const [rotateSpeed, setRotateSpeed] = useState(0.02);
+  const [isShiftPressed, setIsShiftPressed] = useState(false);
+  const [isControlPressed, setIsControlPressed] = useState(false);
+  const [activeKeys, setActiveKeys] = useState(new Set<string>());
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      setActiveKeys(prev => new Set(prev).add(e.key.toLowerCase()));
+      if (e.key === 'Shift') setIsShiftPressed(true);
+      if (e.key === 'Control') setIsControlPressed(true);
+      
+      // Prevent default for camera control keys
+      const cameraKeys = ['w', 'a', 's', 'd', 'q', 'e', 'r', 'f', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'];
+      if (cameraKeys.includes(e.key.toLowerCase())) {
+        e.preventDefault();
+      }
+    };
+
+    const handleKeyUp = (e: KeyboardEvent) => {
+      setActiveKeys(prev => {
+        const newKeys = new Set(prev);
+        newKeys.delete(e.key.toLowerCase());
+        return newKeys;
+      });
+      if (e.key === 'Shift') setIsShiftPressed(false);
+      if (e.key === 'Control') setIsControlPressed(false);
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+    };
+  }, []);
+
+  useFrame(() => {
+    const currentMoveSpeed = isShiftPressed ? moveSpeed * 2 : moveSpeed;
+    const currentRotateSpeed = isControlPressed ? rotateSpeed * 0.5 : rotateSpeed;
+    
+    // Movement controls (W, A, S, D, Q, E)
+    if (activeKeys.has('w')) camera.translateZ(-currentMoveSpeed);
+    if (activeKeys.has('s')) camera.translateZ(currentMoveSpeed);
+    if (activeKeys.has('a')) camera.translateX(-currentMoveSpeed);
+    if (activeKeys.has('d')) camera.translateX(currentMoveSpeed);
+    if (activeKeys.has('q')) camera.translateY(-currentMoveSpeed);
+    if (activeKeys.has('e')) camera.translateY(currentMoveSpeed);
+    
+    // Rotation controls (Arrow keys)
+    if (activeKeys.has('arrowleft')) camera.rotation.y += currentRotateSpeed;
+    if (activeKeys.has('arrowright')) camera.rotation.y -= currentRotateSpeed;
+    if (activeKeys.has('arrowup')) camera.rotation.x += currentRotateSpeed;
+    if (activeKeys.has('arrowdown')) camera.rotation.x -= currentRotateSpeed;
+    
+    // Reset camera (R key)
+    if (activeKeys.has('r')) {
+      camera.position.set(0, 0, 5);
+      camera.rotation.set(0, 0, 0);
+    }
+    
+    // Focus on origin (F key)
+    if (activeKeys.has('f')) {
+      camera.lookAt(0, 0, 0);
+    }
+  });
+
+  return (
+    <Html fullscreen>
+      <div className="absolute bottom-4 left-4 bg-gradient-to-br from-gray-900/95 to-black/95 p-4 rounded-xl backdrop-blur-xl border border-gray-700/50 shadow-2xl text-xs max-w-xs">
+        <h4 className="text-sm font-semibold text-gray-300 mb-2 flex items-center gap-2">
+          <span className="material-symbols-outlined text-base">keyboard</span>
+          Camera Controls
+        </h4>
+        <div className="grid grid-cols-2 gap-2 text-gray-400">
+          <div><kbd className="px-1 py-0.5 bg-gray-800 rounded">W/S</kbd> Forward/Back</div>
+          <div><kbd className="px-1 py-0.5 bg-gray-800 rounded">A/D</kbd> Left/Right</div>
+          <div><kbd className="px-1 py-0.5 bg-gray-800 rounded">Q/E</kbd> Down/Up</div>
+          <div><kbd className="px-1 py-0.5 bg-gray-800 rounded">↑↓←→</kbd> Rotate</div>
+          <div><kbd className="px-1 py-0.5 bg-gray-800 rounded">R</kbd> Reset</div>
+          <div><kbd className="px-1 py-0.5 bg-gray-800 rounded">F</kbd> Focus</div>
+          <div className="col-span-2"><kbd className="px-1 py-0.5 bg-gray-800 rounded">Shift</kbd> Speed boost</div>
+          <div className="col-span-2"><kbd className="px-1 py-0.5 bg-gray-800 rounded">Ctrl</kbd> Precise rotation</div>
+        </div>
+      </div>
+    </Html>
+  );
+};
 
 // --- Quality Mapping ---
 const qualityToResolution = (quality: QualitySetting, parent: HTMLElement) => {
@@ -35,18 +134,22 @@ const qualityToDPR = (quality: QualitySetting): [number, number] => {
   }
 }
 
-// --- Annotations System ---
+// --- Enhanced Annotations System ---
 interface Annotation {
   id: string;
   position: [number, number, number];
   text: string;
   color: string;
+  timestamp: string;
+  author?: string;
 }
 
-const AnnotationMarker = ({ annotation, onUpdate, onDelete }: { 
+const AnnotationMarker = ({ annotation, onUpdate, onDelete, isSelected, onSelect }: { 
   annotation: Annotation; 
   onUpdate: (id: string, position: [number, number, number]) => void;
   onDelete: (id: string) => void;
+  isSelected: boolean;
+  onSelect: (id: string) => void;
 }) => {
   const [hovered, setHovered] = useState(false);
   
@@ -54,43 +157,67 @@ const AnnotationMarker = ({ annotation, onUpdate, onDelete }: {
     <PivotControls
       anchor={[0, 0, 0]}
       onDrag={(worldMatrix) => {
-        // Extract position from the world matrix
         const position = new THREE.Vector3();
         position.setFromMatrixPosition(worldMatrix);
         onUpdate(annotation.id, [position.x, position.y, position.z]);
       }}
-      visible={hovered}
+      visible={isSelected}
       scale={0.5}
+      depthTest={false}
     >
       <group position={annotation.position}>
         <mesh
           onPointerOver={() => setHovered(true)}
           onPointerOut={() => setHovered(false)}
+          onClick={(e) => {
+            e.stopPropagation();
+            onSelect(annotation.id);
+          }}
         >
           <sphereGeometry args={[0.1, 16, 16]} />
-          <meshBasicMaterial color={annotation.color} />
+          <meshStandardMaterial 
+            color={annotation.color} 
+            emissive={annotation.color}
+            emissiveIntensity={hovered || isSelected ? 0.5 : 0.2}
+          />
         </mesh>
         <Html
           position={[0, 0.3, 0]}
           center
           style={{
-            background: 'rgba(0, 0, 0, 0.8)',
-            padding: '4px 8px',
-            borderRadius: '4px',
+            background: `linear-gradient(135deg, rgba(0, 0, 0, 0.9), rgba(0, 0, 0, 0.8))`,
+            padding: '8px 12px',
+            borderRadius: '8px',
             fontSize: '12px',
             whiteSpace: 'nowrap',
-            pointerEvents: hovered ? 'auto' : 'none'
+            pointerEvents: hovered || isSelected ? 'auto' : 'none',
+            border: `1px solid ${annotation.color}40`,
+            boxShadow: `0 4px 12px ${annotation.color}20`,
+            backdropFilter: 'blur(10px)',
+            minWidth: '150px'
           }}
         >
-          <div className="flex items-center gap-2">
-            <span>{annotation.text}</span>
-            {hovered && (
-              <button
-                onClick={() => onDelete(annotation.id)}
-                className="text-red-400 hover:text-red-300"
-              >
-                ×
-              </button>
+          <div className="flex flex-col gap-1">
+            <div className="flex items-center justify-between gap-4">
+              <span className="font-medium" style={{ color: annotation.color }}>{annotation.text}</span>
+              {(hovered || isSelected) && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDelete(annotation.id);
+                  }}
+                  className="text-red-400 hover:text-red-300 transition-colors"
+                  style={{ fontSize: '18px', lineHeight: '1' }}
+                >
+                  ×
+                </button>
+              )}
+            </div>
+            {(hovered || isSelected) && (
+              <>
+                <div className="text-xs text-gray-400">{annotation.timestamp}</div>
+                {annotation.author && <div className="text-xs text-gray-500">by {annotation.author}</div>}
+              </>
             )}
           </div>
         </Html>
@@ -99,22 +226,52 @@ const AnnotationMarker = ({ annotation, onUpdate, onDelete }: {
   );
 };
 
-// --- Measurement Tool ---
-const MeasurementTool = ({ points }: { 
+// --- Enhanced Measurement Tool ---
+const MeasurementTool = ({ points, onAddPoint, onClear }: { 
   points: THREE.Vector3[];
+  onAddPoint: (point: THREE.Vector3) => void;
+  onClear: () => void;
 }) => {
+  const { camera, scene } = useThree();
+  const [hoveredPoint, setHoveredPoint] = useState<THREE.Vector3 | null>(null);
+  
   const distance = points.length === 2 
-    ? points[0].distanceTo(points[1]).toFixed(2)
+    ? points[0].distanceTo(points[1]).toFixed(3)
     : null;
+  
+  const handlePointerMove = useCallback((e: any) => {
+    const raycaster = new THREE.Raycaster();
+    raycaster.setFromCamera(e.pointer, camera);
+    const intersects = raycaster.intersectObjects(scene.children, true);
     
+    if (intersects.length > 0) {
+      setHoveredPoint(intersects[0].point);
+    }
+  }, [camera, scene]);
+  
   return (
     <>
       {points.map((point, i) => (
-        <mesh key={i} position={point}>
-          <sphereGeometry args={[0.05, 16, 16]} />
-          <meshBasicMaterial color="#00ff00" />
-        </mesh>
+        <group key={i}>
+          <mesh position={point}>
+            <sphereGeometry args={[0.05, 16, 16]} />
+            <meshStandardMaterial color="#00ff00" emissive="#00ff00" emissiveIntensity={0.5} />
+          </mesh>
+          <Html position={point} center>
+            <div className="bg-black/80 text-green-400 px-2 py-1 rounded text-xs">
+              P{i + 1}
+            </div>
+          </Html>
+        </group>
       ))}
+      
+      {hoveredPoint && points.length < 2 && (
+        <mesh position={hoveredPoint}>
+          <sphereGeometry args={[0.03, 16, 16]} />
+          <meshBasicMaterial color="#00ff00" opacity={0.5} transparent />
+        </mesh>
+      )}
+      
       {points.length === 2 && (
         <>
           <Line
@@ -125,8 +282,19 @@ const MeasurementTool = ({ points }: {
             dashScale={5}
           />
           <Html position={points[0].clone().add(points[1]).multiplyScalar(0.5)} center>
-            <div className="bg-black/80 text-green-400 px-2 py-1 rounded text-sm">
-              {distance} units
+            <div className="bg-gradient-to-r from-green-900/90 to-green-800/90 text-green-400 px-3 py-2 rounded-lg text-sm font-medium backdrop-blur-sm border border-green-500/30">
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-base">straighten</span>
+                {distance} units
+              </div>
+              {points.length === 2 && (
+                <button
+                  onClick={onClear}
+                  className="text-xs text-green-300 hover:text-green-200 mt-1"
+                >
+                  Clear measurement
+                </button>
+              )}
             </div>
           </Html>
         </>
@@ -136,12 +304,14 @@ const MeasurementTool = ({ points }: {
 };
 
 // --- Camera Path Animation ---
-const CameraPathAnimation = ({ isPlaying, path }: { 
+const CameraPathAnimation = ({ isPlaying, path, onUpdatePath }: { 
   isPlaying: boolean; 
   path: THREE.Vector3[];
+  onUpdatePath: (path: THREE.Vector3[]) => void;
 }) => {
   const { camera } = useThree();
   const [progress, setProgress] = useState(0);
+  const [selectedKeyframe, setSelectedKeyframe] = useState<number | null>(null);
   
   useFrame((_, delta) => {
     if (!isPlaying || path.length < 2) return;
@@ -152,22 +322,44 @@ const CameraPathAnimation = ({ isPlaying, path }: {
       return next;
     });
     
-    // Interpolate camera position along path
     const curve = new THREE.CatmullRomCurve3(path);
     const point = curve.getPoint(progress);
     camera.position.lerp(point, 0.1);
-    
-    // Look at center
     camera.lookAt(0, 0, 0);
   });
   
   return (
     <>
       {path.map((point, i) => (
-        <mesh key={i} position={point}>
-          <boxGeometry args={[0.1, 0.1, 0.1]} />
-          <meshBasicMaterial color="#ff00ff" />
-        </mesh>
+        <group key={i}>
+          {selectedKeyframe === i && (
+            <TransformControls
+              object={new THREE.Object3D()}
+              position={point}
+              onObjectChange={(e: any) => {
+                const newPath = [...path];
+                newPath[i] = e?.target.object.position.clone();
+                onUpdatePath(newPath);
+              }}
+            />
+          )}
+          <mesh 
+            position={point}
+            onClick={() => setSelectedKeyframe(i)}
+          >
+            <boxGeometry args={[0.1, 0.1, 0.1]} />
+            <meshStandardMaterial 
+              color={selectedKeyframe === i ? "#ff00ff" : "#ff00ff"} 
+              emissive="#ff00ff"
+              emissiveIntensity={selectedKeyframe === i ? 0.8 : 0.3}
+            />
+          </mesh>
+          <Html position={point} center>
+            <div className="bg-purple-900/80 text-purple-300 px-2 py-1 rounded text-xs">
+              K{i + 1}
+            </div>
+          </Html>
+        </group>
       ))}
       {path.length > 1 && (
         <Line
@@ -188,14 +380,27 @@ const Loader = () => {
   return (
     <Html center>
       <div className="text-white text-center">
-        <div className="text-2xl font-bold">{Math.round(progress)}%</div>
-        <div className="text-sm">Loading...</div>
+        <motion.div
+          initial={{ scale: 0.8, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          className="bg-gradient-to-br from-blue-900/80 to-purple-900/80 p-8 rounded-2xl backdrop-blur-xl border border-blue-500/20"
+        >
+          <div className="w-16 h-16 mx-auto mb-4 relative">
+            <motion.div
+              animate={{ rotate: 360 }}
+              transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+              className="absolute inset-0 rounded-full border-4 border-blue-500 border-t-transparent"
+            />
+          </div>
+          <div className="text-3xl font-bold mb-2">{Math.round(progress)}%</div>
+          <div className="text-sm text-blue-300">Loading 3D Model...</div>
+        </motion.div>
       </div>
     </Html>
   );
 };
 
-// --- Renderer Components ---
+// --- Enhanced Renderer Components ---
 
 const GaussianSplatRenderer = ({ url }: { url: string}) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -263,34 +468,82 @@ const GaussianSplatRenderer = ({ url }: { url: string}) => {
 const TriangleSplatRenderer = ({ url, onStatsUpdate }: { url: string; onStatsUpdate: (stats: any) => void }) => {
   const meshRef = useRef<THREE.Mesh>(null);
   const { settings } = useViewerSettings();
+  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     let mounted = true;
-    loadTSF(url, (loaded, total) => {
+    
+    const loadFile = async () => {
+      try {
+        let geometry, stats;
+        
+        if (url.endsWith('.off')) {
+          const { loadOFF } = await import('../viewers/triangle/offLoader');
+          const result = await loadOFF(url, (loaded, total) => {
+            onStatsUpdate({ loadingProgress: total ? (loaded / total) * 100 : 0 });
+          });
+          geometry = result.geometry;
+          stats = result.stats;
+        } else {
+          const result = await loadTSF(url, (loaded, total) => {
       onStatsUpdate({ loadingProgress: total ? (loaded / total) * 100 : 0 });
-    }).then(({ geometry, stats }) => {
+          });
+          geometry = result.geometry;
+          stats = result.stats;
+        }
+        
       if (!mounted) return;
+        
       const geom = new THREE.BufferGeometry();
       geom.setAttribute('position', new THREE.BufferAttribute(geometry.vertices, 3));
-      geom.setAttribute('color', new THREE.BufferAttribute(geometry.colors, 3, true));
+        if (geometry.colors) {
+      const colorArray = new Float32Array(geometry.colors.length);
+      for (let i = 0; i < geometry.colors.length; i++) {
+        colorArray[i] = geometry.colors[i] / 255.0;
+      }
+      geom.setAttribute('color', new THREE.BufferAttribute(colorArray, 3));
+        }
       geom.setIndex(new THREE.BufferAttribute(geometry.indices, 1));
+        geom.computeVertexNormals();
+        geom.computeBoundingBox();
+        
       if (meshRef.current) {
         meshRef.current.geometry = geom;
+        setLoaded(true);
       }
-      onStatsUpdate({ ...stats });
-    }).catch(e => onStatsUpdate({ error: (e as Error).message }));
+      onStatsUpdate({ ...stats, loaded: true });
+      } catch (e) {
+        onStatsUpdate({ error: (e as Error).message });
+      }
+    };
+    
+    loadFile();
 
     return () => { mounted = false; };
   }, [url, onStatsUpdate]);
 
   useEffect(() => {
-    if (meshRef.current) {
-      meshRef.current.material = createTriangleMaterial(settings.exposure);
-      (meshRef.current.material as THREE.ShaderMaterial).wireframe = settings.wireframe;
+    if (meshRef.current && loaded) {
+      meshRef.current.material = createTriangleSplattingMaterial({
+        hasVertexColors: true,
+        wireframe: settings.wireframe,
+        exposure: settings.exposure
+      });
     }
-  }, [settings.exposure, settings.wireframe]);
+  }, [settings.exposure, settings.wireframe, loaded]);
 
-  return <mesh ref={meshRef} />;
+  return (
+    <>
+      <mesh ref={meshRef} />
+      {loaded && meshRef.current && (
+        <Bounds fit clip observe margin={1.2}>
+          <Center>
+            <primitive object={meshRef.current} />
+          </Center>
+        </Bounds>
+      )}
+    </>
+  );
 };
 
 
@@ -322,17 +575,23 @@ const UnifiedRenderer = ({ fileType, fileUrl, onStatsUpdate }: {
 }) => {
   const { settings } = useViewerSettings();
   const [annotations, setAnnotations] = useState<Annotation[]>([]);
+  const [selectedAnnotation, setSelectedAnnotation] = useState<string | null>(null);
   const [measurementMode, setMeasurementMode] = useState(false);
-  const [measurementPoints] = useState<THREE.Vector3[]>([]);
-  const [cameraPath] = useState<THREE.Vector3[]>([]);
+  const [measurementPoints, setMeasurementPoints] = useState<THREE.Vector3[]>([]);
+  const [cameraPath, setCameraPath] = useState<THREE.Vector3[]>([]);
   const [isPlayingPath, setIsPlayingPath] = useState(false);
+  const [showGrid, setShowGrid] = useState(true);
+  const [showAxes, setShowAxes] = useState(true);
+  const [cameraMode, setCameraMode] = useState<'orbit' | 'fly' | 'first-person'>('orbit');
   
   const handleAddAnnotation = (position: [number, number, number], text: string) => {
     const newAnnotation: Annotation = {
       id: Date.now().toString(),
       position,
       text,
-      color: '#00d4ff'
+      color: '#00d4ff',
+      timestamp: new Date().toLocaleString(),
+      author: 'Current User'
     };
     setAnnotations([...annotations, newAnnotation]);
   };
@@ -345,6 +604,31 @@ const UnifiedRenderer = ({ fileType, fileUrl, onStatsUpdate }: {
   
   const handleDeleteAnnotation = (id: string) => {
     setAnnotations(annotations.filter(ann => ann.id !== id));
+    if (selectedAnnotation === id) {
+      setSelectedAnnotation(null);
+    }
+  };
+  
+  const handleMeasurementClick = useCallback((e: any) => {
+    if (!measurementMode) return;
+    
+    const point = e.point;
+    if (measurementPoints.length < 2) {
+      setMeasurementPoints([...measurementPoints, point]);
+    }
+  }, [measurementMode, measurementPoints]);
+  
+  const handleClearMeasurement = () => {
+    setMeasurementPoints([]);
+  };
+  
+  const handleAddKeyframe = (camera: THREE.Camera) => {
+    setCameraPath([...cameraPath, camera.position.clone()]);
+  };
+  
+  const handleExportScene = () => {
+    // Export functionality would go here
+    console.log('Exporting scene with annotations:', annotations);
   };
   
   if (!fileUrl || !fileType) return null;
@@ -354,25 +638,96 @@ const UnifiedRenderer = ({ fileType, fileUrl, onStatsUpdate }: {
       <>
         <GaussianSplatRenderer url={fileUrl} />
         <HolographicStats />
-        {/* Annotation UI overlay */}
+        {/* Enhanced UI overlay */}
         <div className="absolute top-4 right-4 flex flex-col gap-2">
-          <button
-            onClick={() => {
-              const text = prompt('Enter annotation text:');
-              if (text) handleAddAnnotation([0, 0, 0], text);
-            }}
-            className="bg-blue-600/80 hover:bg-blue-500 px-3 py-2 rounded text-sm backdrop-blur"
+          <motion.div
+            initial={{ x: 100, opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            className="bg-gradient-to-br from-gray-900/90 to-black/90 p-4 rounded-xl backdrop-blur-xl border border-gray-700/50 shadow-2xl"
           >
-            Add Annotation
-          </button>
-          <button
-            onClick={() => setMeasurementMode(!measurementMode)}
-            className={`px-3 py-2 rounded text-sm backdrop-blur ${
-              measurementMode ? 'bg-green-600/80' : 'bg-gray-600/80'
-            }`}
-          >
-            {measurementMode ? 'Exit Measure' : 'Measure'}
-          </button>
+            <h3 className="text-sm font-medium text-gray-300 mb-3 flex items-center gap-2">
+              <span className="material-symbols-outlined text-base">tune</span>
+              Scene Tools
+            </h3>
+            
+            <div className="space-y-2">
+              <button
+                onClick={() => {
+                  const text = prompt('Enter annotation text:');
+                  if (text) handleAddAnnotation([0, 0, 0], text);
+                }}
+                className="w-full bg-gradient-to-r from-blue-600/80 to-blue-700/80 hover:from-blue-500 hover:to-blue-600 px-3 py-2 rounded-lg text-sm backdrop-blur flex items-center gap-2 transition-all"
+              >
+                <span className="material-symbols-outlined text-base">add_location</span>
+                Add Annotation
+              </button>
+              
+              <button
+                onClick={() => setMeasurementMode(!measurementMode)}
+                className={`w-full px-3 py-2 rounded-lg text-sm backdrop-blur flex items-center gap-2 transition-all ${
+                  measurementMode 
+                    ? 'bg-gradient-to-r from-green-600/80 to-green-700/80' 
+                    : 'bg-gradient-to-r from-gray-600/80 to-gray-700/80 hover:from-gray-500 hover:to-gray-600'
+                }`}
+              >
+                <span className="material-symbols-outlined text-base">straighten</span>
+                {measurementMode ? 'Exit Measure' : 'Measure Distance'}
+              </button>
+              
+              <button
+                onClick={() => alert('Camera path recording coming soon!')}
+                className="w-full bg-gradient-to-r from-purple-600/80 to-purple-700/80 hover:from-purple-500 hover:to-purple-600 px-3 py-2 rounded-lg text-sm backdrop-blur flex items-center gap-2 transition-all"
+              >
+                <span className="material-symbols-outlined text-base">videocam</span>
+                Record Path
+              </button>
+              
+              <button
+                onClick={handleExportScene}
+                className="w-full bg-gradient-to-r from-orange-600/80 to-orange-700/80 hover:from-orange-500 hover:to-orange-600 px-3 py-2 rounded-lg text-sm backdrop-blur flex items-center gap-2 transition-all"
+              >
+                <span className="material-symbols-outlined text-base">download</span>
+                Export Scene
+              </button>
+            </div>
+          </motion.div>
+          
+          {annotations.length > 0 && (
+            <motion.div
+              initial={{ x: 100, opacity: 0 }}
+              animate={{ x: 0, opacity: 1 }}
+              transition={{ delay: 0.1 }}
+              className="bg-gradient-to-br from-gray-900/90 to-black/90 p-4 rounded-xl backdrop-blur-xl border border-gray-700/50 shadow-2xl max-w-xs"
+            >
+              <h3 className="text-sm font-medium text-gray-300 mb-2">Annotations ({annotations.length})</h3>
+              <div className="space-y-1 max-h-40 overflow-y-auto">
+                {annotations.map(ann => (
+                  <div
+                    key={ann.id}
+                    onClick={() => setSelectedAnnotation(ann.id)}
+                    className={`p-2 rounded cursor-pointer text-xs transition-all ${
+                      selectedAnnotation === ann.id 
+                        ? 'bg-blue-900/50 border border-blue-500/50' 
+                        : 'bg-gray-800/50 hover:bg-gray-700/50'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span style={{ color: ann.color }}>{ann.text}</span>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteAnnotation(ann.id);
+                        }}
+                        className="text-red-400 hover:text-red-300"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </motion.div>
+          )}
         </div>
       </>
     );
@@ -384,12 +739,56 @@ const UnifiedRenderer = ({ fileType, fileUrl, onStatsUpdate }: {
         style={{ background: settings.backgroundColor }}
         camera={{ position: [0, 0, 5], fov: 60 }}
         shadows={settings.quality !== 'Low'}
-        gl={{ preserveDrawingBuffer: true, antialias: settings.quality !== 'Low' }}
+        gl={{ 
+          preserveDrawingBuffer: true, 
+          antialias: settings.quality !== 'Low',
+          alpha: true,
+          powerPreference: "high-performance"
+        }}
         dpr={qualityToDPR(settings.quality)}
+        onClick={handleMeasurementClick}
       >
         <Suspense fallback={<Loader />}>
           {fileType === 'triangle' && <TriangleSplatRenderer url={fileUrl} onStatsUpdate={onStatsUpdate} />}
           {fileType === 'mesh' && <MeshRenderer url={fileUrl} />}
+          
+          {/* Enhanced Lighting */}
+          <ambientLight intensity={0.6} />
+          <directionalLight 
+            position={[10, 20, 10]} 
+            intensity={1.2} 
+            castShadow={settings.quality !== 'Low'}
+            shadow-mapSize={[2048, 2048]}
+          />
+          <directionalLight 
+            position={[-10, 10, -10]} 
+            intensity={0.5} 
+            color="#8888ff"
+          />
+          <hemisphereLight 
+            color="#ffffff" 
+            groundColor="#444444" 
+            intensity={0.4} 
+          />
+          
+          {/* Grid and Axes */}
+          {showGrid && (
+            <Grid 
+              args={[100, 100]} 
+              cellSize={1} 
+              cellThickness={0.5} 
+              cellColor="#444444" 
+              sectionSize={10} 
+              sectionThickness={1} 
+              sectionColor="#666666" 
+              fadeDistance={100} 
+              fadeStrength={1} 
+              followCamera={false} 
+              infiniteGrid={false}
+            />
+          )}
+          
+          {showAxes && <axesHelper args={[50]} />}
           
           {/* Annotations */}
           {annotations.map(annotation => (
@@ -398,6 +797,8 @@ const UnifiedRenderer = ({ fileType, fileUrl, onStatsUpdate }: {
               annotation={annotation}
               onUpdate={handleUpdateAnnotation}
               onDelete={handleDeleteAnnotation}
+              isSelected={selectedAnnotation === annotation.id}
+              onSelect={setSelectedAnnotation}
             />
           ))}
           
@@ -405,87 +806,261 @@ const UnifiedRenderer = ({ fileType, fileUrl, onStatsUpdate }: {
           {measurementMode && (
             <MeasurementTool
               points={measurementPoints}
+              onAddPoint={(point) => {
+                if (measurementPoints.length < 2) {
+                  setMeasurementPoints([...measurementPoints, point]);
+                }
+              }}
+              onClear={handleClearMeasurement}
             />
           )}
           
           {/* Camera Path */}
-          <CameraPathAnimation isPlaying={isPlayingPath} path={cameraPath} />
+          <CameraPathAnimation 
+            isPlaying={isPlayingPath} 
+            path={cameraPath}
+            onUpdatePath={setCameraPath}
+          />
+          
+          {/* Camera Controls */}
+          {cameraMode === 'orbit' && <OrbitControls makeDefault enableDamping dampingFactor={0.05} />}
+          
+          {/* Enhanced Keyboard Controls */}
+          <EnhancedCameraControls />
         </Suspense>
-        <ambientLight intensity={0.8} />
-        <directionalLight position={[5, 10, 7.5]} intensity={1.5} castShadow={settings.quality !== 'Low'} />
-        <OrbitControls makeDefault />
-        <Environment preset="city" />
+        
+        {/* Environment */}
+        <Environment preset={settings.quality === 'High' ? 'city' : 'sunset'} />
       </Canvas>
+      
       <HolographicStats />
       
-      {/* Enhanced UI Controls */}
-      <div className="absolute top-4 right-4 flex flex-col gap-2">
-        <button
-          onClick={() => {
-            const text = prompt('Enter annotation text:');
-            if (text) handleAddAnnotation([0, 0, 0], text);
-          }}
-          className="bg-blue-600/80 hover:bg-blue-500 px-3 py-2 rounded text-sm backdrop-blur flex items-center gap-2"
+      {/* Enhanced Professional UI Controls */}
+      <div className="absolute top-4 right-4 flex flex-col gap-3">
+        <motion.div
+          initial={{ x: 100, opacity: 0 }}
+          animate={{ x: 0, opacity: 1 }}
+          className="bg-gradient-to-br from-gray-900/95 to-black/95 p-5 rounded-xl backdrop-blur-xl border border-gray-700/50 shadow-2xl min-w-[250px]"
         >
-          <span className="material-symbols-outlined text-base">add_location</span>
-          Add Note
-        </button>
-        <button
-          onClick={() => setMeasurementMode(!measurementMode)}
-          className={`px-3 py-2 rounded text-sm backdrop-blur flex items-center gap-2 ${
-            measurementMode ? 'bg-green-600/80' : 'bg-gray-600/80 hover:bg-gray-500/80'
-          }`}
-        >
-          <span className="material-symbols-outlined text-base">straighten</span>
-          {measurementMode ? 'Exit Measure' : 'Measure'}
-        </button>
-        <button
-          onClick={() => {
-            if (cameraPath.length < 10) {
-              // Camera path functionality temporarily disabled
-              alert('Camera path recording coming soon!');
-            }
-          }}
-          className="bg-purple-600/80 hover:bg-purple-500 px-3 py-2 rounded text-sm backdrop-blur flex items-center gap-2"
-        >
-          <span className="material-symbols-outlined text-base">add_a_photo</span>
-          Add Keyframe
-        </button>
-        {cameraPath.length > 1 && (
-          <button
-            onClick={() => setIsPlayingPath(!isPlayingPath)}
-            className="bg-pink-600/80 hover:bg-pink-500 px-3 py-2 rounded text-sm backdrop-blur flex items-center gap-2"
+          <h3 className="text-sm font-medium text-gray-300 mb-4 flex items-center gap-2">
+            <span className="material-symbols-outlined text-base">tune</span>
+            Professional Tools
+          </h3>
+          
+          <div className="space-y-3">
+            {/* View Controls */}
+            <div className="space-y-2">
+              <label className="text-xs text-gray-400 uppercase tracking-wider">View Options</label>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setShowGrid(!showGrid)}
+                  className={`flex-1 px-2 py-1 rounded text-xs transition-all ${
+                    showGrid 
+                      ? 'bg-blue-600/80 text-white' 
+                      : 'bg-gray-700/80 text-gray-400 hover:bg-gray-600/80'
+                  }`}
+                >
+                  Grid
+                </button>
+                <button
+                  onClick={() => setShowAxes(!showAxes)}
+                  className={`flex-1 px-2 py-1 rounded text-xs transition-all ${
+                    showAxes 
+                      ? 'bg-blue-600/80 text-white' 
+                      : 'bg-gray-700/80 text-gray-400 hover:bg-gray-600/80'
+                  }`}
+                >
+                  Axes
+                </button>
+              </div>
+            </div>
+            
+            {/* Annotation Tools */}
+            <EnhancedButton
+              onClick={() => {
+                const text = prompt('Enter annotation text:');
+                if (text) handleAddAnnotation([0, 0, 0], text);
+              }}
+              variant="primary"
+              size="sm"
+              fullWidth
+              icon={<span className="material-symbols-outlined text-base">add_location</span>}
+            >
+              Add Annotation
+            </EnhancedButton>
+            
+            {/* Measurement Tools */}
+            <EnhancedButton
+              onClick={() => {
+                setMeasurementMode(!measurementMode);
+                if (!measurementMode) {
+                  setMeasurementPoints([]);
+                }
+              }}
+              variant={measurementMode ? "success" : "secondary"}
+              size="sm"
+              fullWidth
+              icon={<span className="material-symbols-outlined text-base">straighten</span>}
+            >
+              {measurementMode ? 'Exit Measure Mode' : 'Measure Distance'}
+            </EnhancedButton>
+            
+            {/* Camera Tools */}
+            <div className="space-y-2">
+              <button
+                onClick={() => {
+                  // Camera keyframe functionality will be added
+                  alert('Add camera keyframe at current position');
+                }}
+                className="w-full bg-gradient-to-r from-purple-600/80 to-purple-700/80 hover:from-purple-500 hover:to-purple-600 px-3 py-2 rounded-lg text-sm backdrop-blur flex items-center gap-2 transition-all transform hover:scale-[1.02]"
+              >
+                <span className="material-symbols-outlined text-base">add_a_photo</span>
+                Add Camera Keyframe
+              </button>
+              
+              {cameraPath.length > 1 && (
+                <button
+                  onClick={() => setIsPlayingPath(!isPlayingPath)}
+                  className="w-full bg-gradient-to-r from-pink-600/80 to-pink-700/80 hover:from-pink-500 hover:to-pink-600 px-3 py-2 rounded-lg text-sm backdrop-blur flex items-center gap-2 transition-all transform hover:scale-[1.02]"
+                >
+                  <span className="material-symbols-outlined text-base">
+                    {isPlayingPath ? 'pause' : 'play_arrow'}
+                  </span>
+                  {isPlayingPath ? 'Pause' : 'Play'} Camera Path
+                </button>
+              )}
+            </div>
+            
+            {/* Export Tools */}
+            <div className="pt-2 border-t border-gray-700/50">
+              <button
+                onClick={handleExportScene}
+                className="w-full bg-gradient-to-r from-orange-600/80 to-orange-700/80 hover:from-orange-500 hover:to-orange-600 px-3 py-2 rounded-lg text-sm backdrop-blur flex items-center gap-2 transition-all transform hover:scale-[1.02]"
+              >
+                <span className="material-symbols-outlined text-base">download</span>
+                Export Scene Data
+              </button>
+            </div>
+          </div>
+        </motion.div>
+        
+        {/* Annotations List */}
+        {annotations.length > 0 && (
+          <motion.div
+            initial={{ x: 100, opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            transition={{ delay: 0.1 }}
+            className="bg-gradient-to-br from-gray-900/95 to-black/95 p-4 rounded-xl backdrop-blur-xl border border-gray-700/50 shadow-2xl min-w-[250px]"
           >
-            <span className="material-symbols-outlined text-base">
-              {isPlayingPath ? 'pause' : 'play_arrow'}
-            </span>
-            {isPlayingPath ? 'Pause' : 'Play'} Path
-          </button>
+            <h3 className="text-sm font-medium text-gray-300 mb-3 flex items-center justify-between">
+              <span className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-base">location_on</span>
+                Annotations ({annotations.length})
+              </span>
+              <button
+                onClick={() => {
+                  if (confirm('Clear all annotations?')) {
+                    setAnnotations([]);
+                    setSelectedAnnotation(null);
+                  }
+                }}
+                className="text-xs text-red-400 hover:text-red-300"
+              >
+                Clear all
+              </button>
+            </h3>
+            <div className="space-y-2 max-h-48 overflow-y-auto">
+              {annotations.map(ann => (
+                <motion.div
+                  key={ann.id}
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  onClick={() => setSelectedAnnotation(ann.id)}
+                  className={`p-2 rounded-lg cursor-pointer text-xs transition-all ${
+                    selectedAnnotation === ann.id 
+                      ? 'bg-gradient-to-r from-blue-900/50 to-blue-800/50 border border-blue-500/50' 
+                      : 'bg-gray-800/50 hover:bg-gray-700/50 border border-transparent'
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex-1">
+                      <div className="font-medium" style={{ color: ann.color }}>{ann.text}</div>
+                      <div className="text-gray-500 text-[10px] mt-1">{ann.timestamp}</div>
+                    </div>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteAnnotation(ann.id);
+                      }}
+                      className="text-red-400 hover:text-red-300 text-lg leading-none"
+                    >
+                      ×
+                    </button>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          </motion.div>
+        )}
+        
+        {/* Measurement Results */}
+        {measurementPoints.length > 0 && (
+          <motion.div
+            initial={{ x: 100, opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            transition={{ delay: 0.2 }}
+            className="bg-gradient-to-br from-green-900/95 to-green-800/95 p-4 rounded-xl backdrop-blur-xl border border-green-700/50 shadow-2xl min-w-[250px]"
+          >
+            <h3 className="text-sm font-medium text-green-300 mb-2 flex items-center gap-2">
+              <span className="material-symbols-outlined text-base">straighten</span>
+              Measurement
+            </h3>
+            <div className="text-xs text-green-200">
+              {measurementPoints.length === 1 ? (
+                <p>Click to add second point</p>
+              ) : (
+                <p>Distance: {measurementPoints[0].distanceTo(measurementPoints[1]).toFixed(3)} units</p>
+              )}
+            </div>
+          </motion.div>
         )}
       </div>
     </>
   );
 };
 
+// Enhanced Annotation System with improved UI
+const AnnotationSystem = ({ onAnnotationSelect, selectedId }: { 
+  onAnnotationSelect: (id: string | null) => void; 
+  selectedId: string | null;
+}) => {
+  return null; // Placeholder for now, annotations are handled in UnifiedRenderer
+};
 
-// --- Main Page Component ---
-
-const SplatViewerPage = () => {
+// Main Component
+const SplatViewerPage: React.FC = () => {
+  const [splatUrl, setSplatUrl] = useState<string | null>(null);
+  const [fileName, setFileName] = useState<string>('');
+  const [isDebugMode, setIsDebugMode] = useState(false);
+  const [viewerType, setViewerType] = useState<ViewerType>('gaussian');
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // Missing state declarations
+  const [fileType, setFileType] = useState<'gaussian' | 'triangle' | 'mesh' | null>(null);
   const [file, setFile] = useState<File | null>(null);
   const [fileUrl, setFileUrl] = useState<string | null>(null);
-  const [fileType, setFileType] = useState<'gaussian' | 'triangle' | 'mesh' | null>(null);
   const [stats, setStats] = useState<any>({});
   const [error, setError] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
-  const [lumaUrl, setLumaUrl] = useState('');
   const [showLumaInput, setShowLumaInput] = useState(false);
+  const [lumaUrl, setLumaUrl] = useState('');
 
   // Unified file handler
   const handleFiles = useCallback(async (files: FileList | File[]) => {
     if (files.length === 0) return;
     const fileToProcess = files[0];
 
-    if (fileUrl) URL.revokeObjectURL(fileUrl);
+    if (splatUrl) URL.revokeObjectURL(splatUrl);
     setError(null);
     setStats({});
 
@@ -502,15 +1077,17 @@ const SplatViewerPage = () => {
       determinedType = hasGaussianProperties ? 'gaussian' : 'mesh';
     } else if (fileToProcess.name.endsWith('.tsf')) {
       determinedType = 'triangle';
+    } else if (fileToProcess.name.endsWith('.off')) {
+      determinedType = 'triangle';
     } else {
-      setError('Unsupported file type. Please upload a .ply or .tsf file.');
+      setError('Unsupported file type. Please upload a .ply, .tsf, or .off file.');
       return;
     }
     
     setFileType(determinedType);
     setFile(fileToProcess);
     setFileUrl(URL.createObjectURL(fileToProcess));
-  }, [fileUrl]);
+  }, [splatUrl]);
 
   // Manual drag event handlers
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
@@ -546,6 +1123,7 @@ const SplatViewerPage = () => {
   return (
     <div className="relative flex min-h-screen flex-col bg-gray-950 text-white">
       <Header />
+      <NavigationBreadcrumb />
       <ViewerSettingsProvider>
         <main className="flex-1 flex flex-col items-center justify-center p-4 gap-4 relative">
           {/* Add Luma AI toggle button */}
@@ -564,7 +1142,7 @@ const SplatViewerPage = () => {
 
           <CardGlass className="w-full h-[70vh] flex-grow overflow-hidden flex items-center justify-center relative">
             <AnimatePresence mode="wait">
-          {!fileUrl ? (
+          {!splatUrl ? (
                 showLumaInput ? (
                   // Luma AI URL input
                   <motion.div
@@ -635,7 +1213,7 @@ const SplatViewerPage = () => {
                         id="splat-file-upload"
                         type="file"
                         className="hidden"
-                        accept=".ply,.tsf"
+                        accept=".ply,.tsf,.off"
                         onChange={(e) => handleFiles(e.target.files || [])}
                       />
                       <div className="space-y-4 flex flex-col items-center">

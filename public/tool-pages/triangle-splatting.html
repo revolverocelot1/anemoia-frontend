@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Triangle Splatting - Real-Time 3D Radiance Field Rendering</title>
+  
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
+    
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: 'Inter', -apple-system, sans-serif;
+      background: #000814;
+      color: #fff;
+      overflow-x: hidden;
+      position: relative;
+    }
+    
+    /* Animated background */
+    .bg-container {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 0;
+      overflow: hidden;
+    }
+    
+    /* Animated triangular mesh background */
+    .triangle-mesh {
+      position: absolute;
+      width: 150%;
+      height: 150%;
+      top: -25%;
+      left: -25%;
+      background: 
+        linear-gradient(60deg, transparent 40%, rgba(0, 212, 255, 0.03) 50%, transparent 60%),
+        linear-gradient(-60deg, transparent 40%, rgba(147, 51, 234, 0.03) 50%, transparent 60%);
+      background-size: 40px 69px;
+      animation: meshFloat 20s ease-in-out infinite;
+    }
+    
+    .triangle-mesh::before {
+      content: '';
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      background: 
+        repeating-conic-gradient(from 0deg at 50% 50%, 
+          transparent 0deg, 
+          rgba(0, 212, 255, 0.05) 120deg, 
+          transparent 240deg);
+      animation: meshRotate 60s linear infinite;
+    }
+    
+    @keyframes meshFloat {
+      0%, 100% { transform: translate(0, 0) scale(1); }
+      33% { transform: translate(-30px, -20px) scale(1.05); }
+      66% { transform: translate(20px, -30px) scale(0.95); }
+    }
+    
+    @keyframes meshRotate {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+    
+    /* Floating particles */
+    .particle {
+      position: absolute;
+      width: 3px;
+      height: 3px;
+      background: #00d4ff;
+      border-radius: 50%;
+      opacity: 0;
+      animation: particleFloat 10s infinite;
+      box-shadow: 0 0 10px #00d4ff;
+    }
+    
+    @keyframes particleFloat {
+      0% {
+        opacity: 0;
+        transform: translateY(100vh) translateX(0);
+      }
+      10% {
+        opacity: 1;
+      }
+      90% {
+        opacity: 1;
+      }
+      100% {
+        opacity: 0;
+        transform: translateY(-100vh) translateX(100px);
+      }
+    }
+    
+    /* Main content */
+    .container {
+      position: relative;
+      z-index: 1;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 2rem;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+    
+    .hero {
+      text-align: center;
+      margin-bottom: 4rem;
+    }
+    
+    h1 {
+      font-size: clamp(3rem, 8vw, 5rem);
+      font-weight: 700;
+      margin-bottom: 1rem;
+      background: linear-gradient(135deg, #00d4ff, #7c3aed, #00d4ff);
+      background-size: 200% 200%;
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      animation: gradientShift 4s ease infinite;
+    }
+    
+    @keyframes gradientShift {
+      0%, 100% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+    }
+    
+    .subtitle {
+      font-size: 1.5rem;
+      color: rgba(255, 255, 255, 0.8);
+      margin-bottom: 2rem;
+      font-weight: 300;
+    }
+    
+    .features {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 2rem;
+      margin-bottom: 3rem;
+    }
+    
+    .feature-card {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(0, 212, 255, 0.2);
+      border-radius: 1rem;
+      padding: 2rem;
+      backdrop-filter: blur(10px);
+      transition: all 0.3s ease;
+      position: relative;
+      overflow: hidden;
+    }
+    
+    .feature-card::before {
+      content: '';
+      position: absolute;
+      top: -2px;
+      left: -2px;
+      right: -2px;
+      bottom: -2px;
+      background: linear-gradient(45deg, #00d4ff, transparent, #7c3aed);
+      border-radius: 1rem;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+      z-index: -1;
+    }
+    
+    .feature-card:hover {
+      transform: translateY(-5px);
+      background: rgba(255, 255, 255, 0.05);
+    }
+    
+    .feature-card:hover::before {
+      opacity: 0.5;
+    }
+    
+    .feature-icon {
+      font-size: 3rem;
+      margin-bottom: 1rem;
+      display: block;
+    }
+    
+    .feature-title {
+      font-size: 1.5rem;
+      margin-bottom: 0.5rem;
+      color: #00d4ff;
+    }
+    
+    .cta-button {
+      display: inline-block;
+      padding: 1rem 3rem;
+      background: linear-gradient(135deg, #00d4ff, #7c3aed);
+      color: white;
+      text-decoration: none;
+      border-radius: 2rem;
+      font-weight: 600;
+      font-size: 1.1rem;
+      transition: all 0.3s ease;
+      box-shadow: 0 5px 20px rgba(0, 212, 255, 0.3);
+      position: relative;
+      overflow: hidden;
+    }
+    
+    .cta-button::before {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 0;
+      height: 0;
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 50%;
+      transform: translate(-50%, -50%);
+      transition: width 0.3s ease, height 0.3s ease;
+    }
+    
+    .cta-button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 30px rgba(0, 212, 255, 0.5);
+    }
+    
+    .cta-button:hover::before {
+      width: 300px;
+      height: 300px;
+    }
+    
+    /* 3D Triangle Animation */
+    .triangle-3d {
+      width: 200px;
+      height: 200px;
+      margin: 2rem auto;
+      perspective: 1000px;
+    }
+    
+    .triangle-inner {
+      width: 100%;
+      height: 100%;
+      position: relative;
+      transform-style: preserve-3d;
+      animation: rotate3d 10s linear infinite;
+    }
+    
+    .triangle-face {
+      position: absolute;
+      width: 0;
+      height: 0;
+      border-style: solid;
+      opacity: 0.8;
+    }
+    
+    .triangle-face:nth-child(1) {
+      border-left: 100px solid transparent;
+      border-right: 100px solid transparent;
+      border-bottom: 173px solid rgba(0, 212, 255, 0.6);
+      transform: rotateY(0deg) translateZ(50px);
+    }
+    
+    .triangle-face:nth-child(2) {
+      border-left: 100px solid transparent;
+      border-right: 100px solid transparent;
+      border-bottom: 173px solid rgba(124, 58, 237, 0.6);
+      transform: rotateY(120deg) translateZ(50px);
+    }
+    
+    .triangle-face:nth-child(3) {
+      border-left: 100px solid transparent;
+      border-right: 100px solid transparent;
+      border-bottom: 173px solid rgba(236, 72, 153, 0.6);
+      transform: rotateY(240deg) translateZ(50px);
+    }
+    
+    @keyframes rotate3d {
+      from { transform: rotateX(0deg) rotateY(0deg); }
+      to { transform: rotateX(360deg) rotateY(360deg); }
+    }
+    
+    /* Technical specs */
+    .specs {
+      background: rgba(255, 255, 255, 0.02);
+      border-radius: 1rem;
+      padding: 2rem;
+      margin: 3rem 0;
+      border: 1px solid rgba(0, 212, 255, 0.1);
+    }
+    
+    .specs h3 {
+      color: #00d4ff;
+      margin-bottom: 1rem;
+      font-size: 1.5rem;
+    }
+    
+    .spec-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1rem;
+      margin-top: 1rem;
+    }
+    
+    .spec-item {
+      background: rgba(0, 212, 255, 0.05);
+      padding: 1rem;
+      border-radius: 0.5rem;
+      border: 1px solid rgba(0, 212, 255, 0.2);
+    }
+    
+    .spec-label {
+      color: rgba(255, 255, 255, 0.6);
+      font-size: 0.9rem;
+    }
+    
+    .spec-value {
+      color: #00d4ff;
+      font-size: 1.2rem;
+      font-weight: 600;
+    }
+    
+    @media (max-width: 768px) {
+      .features {
+        grid-template-columns: 1fr;
+      }
+      
+      h1 {
+        font-size: 3rem;
+      }
+      
+      .subtitle {
+        font-size: 1.2rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="bg-container">
+    <div class="triangle-mesh"></div>
+    <!-- Floating particles -->
+    <script>
+      for (let i = 0; i < 30; i++) {
+        const particle = document.createElement('div');
+        particle.className = 'particle';
+        particle.style.left = Math.random() * 100 + '%';
+        particle.style.animationDelay = Math.random() * 10 + 's';
+        particle.style.animationDuration = (10 + Math.random() * 10) + 's';
+        document.querySelector('.bg-container').appendChild(particle);
+      }
+    </script>
+  </div>
+  
+  <div class="container">
+    <div class="hero">
+      <div class="triangle-3d">
+        <div class="triangle-inner">
+          <div class="triangle-face"></div>
+          <div class="triangle-face"></div>
+          <div class="triangle-face"></div>
+        </div>
+      </div>
+      
+      <h1>Triangle Splatting</h1>
+      <p class="subtitle">Real-Time Neural Radiance Field Rendering</p>
+    </div>
+    
+    <div class="features">
+      <div class="feature-card">
+        <span class="feature-icon">⚡</span>
+        <h3 class="feature-title">Lightning Fast</h3>
+        <p>GPU-accelerated WebGL rendering for smooth real-time visualization of complex 3D scenes</p>
+      </div>
+      
+      <div class="feature-card">
+        <span class="feature-icon">🔺</span>
+        <h3 class="feature-title">Triangle Primitives</h3>
+        <p>Advanced 3D representation using triangle meshes for accurate surface reconstruction</p>
+      </div>
+      
+      <div class="feature-card">
+        <span class="feature-icon">🎨</span>
+        <h3 class="feature-title">Vertex Colors</h3>
+        <p>Support for RGB vertex colors with custom shaders for photorealistic rendering</p>
+      </div>
+    </div>
+    
+    <div class="specs">
+      <h3>🔧 Technical Specifications</h3>
+      <div class="spec-grid">
+        <div class="spec-item">
+          <div class="spec-label">File Format</div>
+          <div class="spec-value">.OFF</div>
+        </div>
+        <div class="spec-item">
+          <div class="spec-label">Rendering</div>
+          <div class="spec-value">WebGL 2.0</div>
+        </div>
+        <div class="spec-item">
+          <div class="spec-label">Shaders</div>
+          <div class="spec-value">Custom GLSL</div>
+        </div>
+        <div class="spec-item">
+          <div class="spec-label">Framework</div>
+          <div class="spec-value">Three.js</div>
+        </div>
+      </div>
+    </div>
+    
+    <div style="text-align: center; margin-top: 3rem;">
+      <a href="/triangle-splatting" class="cta-button">
+        Launch Triangle Splatting Viewer
+      </a>
+    </div>
+    
+    <div style="text-align: center; margin-top: 2rem; color: rgba(255, 255, 255, 0.5);">
+      <p>Based on cutting-edge research in neural radiance field rendering</p>
+      <p style="margin-top: 0.5rem;">Supports .off files from Triangle Splatting models</p>
+    </div>
+  </div>
+</body>
+</html> 

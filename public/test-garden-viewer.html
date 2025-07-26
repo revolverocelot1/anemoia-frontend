@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Garden OFF Viewer Test</title>
+    <style>
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #0a0a0a;
+            color: #ffffff;
+            overflow: hidden;
+        }
+        #container {
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            background: linear-gradient(135deg, #000814 0%, #001d3d 100%);
+        }
+        #info {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(0, 20, 40, 0.9);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(0, 212, 255, 0.3);
+            padding: 15px;
+            border-radius: 10px;
+            font-size: 14px;
+            z-index: 100;
+            max-width: 400px;
+            box-shadow: 0 4px 20px rgba(0, 212, 255, 0.2);
+        }
+        #canvas {
+            flex: 1;
+        }
+        #controls {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            background: rgba(0, 20, 40, 0.9);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(0, 212, 255, 0.3);
+            padding: 15px;
+            border-radius: 10px;
+            z-index: 100;
+            box-shadow: 0 4px 20px rgba(0, 212, 255, 0.2);
+        }
+        button {
+            background: linear-gradient(135deg, #00d4ff, #0066cc);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            margin: 2px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+        button:hover {
+            background: linear-gradient(135deg, #00a8cc, #0052a3);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 10px rgba(0, 212, 255, 0.4);
+        }
+        button:active {
+            transform: translateY(0);
+        }
+        .error {
+            color: #ff4757;
+        }
+        .success {
+            color: #00d4ff;
+        }
+        h3 {
+            color: #00d4ff;
+            margin-bottom: 10px;
+        }
+        #stats {
+            color: #a0a0a0;
+            margin-top: 10px;
+        }
+        .controls-section {
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid rgba(0, 212, 255, 0.2);
+        }
+        .controls-section h4 {
+            color: #00d4ff;
+            margin-bottom: 5px;
+            font-size: 12px;
+        }
+        .controls-hint {
+            color: #888;
+            font-size: 11px;
+            line-height: 1.4;
+        }
+        input[type="range"] {
+            width: 100%;
+            margin: 5px 0;
+        }
+        input[type="color"] {
+            width: 50px;
+            height: 30px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        label {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin: 5px 0;
+            color: #a0a0a0;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <div id="info">
+            <h3>Garden OFF Viewer Test</h3>
+            <div id="status">Initializing...</div>
+            <div id="stats"></div>
+        </div>
+        <div id="controls">
+            <button onclick="loadGarden()">Load Garden.off</button>
+            <button onclick="toggleWireframe()">Toggle Wireframe</button>
+            <button onclick="resetCamera()">Reset Camera</button>
+            <button onclick="toggleAutoRotate()">Toggle Auto-Rotate</button>
+            
+            <div class="controls-section">
+                <h4>Rendering Settings</h4>
+                <label>
+                    Exposure: <span id="exposureValue">1.0</span>
+                    <input type="range" id="exposure" min="0.1" max="3" step="0.1" value="1" onchange="updateExposure(this.value)">
+                </label>
+                <label>
+                    Background:
+                    <input type="color" id="bgColor" value="#001428" onchange="updateBackground(this.value)">
+                </label>
+            </div>
+            
+            <div class="controls-section">
+                <h4>Controls</h4>
+                <div class="controls-hint">
+                    🖱️ Left: Rotate | Right: Pan | Scroll: Zoom<br>
+                    Double-click: Focus on point
+                </div>
+            </div>
+        </div>
+        <canvas id="canvas"></canvas>
+    </div>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.158.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.158.0/examples/jsm/"
+            }
+        }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { GUI } from 'three/addons/libs/lil-gui.module.min.js';
+
+        let scene, camera, renderer, controls;
+        let mesh, material;
+        let stats = { vertices: 0, faces: 0, loadTime: 0 };
+
+        // Initialize Three.js
+        function init() {
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x001428); // Dark blue
+            scene.fog = new THREE.Fog(0x001428, 50, 300);
+
+            camera = new THREE.PerspectiveCamera(
+                60,
+                window.innerWidth / window.innerHeight,
+                0.1,
+                1000
+            );
+            camera.position.set(50, 50, 50);
+
+            renderer = new THREE.WebGLRenderer({ 
+                canvas: document.getElementById('canvas'),
+                antialias: true,
+                alpha: true 
+            });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            renderer.toneMapping = THREE.ACESFilmicToneMapping;
+            renderer.toneMappingExposure = 1.0;
+
+            controls = new OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.screenSpacePanning = true;
+            controls.minDistance = 1;
+            controls.maxDistance = 500;
+            controls.maxPolarAngle = Math.PI;
+            controls.autoRotate = false;
+            controls.autoRotateSpeed = 2.0;
+
+            // Lights - More realistic lighting setup
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+            scene.add(ambientLight);
+
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            directionalLight.position.set(50, 100, 50);
+            directionalLight.castShadow = true;
+            directionalLight.shadow.camera.left = -100;
+            directionalLight.shadow.camera.right = 100;
+            directionalLight.shadow.camera.top = 100;
+            directionalLight.shadow.camera.bottom = -100;
+            directionalLight.shadow.mapSize.width = 2048;
+            directionalLight.shadow.mapSize.height = 2048;
+            scene.add(directionalLight);
+
+            const directionalLight2 = new THREE.DirectionalLight(0x4488ff, 0.3);
+            directionalLight2.position.set(-50, 50, -50);
+            scene.add(directionalLight2);
+
+            // Add hemisphere light for better ambient
+            const hemiLight = new THREE.HemisphereLight(0x87CEEB, 0x228B22, 0.3);
+            scene.add(hemiLight);
+
+            // Grid with better styling
+            const gridHelper = new THREE.GridHelper(200, 40, 0x00d4ff, 0x003366);
+            gridHelper.material.opacity = 0.2;
+            gridHelper.material.transparent = true;
+            scene.add(gridHelper);
+
+            updateStatus('Initialized. Click "Load Garden.off" to start.', 'success');
+            animate();
+        }
+
+        // Parse OFF file
+        async function parseOFF(text) {
+            const lines = text.trim().split('\n').filter(line => line.trim() && !line.startsWith('#'));
+            
+            const header = lines[0].trim();
+            if (header !== 'OFF' && header !== 'COFF') {
+                throw new Error(`Unsupported format: ${header}`);
+            }
+
+            const counts = lines[1].trim().split(/\s+/).map(Number);
+            const numVertices = counts[0];
+            const numFaces = counts[1];
+
+            updateStatus(`Parsing ${numVertices} vertices and ${numFaces} faces...`);
+
+            const vertices = [];
+            const colors = [];
+            const indices = [];
+            let hasVertexColors = false;
+            let hasFaceColors = false;
+
+            let lineIndex = 2;
+
+            // Parse vertices
+            for (let i = 0; i < numVertices; i++) {
+                if (i % 100000 === 0) {
+                    updateStatus(`Parsing vertices: ${i}/${numVertices}`);
+                }
+                
+                const parts = lines[lineIndex++].trim().split(/\s+/);
+                vertices.push(
+                    parseFloat(parts[0]),
+                    parseFloat(parts[1]),
+                    parseFloat(parts[2])
+                );
+
+                if (parts.length >= 6) {
+                    hasVertexColors = true;
+                    colors.push(
+                        parseFloat(parts[3]) / 255,
+                        parseFloat(parts[4]) / 255,
+                        parseFloat(parts[5]) / 255
+                    );
+                }
+            }
+
+            // Parse faces
+            const faceColors = [];
+            for (let i = 0; i < numFaces; i++) {
+                if (i % 100000 === 0) {
+                    updateStatus(`Parsing faces: ${i}/${numFaces}`);
+                }
+
+                const parts = lines[lineIndex++].trim().split(/\s+/);
+                const faceVertexCount = parseInt(parts[0]);
+
+                // Check for face colors
+                let faceColor = null;
+                if (parts.length > faceVertexCount + 3) {
+                    hasFaceColors = true;
+                    const r = parseInt(parts[faceVertexCount + 1]);
+                    const g = parseInt(parts[faceVertexCount + 2]);
+                    const b = parseInt(parts[faceVertexCount + 3]);
+                    faceColor = [r / 255, g / 255, b / 255];
+                }
+
+                // Triangulate
+                for (let j = 1; j < faceVertexCount - 1; j++) {
+                    indices.push(
+                        parseInt(parts[1]),
+                        parseInt(parts[j + 1]),
+                        parseInt(parts[j + 2])
+                    );
+                    if (faceColor) {
+                        faceColors.push(...faceColor);
+                    }
+                }
+            }
+
+            // If no vertex colors but have face colors, convert
+            if (!hasVertexColors && hasFaceColors) {
+                updateStatus('Converting face colors to vertex colors...');
+                const vertexColorAccum = new Float32Array(numVertices * 3);
+                const vertexCount = new Uint32Array(numVertices);
+
+                for (let i = 0; i < indices.length; i += 3) {
+                    const idx = Math.floor(i / 3);
+                    const v1 = indices[i];
+                    const v2 = indices[i + 1];
+                    const v3 = indices[i + 2];
+
+                    const r = faceColors[idx * 3];
+                    const g = faceColors[idx * 3 + 1];
+                    const b = faceColors[idx * 3 + 2];
+
+                    [v1, v2, v3].forEach(v => {
+                        vertexColorAccum[v * 3] += r;
+                        vertexColorAccum[v * 3 + 1] += g;
+                        vertexColorAccum[v * 3 + 2] += b;
+                        vertexCount[v]++;
+                    });
+                }
+
+                for (let i = 0; i < numVertices; i++) {
+                    if (vertexCount[i] > 0) {
+                        colors.push(
+                            vertexColorAccum[i * 3] / vertexCount[i],
+                            vertexColorAccum[i * 3 + 1] / vertexCount[i],
+                            vertexColorAccum[i * 3 + 2] / vertexCount[i]
+                        );
+                    } else {
+                        colors.push(0.5, 0.5, 0.5);
+                    }
+                }
+                hasVertexColors = true;
+            }
+
+            // Generate default colors if needed
+            if (!hasVertexColors) {
+                updateStatus('Generating default garden colors...');
+                for (let i = 0; i < numVertices; i++) {
+                    const y = vertices[i * 3 + 1];
+                    const height = (y + 10) / 20; // Normalize
+                    
+                    let r, g, b;
+                    if (height < 0.3) {
+                        // Ground - browns
+                        r = 0.4 + Math.random() * 0.2;
+                        g = 0.3 + Math.random() * 0.1;
+                        b = 0.2;
+                    } else if (height < 0.7) {
+                        // Vegetation - greens
+                        r = 0.2 + Math.random() * 0.3;
+                        g = 0.5 + Math.random() * 0.3;
+                        b = 0.2 + Math.random() * 0.2;
+                    } else {
+                        // Trees/flowers
+                        r = 0.3 + Math.random() * 0.4;
+                        g = 0.6 + Math.random() * 0.3;
+                        b = 0.3 + Math.random() * 0.3;
+                    }
+                    colors.push(r, g, b);
+                }
+            }
+
+            return {
+                vertices: new Float32Array(vertices),
+                colors: new Float32Array(colors),
+                indices: new Uint32Array(indices),
+                stats: { vertices: numVertices, faces: indices.length / 3 }
+            };
+        }
+
+        // Load garden.off
+        window.loadGarden = async function() {
+            try {
+                updateStatus('Loading garden.off...');
+                const startTime = Date.now();
+                
+                const response = await fetch('test-garden.off');
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                
+                const text = await response.text();
+                updateStatus('File loaded, parsing...');
+                
+                const geometry = await parseOFF(text);
+                
+                // Create mesh
+                if (mesh) {
+                    scene.remove(mesh);
+                    mesh.geometry.dispose();
+                }
+
+                const bufferGeometry = new THREE.BufferGeometry();
+                bufferGeometry.setAttribute('position', new THREE.BufferAttribute(geometry.vertices, 3));
+                bufferGeometry.setAttribute('color', new THREE.BufferAttribute(geometry.colors, 3));
+                bufferGeometry.setIndex(new THREE.BufferAttribute(geometry.indices, 1));
+                bufferGeometry.computeVertexNormals();
+                bufferGeometry.computeBoundingBox();
+
+                material = new THREE.MeshPhongMaterial({
+                    vertexColors: true,
+                    side: THREE.DoubleSide,
+                    flatShading: false,
+                    shininess: 30,
+                    specular: new THREE.Color(0x222222)
+                });
+
+                mesh = new THREE.Mesh(bufferGeometry, material);
+                scene.add(mesh);
+
+                // Center camera on mesh with better positioning
+                const box = bufferGeometry.boundingBox;
+                const center = box.getCenter(new THREE.Vector3());
+                const size = box.getSize(new THREE.Vector3());
+                const maxDim = Math.max(size.x, size.y, size.z);
+                
+                // Calculate optimal camera distance
+                const fov = camera.fov * (Math.PI / 180);
+                const cameraDistance = Math.abs(maxDim / 2 / Math.tan(fov / 2));
+                const finalDistance = cameraDistance * 1.5; // Add some padding
+                
+                camera.position.set(
+                    center.x + finalDistance * 0.5,
+                    center.y + finalDistance * 0.7,
+                    center.z + finalDistance
+                );
+                controls.target.copy(center);
+                controls.update();
+
+                const loadTime = Date.now() - startTime;
+                stats = { ...geometry.stats, loadTime };
+                
+                updateStats();
+                updateStatus('Garden loaded successfully!', 'success');
+            } catch (error) {
+                console.error('Error:', error);
+                updateStatus(`Error: ${error.message}`, 'error');
+            }
+        };
+
+        window.toggleWireframe = function() {
+            if (material) {
+                material.wireframe = !material.wireframe;
+            }
+        };
+
+        window.resetCamera = function() {
+            camera.position.set(50, 50, 50);
+            controls.target.set(0, 0, 0);
+            controls.update();
+        };
+
+        window.toggleAutoRotate = function() {
+            controls.autoRotate = !controls.autoRotate;
+        };
+
+        window.updateExposure = function(value) {
+            renderer.toneMappingExposure = parseFloat(value);
+            document.getElementById('exposureValue').textContent = value;
+        };
+
+        window.updateBackground = function(color) {
+            scene.background = new THREE.Color(color);
+            scene.fog.color = new THREE.Color(color);
+        };
+
+        function updateStatus(message, type = '') {
+            const statusEl = document.getElementById('status');
+            statusEl.textContent = message;
+            statusEl.className = type;
+        }
+
+        function updateStats() {
+            document.getElementById('stats').innerHTML = `
+                <strong>Statistics:</strong><br>
+                Vertices: ${stats.vertices.toLocaleString()}<br>
+                Faces: ${stats.faces.toLocaleString()}<br>
+                Load Time: ${stats.loadTime}ms
+            `;
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        init();
+    </script>
+</body>
+</html> 
