@@ -10,6 +10,7 @@ import PoseResultsPage from './pages/PoseResultsPage';
 import UpscalerPage from './pages/UpscalerPage';
 import UpscalerResultsPage from './pages/UpscalerResultsPage';
 import ObjectRemovalPage from './pages/ObjectRemovalPage';
+import VideoActionStudioPage from './pages/VideoActionStudioPage';
 import { AccountPage } from './pages/AccountPage';
 // We will create these pages next
 // import PosePage from './pages/PosePage';
@@ -30,6 +31,7 @@ function App() {
       <Route path="/upscaler" element={<UpscalerPage />} />
       <Route path="/upscaler/results" element={<UpscalerResultsPage />} />
       <Route path="/object-removal" element={<ObjectRemovalPage />} />
+      <Route path="/video-action-studio" element={<VideoActionStudioPage />} />
       {/* <Route path="/pose-estimation" element={<PosePage />} /> */}
     </Routes>
   );

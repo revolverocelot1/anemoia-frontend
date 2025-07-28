@@ -6,9 +6,10 @@ interface ToolCardProps {
   icon: string;
   accent?: string;
   path: string;
+  isBeta?: boolean;
 }
 
-const ToolCard = ({ title, description, icon, accent, path }: ToolCardProps) => {
+const ToolCard = ({ title, description, icon, accent, path, isBeta }: ToolCardProps) => {
   // Default accent color if none provided
   const accentColor = accent || 'accent-color-1';
 
@@ -31,7 +32,14 @@ const ToolCard = ({ title, description, icon, accent, path }: ToolCardProps) => 
 
         {/* Text content */}
         <div className="space-y-2">
-          <h3 className="text-xl font-bold text-[var(--text-primary)]">{title}</h3>
+          <div className="flex items-center gap-2">
+            <h3 className="text-xl font-bold text-[var(--text-primary)]">{title}</h3>
+            {isBeta && (
+              <span className="bg-gradient-to-r from-purple-500 to-pink-500 text-white text-xs px-2 py-1 rounded-full font-medium">
+                BETA
+              </span>
+            )}
+          </div>
           <p className="text-sm text-[var(--text-secondary)]">{description}</p>
         </div>
       </div>

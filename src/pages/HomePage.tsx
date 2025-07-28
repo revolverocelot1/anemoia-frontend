@@ -1,6 +1,7 @@
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import ToolCard from '../components/ToolCard';
+import VideoActionStudioPage from './VideoActionStudioPage';
 
 const HomePage = () => {
   return (
@@ -15,34 +16,42 @@ const HomePage = () => {
                 Unlock the power of AI to transform your images. Explore our tools and create something amazing.
               </p>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 w-full">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 w-full">
               <ToolCard
                 title="Depth Map"
                 description="Generate stunning 3D depth maps from any 2D image."
-                icon="layers"
+                icon="3d_rotation"
                 accent="1"
                 path="/depth-map"
               />
               <ToolCard
                 title="Pose Estimation"
                 description="Detect and visualize human body poses in your photos."
-                icon="accessibility_new"
+                icon="person_search"
                 accent="2"
                 path="/pose-estimation"
               />
               <ToolCard
                 title="AI Upscaler"
                 description="Enhance image resolution using Real-ESRGAN AI technology"
-                icon="auto_awesome"
+                icon="high_quality"
                 accent="3"
                 path="/upscaler"
               />
               <ToolCard
                 title="Object Removal"
                 description="Remove unwanted objects from images with professional AI technology"
-                icon="auto_fix_high"
+                icon="content_cut"
                 accent="4"
                 path="/object-removal"
+              />
+              <ToolCard
+                title="Video Action Studio"
+                description="Professional video editing with AI-powered subtitle embedding and burning."
+                icon="video_library"
+                accent="5"
+                path="/video-action-studio"
+                isBeta={true}
               />
             </div>
           </div>
