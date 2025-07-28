@@ -312,7 +312,7 @@ const HomePage = () => {
                   className="relative"
                 >
                   <ToolCard
-                    title="Video Caption Studio"
+                    title="Video Caption Studio (Beta)"
                     description="AI-powered subtitle generation and editing for videos. Create professional captions with automated transcription and timing."
                     icon="subtitles"
                     accent="7"

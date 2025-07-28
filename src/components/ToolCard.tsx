@@ -1,6 +1,13 @@
 import { motion, type Variants } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { BsLayers, BsPersonBoundingBox, BsArrowsAngleExpand, BsDice5, BsColumnsGap, BsTools } from 'react-icons/bs';
+import IconDepthMap from './icons/IconDepthMap';
+import IconPoseEstimation from './icons/IconPoseEstimation';
+import IconAIUpscaler from './icons/IconAIUpscaler';
+import IconSplatViewer from './icons/IconSplatViewer';
+import IconImageComparison from './icons/IconImageComparison';
+import IconVideoCaptionStudio from './icons/IconVideoCaptionStudio';
+import IconFaceSwap from './icons/IconFaceSwap';
 
 interface ToolCardProps {
   title: string;
@@ -12,11 +19,13 @@ interface ToolCardProps {
 }
 
 const iconMap: Record<string, React.ComponentType<any>> = {
-  layers: BsLayers,
-  accessibility_new: BsPersonBoundingBox,
-  zoom_in: BsArrowsAngleExpand,
-  compare_arrows: BsColumnsGap,
-  camera_invert: BsDice5,
+  layers: IconDepthMap,
+  accessibility_new: IconPoseEstimation,
+  zoom_in: IconAIUpscaler,
+  compare_arrows: IconImageComparison,
+  camera_invert: IconSplatViewer,
+  subtitles: IconVideoCaptionStudio,
+  face_retouching_natural: IconFaceSwap,
   misc: BsTools,
 };
 

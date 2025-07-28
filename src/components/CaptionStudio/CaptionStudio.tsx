@@ -42,7 +42,6 @@ import { optimizedVideoExportService } from '../../services/optimized-video-expo
 import { videoVerificationService } from '../../services/video-verification.service';
 import { subtitleVerificationService } from '../../services/subtitle-verification.service';
 import { createOffscreenSubtitleRenderer } from '../../services/offscreen-subtitle-renderer.service';
-import { TranscriptionLoadingOverlay } from '../TranscriptionLoadingOverlay';
 import VideoPlayer from './VideoPlayer';
 import SubtitleTimeline from './SubtitleTimeline';
 import SubtitleEditor from './SubtitleEditor';
@@ -93,6 +92,27 @@ const CaptionStudio: React.FC<CaptionStudioProps> = ({ className = '' }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const subtitleCanvasRef = useRef<HTMLCanvasElement>(null);
   const subtitleRendererRef = useRef<SubtitleRenderer | null>(null);
+
+  // Show popup notification on mount
+  useEffect(() => {
+    // Show notification about subtitle burning feature
+    const timer = setTimeout(() => {
+      setNotification({
+        type: 'info',
+        message: '⚠️ Beta Notice: Subtitle burning feature is currently in progress. Embedding subtitles works in a humorous way! 😊'
+      });
+    }, 500);
+
+    // Auto-hide notification after 8 seconds
+    const hideTimer = setTimeout(() => {
+      setNotification(null);
+    }, 8500);
+
+    return () => {
+      clearTimeout(timer);
+      clearTimeout(hideTimer);
+    };
+  }, []);
 
   // Initialize subtitle renderer with optimized settings
   useEffect(() => {
@@ -777,12 +797,7 @@ const CaptionStudio: React.FC<CaptionStudioProps> = ({ className = '' }) => {
         )}
       </AnimatePresence>
 
-      {/* Transcription Loading Overlay */}
-      <TranscriptionLoadingOverlay
-        isLoading={isTranscribing}
-        progress={transcriptionProgress}
-        message={transcriptionProgress > 0 ? 'Transcribing audio...' : 'Initializing transcription...'}
-      />
+      {/* Removed Transcription Loading Overlay */}
     </div>
   );
 };
