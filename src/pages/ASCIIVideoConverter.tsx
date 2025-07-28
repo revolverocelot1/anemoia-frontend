@@ -1333,7 +1333,7 @@ const ASCIIVideoConverter: React.FC = () => {
     }
   };
 
-  const generateTextFile = (frames: ProcessedFrame[]) => {
+  const generateTextFile = (frames: FrameData[]) => {
     if (frames.length === 0) return;
 
     const text = frames.map(f => f.ascii).join('\n\n' + '='.repeat(80) + '\n\n');

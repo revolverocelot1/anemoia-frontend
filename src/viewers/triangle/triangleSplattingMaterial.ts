@@ -273,6 +273,93 @@ export function createTriangleSplattingMaterial(
   });
 }
 
+export function createOptimizedTriangleSplattingMaterial(
+  options: TriangleSplattingMaterialOptions = {}
+): THREE.ShaderMaterial {
+  const {
+    hasVertexColors = true,
+    wireframe = false,
+    exposure = 1.0,
+  } = options;
+
+  // Simplified vertex shader for performance
+  const vertexShader = `
+    #ifdef USE_COLOR
+      varying vec3 vColor;
+    #endif
+    varying vec3 vNormal;
+    
+    void main() {
+      vNormal = normalize(normalMatrix * normal);
+      
+      #ifdef USE_COLOR
+        vColor = color;
+      #else
+        vColor = vec3(0.5, 0.5, 0.5);
+      #endif
+      
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }
+  `;
+
+  // Optimized fragment shader with basic lighting
+  const fragmentShader = `
+    #ifdef USE_COLOR
+      varying vec3 vColor;
+    #endif
+    varying vec3 vNormal;
+    
+    uniform float exposure;
+    uniform vec3 lightDirection;
+    uniform vec3 lightColor;
+    uniform vec3 ambientColor;
+    
+    void main() {
+      vec3 normal = normalize(vNormal);
+      
+      // Simple directional light
+      float NdotL = max(dot(normal, lightDirection), 0.0);
+      vec3 diffuse = lightColor * NdotL;
+      
+      // Basic ambient
+      vec3 ambient = ambientColor;
+      
+      // Combine lighting
+      vec3 lighting = ambient + diffuse;
+      
+      // Apply vertex color
+      #ifdef USE_COLOR
+        vec3 color = vColor * lighting * exposure;
+      #else
+        vec3 color = vec3(0.5) * lighting * exposure;
+      #endif
+      
+      // Simple tone mapping
+      color = color / (color + vec3(1.0));
+      
+      // Gamma correction
+      color = pow(color, vec3(1.0 / 2.2));
+      
+      gl_FragColor = vec4(color, 1.0);
+    }
+  `;
+
+  return new THREE.ShaderMaterial({
+    vertexShader,
+    fragmentShader,
+    uniforms: {
+      exposure: { value: exposure },
+      lightDirection: { value: new THREE.Vector3(0.3, 0.8, 0.5).normalize() },
+      lightColor: { value: new THREE.Color(1.0, 1.0, 1.0) },
+      ambientColor: { value: new THREE.Color(0.3, 0.3, 0.3) },
+    },
+    vertexColors: hasVertexColors,
+    wireframe: wireframe,
+    side: THREE.DoubleSide,
+    defines: hasVertexColors ? { USE_COLOR: true } : {}
+  });
+}
+
 export function createTriangleSplattingDepthMaterial(): THREE.ShaderMaterial {
   return new THREE.ShaderMaterial({
     vertexShader: `

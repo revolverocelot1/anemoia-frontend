@@ -1,0 +1,33 @@
+{
+    "image": {
+        "ssim_window_size": 11,
+        "pixel_diff_threshold": 8,
+        "annotation_color": [255, 0, 0],
+        "annotation_thickness": 2,
+        "min_contour_area": 80,
+        "cosine_similarity_threshold": 0.95
+    },
+    "ocr": {
+        "confidence_threshold": 65,
+        "language": "eng",
+        "psm_mode": 11,
+        "oem_mode": 3,
+        "preprocessing": true,
+        "text_similarity_threshold": 0.85
+    },
+    "logo": {
+        "match_threshold": 0.75,
+        "multi_scale": true,
+        "scale_range": [0.7, 1.5],
+        "scale_steps": 15,
+        "quality_threshold": 0.65,
+        "use_sift": true,
+        "hash_bits": 16
+    },
+    "report": {
+        "title": "VisualTestify Calypso - NASDAQ Trading Platform UI Comparison",
+        "theme": "dark",
+        "include_technical_details": true,
+        "highlight_threshold": 0.15
+    }
+} 

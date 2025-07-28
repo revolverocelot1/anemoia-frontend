@@ -1,4 +1,4 @@
-import { useState, useRef, Suspense, useCallback, useEffect } from 'react';
+import React, { useState, useRef, Suspense, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Canvas, useLoader, useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls, Environment, Html, useProgress, Center, Bounds, Line, PivotControls, Grid, TransformControls, PerspectiveCamera } from '@react-three/drei';
@@ -9,6 +9,7 @@ import { PLYLoader } from 'three/examples/jsm/loaders/PLYLoader.js';
 import { loadTSF } from '../viewers/triangle/loader';
 import { createTriangleSplattingMaterial, TriangleSplattingMaterialOptions } from '../viewers/triangle/triangleSplattingMaterial';
 import { loadOFF, OFFGeometry, OFFStats } from '../viewers/triangle/offLoader';
+import { PLYLoader as CustomPLYLoader } from '../viewers/triangle/plyLoader';
 import { ViewerSettingsProvider, useViewerSettings, QualitySetting } from '../viewers/ViewerSettingsContext';
 import SplatViewerControls from '../components/SplatViewerControls';
 import CardGlass from '../components/CardGlass';
@@ -17,29 +18,75 @@ import Footer from '../components/Footer';
 import HolographicStats from '../components/HolographicStats';
 import EnhancedButton from '../components/EnhancedButton';
 import NavigationBreadcrumb from '../components/NavigationBreadcrumb';
+import { useNavigate } from 'react-router-dom';
+import { Upload, Box, Play, Pause, Settings, Grid3X3, Maximize2, Info, Zap, Eye, ArrowRight } from 'lucide-react';
 
 // Add viewer type
 type ViewerType = 'gaussian' | 'triangle';
 
-// Enhanced Camera Control Component with Keyboard Support
-const EnhancedCameraControls = () => {
-  const { camera, gl } = useThree();
-  const [moveSpeed, setMoveSpeed] = useState(0.5);
-  const [rotateSpeed, setRotateSpeed] = useState(0.02);
+// Enhanced Professional Camera Control Component
+const EnhancedCameraControls = ({ orbitControlsRef }: { orbitControlsRef: React.RefObject<any> }) => {
+  const { camera, gl, scene } = useThree();
+  const [moveSpeed] = useState(0.5);
+  const [rotateSpeed] = useState(0.02);
   const [isShiftPressed, setIsShiftPressed] = useState(false);
   const [isControlPressed, setIsControlPressed] = useState(false);
+  const [isAltPressed, setIsAltPressed] = useState(false);
   const [activeKeys, setActiveKeys] = useState(new Set<string>());
+  const [isPanning, setIsPanning] = useState(false);
+  const pivotPoint = useRef(new THREE.Vector3());
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      setActiveKeys(prev => new Set(prev).add(e.key.toLowerCase()));
+      const key = e.key.toLowerCase();
+      setActiveKeys(prev => new Set(prev).add(key));
+      
+      // Modifier keys
       if (e.key === 'Shift') setIsShiftPressed(true);
       if (e.key === 'Control') setIsControlPressed(true);
+      if (e.key === 'Alt') {
+        setIsAltPressed(true);
+        e.preventDefault();
+      }
       
       // Prevent default for camera control keys
-      const cameraKeys = ['w', 'a', 's', 'd', 'q', 'e', 'r', 'f', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'];
-      if (cameraKeys.includes(e.key.toLowerCase())) {
+      const cameraKeys = ['w', 'a', 's', 'd', 'q', 'e', 'r', 'f', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright', 'z', 'x', 'c', ' '];
+      if (cameraKeys.includes(key) || key === ' ') {
         e.preventDefault();
+      }
+
+      // Frame selected (F key) - Focus on scene center
+      if (key === 'f' && !e.repeat) {
+        if (orbitControlsRef.current) {
+          orbitControlsRef.current.target.set(0, 0, 0);
+          camera.position.set(5, 5, 5);
+          camera.lookAt(0, 0, 0);
+        }
+      }
+
+      // Numpad quick views (like Blender)
+      switch(e.key) {
+        case '1':
+          if (e.location === 3) { // Numpad
+            camera.position.set(0, 0, 10);
+            camera.lookAt(0, 0, 0);
+            if (orbitControlsRef.current) orbitControlsRef.current.target.set(0, 0, 0);
+          }
+          break;
+        case '3':
+          if (e.location === 3) {
+            camera.position.set(10, 0, 0);
+            camera.lookAt(0, 0, 0);
+            if (orbitControlsRef.current) orbitControlsRef.current.target.set(0, 0, 0);
+          }
+          break;
+        case '7':
+          if (e.location === 3) {
+            camera.position.set(0, 10, 0);
+            camera.lookAt(0, 0, 0);
+            if (orbitControlsRef.current) orbitControlsRef.current.target.set(0, 0, 0);
+          }
+          break;
       }
     };
 
@@ -51,63 +98,189 @@ const EnhancedCameraControls = () => {
       });
       if (e.key === 'Shift') setIsShiftPressed(false);
       if (e.key === 'Control') setIsControlPressed(false);
+      if (e.key === 'Alt') setIsAltPressed(false);
+    };
+
+    // Mouse wheel for zoom (with modifiers)
+    const handleWheel = (e: WheelEvent) => {
+      if (isControlPressed || isShiftPressed) {
+        e.preventDefault();
+      }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('keyup', handleKeyUp);
+    gl.domElement.addEventListener('wheel', handleWheel, { passive: false });
 
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
+      gl.domElement.removeEventListener('wheel', handleWheel);
     };
-  }, []);
+  }, [camera, gl, isControlPressed, isShiftPressed, orbitControlsRef]);
 
-  useFrame(() => {
-    const currentMoveSpeed = isShiftPressed ? moveSpeed * 2 : moveSpeed;
-    const currentRotateSpeed = isControlPressed ? rotateSpeed * 0.5 : rotateSpeed;
+  useFrame((_, delta) => {
+    const currentMoveSpeed = isShiftPressed ? moveSpeed * 3 : isControlPressed ? moveSpeed * 0.3 : moveSpeed;
+    const currentRotateSpeed = isControlPressed ? rotateSpeed * 0.3 : isShiftPressed ? rotateSpeed * 2 : rotateSpeed;
     
-    // Movement controls (W, A, S, D, Q, E)
-    if (activeKeys.has('w')) camera.translateZ(-currentMoveSpeed);
-    if (activeKeys.has('s')) camera.translateZ(currentMoveSpeed);
-    if (activeKeys.has('a')) camera.translateX(-currentMoveSpeed);
-    if (activeKeys.has('d')) camera.translateX(currentMoveSpeed);
-    if (activeKeys.has('q')) camera.translateY(-currentMoveSpeed);
-    if (activeKeys.has('e')) camera.translateY(currentMoveSpeed);
+    // Get camera's forward and right vectors
+    const forward = new THREE.Vector3();
+    const right = new THREE.Vector3();
+    const up = new THREE.Vector3(0, 1, 0);
     
-    // Rotation controls (Arrow keys)
-    if (activeKeys.has('arrowleft')) camera.rotation.y += currentRotateSpeed;
-    if (activeKeys.has('arrowright')) camera.rotation.y -= currentRotateSpeed;
-    if (activeKeys.has('arrowup')) camera.rotation.x += currentRotateSpeed;
-    if (activeKeys.has('arrowdown')) camera.rotation.x -= currentRotateSpeed;
+    camera.getWorldDirection(forward);
+    right.crossVectors(forward, up).normalize();
     
-    // Reset camera (R key)
-    if (activeKeys.has('r')) {
-      camera.position.set(0, 0, 5);
-      camera.rotation.set(0, 0, 0);
+    // Professional 3D software-style movement
+    if (activeKeys.has('w')) {
+      if (isAltPressed) {
+        // Alt+W: Move forward along view direction
+        camera.position.addScaledVector(forward, currentMoveSpeed);
+      } else {
+        // W: Move forward on XZ plane
+        const moveDir = forward.clone();
+        moveDir.y = 0;
+        moveDir.normalize();
+        camera.position.addScaledVector(moveDir, currentMoveSpeed);
+      }
+    }
+    if (activeKeys.has('s')) {
+      if (isAltPressed) {
+        camera.position.addScaledVector(forward, -currentMoveSpeed);
+      } else {
+        const moveDir = forward.clone();
+        moveDir.y = 0;
+        moveDir.normalize();
+        camera.position.addScaledVector(moveDir, -currentMoveSpeed);
+      }
+    }
+    if (activeKeys.has('a')) {
+      camera.position.addScaledVector(right, -currentMoveSpeed);
+    }
+    if (activeKeys.has('d')) {
+      camera.position.addScaledVector(right, currentMoveSpeed);
+    }
+    if (activeKeys.has('q') || activeKeys.has('pagedown')) {
+      camera.position.y -= currentMoveSpeed;
+    }
+    if (activeKeys.has('e') || activeKeys.has('pageup')) {
+      camera.position.y += currentMoveSpeed;
     }
     
-    // Focus on origin (F key)
-    if (activeKeys.has('f')) {
+    // Professional rotation controls
+    if (orbitControlsRef.current) {
+      // Orbit around target
+      if (activeKeys.has('arrowleft')) {
+        orbitControlsRef.current.rotateLeft(currentRotateSpeed);
+      }
+      if (activeKeys.has('arrowright')) {
+        orbitControlsRef.current.rotateLeft(-currentRotateSpeed);
+      }
+      if (activeKeys.has('arrowup')) {
+        orbitControlsRef.current.rotateUp(currentRotateSpeed);
+      }
+      if (activeKeys.has('arrowdown')) {
+        orbitControlsRef.current.rotateUp(-currentRotateSpeed);
+      }
+    }
+    
+    // Reset camera (Home key or R)
+    if (activeKeys.has('home') || (activeKeys.has('r') && !isShiftPressed)) {
+      camera.position.set(5, 5, 5);
       camera.lookAt(0, 0, 0);
+      if (orbitControlsRef.current) {
+        orbitControlsRef.current.target.set(0, 0, 0);
+      }
+    }
+    
+    // Update orbit controls target when panning
+    if (orbitControlsRef.current && (activeKeys.has('a') || activeKeys.has('d') || activeKeys.has('w') || activeKeys.has('s'))) {
+      // Move the orbit target with the camera for consistent rotation
+      if (isShiftPressed) {
+        const moveVector = new THREE.Vector3();
+        if (activeKeys.has('a')) moveVector.addScaledVector(right, -currentMoveSpeed);
+        if (activeKeys.has('d')) moveVector.addScaledVector(right, currentMoveSpeed);
+        if (activeKeys.has('w')) {
+          const moveDir = forward.clone();
+          moveDir.y = 0;
+          moveDir.normalize();
+          moveVector.addScaledVector(moveDir, currentMoveSpeed);
+        }
+        if (activeKeys.has('s')) {
+          const moveDir = forward.clone();
+          moveDir.y = 0;
+          moveDir.normalize();
+          moveVector.addScaledVector(moveDir, -currentMoveSpeed);
+        }
+        orbitControlsRef.current.target.add(moveVector);
+      }
     }
   });
 
+  const [showControls, setShowControls] = React.useState(true);
+
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      setShowControls(false);
+    }, 8000); // Hide after 8 seconds
+
+    return () => clearTimeout(timer);
+  }, []);
+
   return (
     <Html fullscreen>
-      <div className="absolute bottom-4 left-4 bg-gradient-to-br from-gray-900/95 to-black/95 p-4 rounded-xl backdrop-blur-xl border border-gray-700/50 shadow-2xl text-xs max-w-xs">
+      <div 
+        className={`absolute bottom-4 left-4 bg-gradient-to-br from-gray-900/95 to-black/95 p-4 rounded-xl backdrop-blur-xl border border-gray-700/50 shadow-2xl text-xs max-w-xs transition-all duration-500 ${showControls ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'}`}
+        onMouseEnter={() => setShowControls(true)}
+      >
         <h4 className="text-sm font-semibold text-gray-300 mb-2 flex items-center gap-2">
           <span className="material-symbols-outlined text-base">keyboard</span>
-          Camera Controls
+          Professional 3D Controls
         </h4>
-        <div className="grid grid-cols-2 gap-2 text-gray-400">
-          <div><kbd className="px-1 py-0.5 bg-gray-800 rounded">W/S</kbd> Forward/Back</div>
-          <div><kbd className="px-1 py-0.5 bg-gray-800 rounded">A/D</kbd> Left/Right</div>
-          <div><kbd className="px-1 py-0.5 bg-gray-800 rounded">Q/E</kbd> Down/Up</div>
-          <div><kbd className="px-1 py-0.5 bg-gray-800 rounded">↑↓←→</kbd> Rotate</div>
-          <div><kbd className="px-1 py-0.5 bg-gray-800 rounded">R</kbd> Reset</div>
-          <div><kbd className="px-1 py-0.5 bg-gray-800 rounded">F</kbd> Focus</div>
-          <div className="col-span-2"><kbd className="px-1 py-0.5 bg-gray-800 rounded">Shift</kbd> Speed boost</div>
-          <div className="col-span-2"><kbd className="px-1 py-0.5 bg-gray-800 rounded">Ctrl</kbd> Precise rotation</div>
+        <div className="space-y-3">
+          {/* Movement */}
+          <div>
+            <h5 className="text-gray-400 font-medium mb-1">Movement</h5>
+            <div className="grid grid-cols-2 gap-1.5 text-gray-500">
+              <div><kbd className="px-1.5 py-0.5 bg-gray-800 rounded text-[10px] border border-gray-700">W/S</kbd> Move Forward/Back</div>
+              <div><kbd className="px-1.5 py-0.5 bg-gray-800 rounded text-[10px] border border-gray-700">A/D</kbd> Move Left/Right</div>
+              <div><kbd className="px-1.5 py-0.5 bg-gray-800 rounded text-[10px] border border-gray-700">Q/E</kbd> Move Down/Up</div>
+              <div><kbd className="px-1.5 py-0.5 bg-gray-800 rounded text-[10px] border border-gray-700">Shift</kbd> Fast + Pan target</div>
+            </div>
+          </div>
+          
+          {/* Rotation */}
+          <div>
+            <h5 className="text-gray-400 font-medium mb-1">Rotation</h5>
+            <div className="grid grid-cols-2 gap-1.5 text-gray-500">
+              <div><kbd className="px-1.5 py-0.5 bg-gray-800 rounded text-[10px] border border-gray-700">↑↓←→</kbd> Orbit camera</div>
+              <div><kbd className="px-1.5 py-0.5 bg-gray-800 rounded text-[10px] border border-gray-700">Mouse</kbd> Click + drag</div>
+              <div><kbd className="px-1.5 py-0.5 bg-gray-800 rounded text-[10px] border border-gray-700">Alt</kbd> + Drag to pan</div>
+              <div><kbd className="px-1.5 py-0.5 bg-gray-800 rounded text-[10px] border border-gray-700">Scroll</kbd> Zoom in/out</div>
+            </div>
+          </div>
+          
+          {/* Quick Views */}
+          <div>
+            <h5 className="text-gray-400 font-medium mb-1">Quick Views</h5>
+            <div className="grid grid-cols-2 gap-1.5 text-gray-500">
+              <div><kbd className="px-1.5 py-0.5 bg-gray-800 rounded text-[10px] border border-gray-700">Num1</kbd> Front view</div>
+              <div><kbd className="px-1.5 py-0.5 bg-gray-800 rounded text-[10px] border border-gray-700">Num3</kbd> Side view</div>
+              <div><kbd className="px-1.5 py-0.5 bg-gray-800 rounded text-[10px] border border-gray-700">Num7</kbd> Top view</div>
+              <div><kbd className="px-1.5 py-0.5 bg-gray-800 rounded text-[10px] border border-gray-700">F</kbd> Frame selected</div>
+            </div>
+          </div>
+          
+          {/* Other */}
+          <div>
+            <h5 className="text-gray-400 font-medium mb-1">Modifiers</h5>
+            <div className="space-y-1 text-gray-500">
+              <div><kbd className="px-1.5 py-0.5 bg-gray-800 rounded text-[10px] border border-gray-700">Shift</kbd> Fast movement / Pan with target</div>
+              <div><kbd className="px-1.5 py-0.5 bg-gray-800 rounded text-[10px] border border-gray-700">Ctrl</kbd> Slow/precise movement</div>
+              <div><kbd className="px-1.5 py-0.5 bg-gray-800 rounded text-[10px] border border-gray-700">R/Home</kbd> Reset camera</div>
+              <div><kbd className="px-1.5 py-0.5 bg-gray-800 rounded text-[10px] border border-gray-700">Space</kbd> Play/Pause animation</div>
+            </div>
+          </div>
         </div>
       </div>
     </Html>
@@ -524,13 +697,23 @@ const TriangleSplatRenderer = ({ url, onStatsUpdate }: { url: string; onStatsUpd
 
   useEffect(() => {
     if (meshRef.current && loaded) {
-      meshRef.current.material = createTriangleSplattingMaterial({
-        hasVertexColors: true,
-        wireframe: settings.wireframe,
-        exposure: settings.exposure
-      });
+      // Use optimized shader for better performance on Low/Medium quality
+      if (settings.quality === 'Low' || settings.quality === 'Medium') {
+        const { createOptimizedTriangleSplattingMaterial } = require('../viewers/triangle/triangleSplattingMaterial');
+        meshRef.current.material = createOptimizedTriangleSplattingMaterial({
+          hasVertexColors: true,
+          wireframe: settings.wireframe,
+          exposure: settings.exposure
+        });
+      } else {
+        meshRef.current.material = createTriangleSplattingMaterial({
+          hasVertexColors: true,
+          wireframe: settings.wireframe,
+          exposure: settings.exposure
+        });
+      }
     }
-  }, [settings.exposure, settings.wireframe, loaded]);
+  }, [settings.exposure, settings.wireframe, settings.quality, loaded]);
 
   return (
     <>
@@ -583,6 +766,7 @@ const UnifiedRenderer = ({ fileType, fileUrl, onStatsUpdate }: {
   const [showGrid, setShowGrid] = useState(true);
   const [showAxes, setShowAxes] = useState(true);
   const [cameraMode, setCameraMode] = useState<'orbit' | 'fly' | 'first-person'>('orbit');
+  const orbitControlsRef = useRef<any>(null);
   
   const handleAddAnnotation = (position: [number, number, number], text: string) => {
     const newAnnotation: Annotation = {
@@ -823,10 +1007,10 @@ const UnifiedRenderer = ({ fileType, fileUrl, onStatsUpdate }: {
           />
           
           {/* Camera Controls */}
-          {cameraMode === 'orbit' && <OrbitControls makeDefault enableDamping dampingFactor={0.05} />}
+          {cameraMode === 'orbit' && <OrbitControls ref={orbitControlsRef} makeDefault enableDamping dampingFactor={0.05} />}
           
           {/* Enhanced Keyboard Controls */}
-          <EnhancedCameraControls />
+          <EnhancedCameraControls orbitControlsRef={orbitControlsRef} />
         </Suspense>
         
         {/* Environment */}
@@ -1037,8 +1221,63 @@ const AnnotationSystem = ({ onAnnotationSelect, selectedId }: {
   return null; // Placeholder for now, annotations are handled in UnifiedRenderer
 };
 
+// Modern Toggle Component with Navigation
+const ViewerToggle = ({ viewerType, onChange }: { viewerType: ViewerType; onChange: (type: ViewerType) => void }) => {
+  const navigate = useNavigate();
+  
+  const handleViewerChange = (type: ViewerType) => {
+    onChange(type);
+    if (type === 'triangle') {
+      // Navigate to triangle splatting page
+      navigate('/triangle-splatting');
+    }
+  };
+  
+  return (
+    <div className="bg-gradient-to-r from-gray-900/90 to-black/90 p-1.5 rounded-2xl backdrop-blur-xl border border-gray-700/50 shadow-xl">
+      <div className="relative flex">
+        <motion.div
+          className="absolute inset-0 h-full w-1/2 bg-gradient-to-r from-cyan-600 to-blue-600 rounded-xl shadow-lg"
+          animate={{
+            x: viewerType === 'gaussian' ? 0 : '100%',
+          }}
+          transition={{ type: "spring", stiffness: 300, damping: 30 }}
+        />
+        <button
+          onClick={() => handleViewerChange('gaussian')}
+          className={`relative z-10 px-8 py-3 rounded-xl text-sm font-semibold transition-all duration-200 ${
+            viewerType === 'gaussian' 
+              ? 'text-white' 
+              : 'text-gray-400 hover:text-gray-200'
+          }`}
+        >
+          <div className="flex items-center gap-2">
+            <span className="material-symbols-outlined text-lg">blur_on</span>
+            <span>Gaussian Splatting</span>
+          </div>
+        </button>
+        <button
+          onClick={() => handleViewerChange('triangle')}
+          className={`relative z-10 px-8 py-3 rounded-xl text-sm font-semibold transition-all duration-200 ${
+            viewerType === 'triangle' 
+              ? 'text-white' 
+              : 'text-gray-400 hover:text-gray-200'
+          } flex items-center gap-2`}
+        >
+          <div className="flex items-center gap-2">
+            <span className="material-symbols-outlined text-lg">change_history</span>
+            <span>Triangle Splatting</span>
+            <ArrowRight size={16} className="ml-1" />
+          </div>
+        </button>
+      </div>
+    </div>
+  );
+};
+
 // Main Component
 const SplatViewerPage: React.FC = () => {
+  const navigate = useNavigate();
   const [splatUrl, setSplatUrl] = useState<string | null>(null);
   const [fileName, setFileName] = useState<string>('');
   const [isDebugMode, setIsDebugMode] = useState(false);
@@ -1052,8 +1291,6 @@ const SplatViewerPage: React.FC = () => {
   const [stats, setStats] = useState<any>({});
   const [error, setError] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
-  const [showLumaInput, setShowLumaInput] = useState(false);
-  const [lumaUrl, setLumaUrl] = useState('');
 
   // Unified file handler
   const handleFiles = useCallback(async (files: FileList | File[]) => {
@@ -1064,9 +1301,15 @@ const SplatViewerPage: React.FC = () => {
     setError(null);
     setStats({});
 
-    let determinedType: 'gaussian' | 'triangle' | 'mesh' | null = null;
-    if (fileToProcess.name.endsWith('.ply')) {
-      // Read the header to determine if it's gaussian or mesh
+    // Check file extension based on viewer type
+    const fileExt = fileToProcess.name.split('.').pop()?.toLowerCase();
+    
+    if (viewerType === 'gaussian') {
+      if (fileExt !== 'ply') {
+        setError('For Gaussian Splatting, please upload a .ply file');
+        return;
+      }
+      // Read the header to check if it's actually a gaussian splat
       const headerSlice = fileToProcess.slice(0, 1000);
       const headerText = await new Promise<string>((resolve) => {
         const reader = new FileReader();
@@ -1074,20 +1317,23 @@ const SplatViewerPage: React.FC = () => {
         reader.readAsText(headerSlice);
       });
       const hasGaussianProperties = headerText.includes('f_dc_0') && headerText.includes('opacity');
-      determinedType = hasGaussianProperties ? 'gaussian' : 'mesh';
-    } else if (fileToProcess.name.endsWith('.tsf')) {
-      determinedType = 'triangle';
-    } else if (fileToProcess.name.endsWith('.off')) {
-      determinedType = 'triangle';
-    } else {
-      setError('Unsupported file type. Please upload a .ply, .tsf, or .off file.');
-      return;
+      if (hasGaussianProperties) {
+        setFileType('gaussian');
+      } else {
+        // It's a regular PLY mesh, not a Gaussian splat
+        setFileType('mesh');
+      }
+    } else if (viewerType === 'triangle') {
+      if (!['tsf', 'off', 'ply'].includes(fileExt || '')) {
+        setError('For Triangle Splatting, please upload a .tsf, .off, or .ply file');
+        return;
+      }
+      setFileType('triangle');
     }
     
-    setFileType(determinedType);
     setFile(fileToProcess);
     setFileUrl(URL.createObjectURL(fileToProcess));
-  }, [splatUrl]);
+  }, [splatUrl, viewerType]);
 
   // Manual drag event handlers
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
@@ -1121,177 +1367,254 @@ const SplatViewerPage: React.FC = () => {
   }
 
   return (
-    <div className="relative flex min-h-screen flex-col bg-gray-950 text-white">
+    <div className="relative flex min-h-screen flex-col bg-gradient-to-br from-gray-900 via-black to-gray-900 text-white">
       <Header />
       <NavigationBreadcrumb />
       <ViewerSettingsProvider>
-        <main className="flex-1 flex flex-col items-center justify-center p-4 gap-4 relative">
-          {/* Add Luma AI toggle button */}
-          <div className="w-full max-w-4xl flex justify-between items-center mb-4">
-            <h1 className="text-2xl md:text-3xl font-bold text-white">3D Splat Viewer</h1>
-            <button
-              onClick={() => setShowLumaInput(!showLumaInput)}
-              className="px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg hover:from-purple-600 hover:to-pink-600 transition-all text-sm font-medium flex items-center gap-2"
-            >
-              <span className="material-symbols-outlined text-base">
-                {showLumaInput ? 'upload_file' : 'language'}
-              </span>
-              {showLumaInput ? 'Upload File' : 'Load from Luma'}
-            </button>
-          </div>
+        <main className="flex-1 flex flex-col p-6">
+          <div className="container mx-auto max-w-7xl">
+            {/* Modern header with viewer type toggle */}
+            <div className="mb-8 text-center">
+              <motion.h1 
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="text-4xl lg:text-5xl font-bold mb-4 bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-600 bg-clip-text text-transparent animate-gradient"
+              >
+                3D Splat Viewer
+              </motion.h1>
+              <motion.p 
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.1 }}
+                className="text-gray-400 text-lg max-w-3xl mx-auto mb-6"
+              >
+                Professional-grade 3D visualization for Gaussian and Triangle Splatting with advanced rendering tools
+              </motion.p>
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.2 }}
+                className="flex justify-center"
+              >
+                <ViewerToggle viewerType={viewerType} onChange={setViewerType} />
+              </motion.div>
+            </div>
 
-          <CardGlass className="w-full h-[70vh] flex-grow overflow-hidden flex items-center justify-center relative">
-            <AnimatePresence mode="wait">
-          {!splatUrl ? (
-                showLumaInput ? (
-                  // Luma AI URL input
-                  <motion.div
-                    key="luma-input"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    className="w-full max-w-md p-6"
-                  >
-              <div className="space-y-4">
-                      <div className="text-center mb-6">
-                        <span className="material-symbols-outlined text-6xl text-purple-400 mb-4 block">language</span>
-                        <h3 className="text-xl font-semibold text-white mb-2">Load from Luma AI</h3>
-                        <p className="text-gray-400 text-sm">
-                          Import your Luma AI captures directly
-                        </p>
-                      </div>
-                      <input
-                        type="text"
-                        placeholder="Enter Luma AI capture URL"
-                        value={lumaUrl}
-                        onChange={(e) => setLumaUrl(e.target.value)}
-                        className="w-full px-4 py-3 bg-[#0a0a0a] border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 transition-colors"
-                      />
-                      <button
-                        onClick={async () => {
-                          if (lumaUrl) {
-                            try {
-                              // Extract capture ID from Luma URL
-                              const captureId = lumaUrl.match(/capture\/([a-zA-Z0-9-]+)/)?.[1];
-                              if (captureId) {
-                                // Note: This is a placeholder - actual Luma API integration would require authentication
-                                alert('Luma AI integration coming soon! For now, please download the PLY file from Luma and upload it.');
-                                setShowLumaInput(false);
-                              } else {
-                                setError('Invalid Luma AI URL. Please use a valid capture URL.');
+            {/* Main viewer area */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: 0.3 }}
+            >
+              <CardGlass className="h-[75vh] overflow-hidden relative bg-gradient-to-br from-gray-900/50 to-black/50 border border-cyan-900/20">
+                <AnimatePresence mode="wait">
+                  {!fileUrl ? (
+                    // Enhanced file upload interface
+                    <motion.div
+                      key="dropzone"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      className="w-full h-full"
+                      onDragOver={handleDragOver}
+                      onDragLeave={handleDragLeave}
+                      onDrop={handleDrop}
+                    >
+                      <div className={`w-full h-full flex flex-col items-center justify-center text-center transition-all ${
+                        isDragging 
+                          ? 'bg-gradient-to-br from-cyan-900/20 to-blue-900/20 border-2 border-cyan-500 border-dashed rounded-lg' 
+                          : ''
+                      }`}>
+                        <input
+                          id="splat-file-upload"
+                          type="file"
+                          className="hidden"
+                          accept={viewerType === 'gaussian' ? '.ply' : '.tsf,.off,.ply'}
+                          onChange={(e) => handleFiles(e.target.files || [])}
+                        />
+                        <div className="space-y-6 flex flex-col items-center max-w-lg">
+                          <motion.div 
+                            animate={{ 
+                              y: isDragging ? -10 : [0, -10, 0],
+                              scale: isDragging ? 1.1 : 1
+                            }} 
+                            transition={{ 
+                              y: { duration: 2, repeat: Infinity },
+                              scale: { duration: 0.2 }
+                            }}
+                            className={`relative ${isDragging ? 'text-cyan-400' : 'text-blue-400'}`}
+                          >
+                            <Upload size={80} />
+                            {isDragging && (
+                              <motion.div
+                                initial={{ scale: 0 }}
+                                animate={{ scale: 1 }}
+                                className="absolute -top-2 -right-2 bg-cyan-500 rounded-full p-1"
+                              >
+                                <ArrowRight size={20} className="text-white" />
+                              </motion.div>
+                            )}
+                          </motion.div>
+                          
+                          <div>
+                            <h3 className="text-2xl font-semibold text-gray-200 mb-2">
+                              {isDragging 
+                                ? "Release to upload!" 
+                                : `Upload ${viewerType === 'gaussian' ? 'Gaussian Splat' : 'Triangle Splat'} File`
                               }
-                            } catch (error) {
-                              console.error('Error loading from Luma:', error);
-                              setError('Failed to load from Luma AI. Please check the URL and try again.');
-                            }
-                          }
-                        }}
-                        disabled={!lumaUrl}
-                        className="w-full px-4 py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg hover:from-purple-600 hover:to-pink-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-medium"
-                      >
-                        Load Splat
-                      </button>
-                      <p className="text-xs text-gray-500 text-center">
-                        Example: https://lumalabs.ai/capture/abc123...
-                      </p>
-                    </div>
-                  </motion.div>
-                ) : (
-                  // File upload interface
-                  <motion.div
-                    key="dropzone"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    className="w-full h-full"
-                    onDragOver={handleDragOver}
-                    onDragLeave={handleDragLeave}
-                    onDrop={handleDrop}
-                  >
-                    <div className={`w-full h-full flex flex-col items-center justify-center text-center border-2 border-dashed transition-all rounded-lg ${isDragging ? 'border-blue-400 bg-blue-900/20' : 'border-gray-600'}`}>
-                      <input
-                        id="splat-file-upload"
-                        type="file"
-                        className="hidden"
-                        accept=".ply,.tsf,.off"
-                        onChange={(e) => handleFiles(e.target.files || [])}
-                      />
-                      <div className="space-y-4 flex flex-col items-center">
-                        <motion.div animate={{ y: [0, -10, 0] }} transition={{ duration: 1.5, repeat: Infinity }}>
-                          <span className="material-symbols-outlined text-6xl text-blue-400">cloud_upload</span>
-                        </motion.div>
-                        <p className="text-xl text-gray-300">
-                          {isDragging ? "Release to upload!" : "Drag & drop a file"}
-                        </p>
-                        <div className="flex items-center w-full max-w-xs">
-                          <div className="flex-grow border-t border-gray-700"></div>
-                          <span className="flex-shrink mx-4 text-gray-500 text-sm">OR</span>
-                          <div className="flex-grow border-t border-gray-700"></div>
+                            </h3>
+                            <p className="text-gray-400">
+                              Drag & drop your {viewerType === 'gaussian' ? '.ply' : '.tsf, .off, or .ply'} file here
+                            </p>
+                          </div>
+                          
+                          <div className="flex items-center w-full">
+                            <div className="flex-grow border-t border-gray-700"></div>
+                            <span className="flex-shrink mx-4 text-gray-500 text-sm uppercase tracking-wider">or</span>
+                            <div className="flex-grow border-t border-gray-700"></div>
+                          </div>
+                          
+                          <motion.label 
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                            htmlFor="splat-file-upload" 
+                            className="bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-semibold py-4 px-10 rounded-xl transition-all cursor-pointer shadow-lg hover:shadow-xl flex items-center gap-3"
+                          >
+                            <Upload size={20} />
+                            Select from Computer
+                          </motion.label>
+                          
+                          {/* Supported formats */}
+                          <div className="text-xs text-gray-500 mt-4">
+                            <p>Supported formats: {viewerType === 'gaussian' 
+                              ? 'PLY (Gaussian Splat format with f_dc_0 and opacity properties)' 
+                              : 'TSF, OFF, PLY (Triangle mesh formats)'
+                            }</p>
+                          </div>
                         </div>
-                        <label htmlFor="splat-file-upload" className="bg-blue-600 text-white font-bold py-3 px-8 rounded-lg hover:bg-blue-500 transition-all focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-opacity-75 cursor-pointer">
-                          Select from Computer
-                        </label>
-              </div>
-            </div>
-                  </motion.div>
-                )
-              ) : (
-                <motion.div key="renderer" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="w-full h-full">
-                  <UnifiedRenderer fileType={fileType} fileUrl={fileUrl} onStatsUpdate={handleStatsUpdate} />
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </CardGlass>
-          
-        {file && (
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-              className="w-full max-w-4xl"
-          >
-              <CardGlass className="p-4">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-              <div>
-                <p className="text-gray-400">File</p>
-                <p className="font-bold truncate">{file.name}</p>
-              </div>
-              <div>
-                <p className="text-gray-400">Size</p>
-                <p className="font-bold">{formatBytes(file.size)}</p>
-              </div>
-              <div>
-                <p className="text-gray-400">Vertices</p>
-                <p className="font-bold">{stats.vertexCount?.toLocaleString() || 'N/A'}</p>
-              </div>
-              <div>
-                <p className="text-gray-400">Faces/Triangles</p>
-                <p className="font-bold">{stats.faceCount?.toLocaleString() || 'N/A'}</p>
-              </div>
-            </div>
-                {stats.loadingProgress > 0 && stats.loadingProgress < 100 && (
-              <div className="w-full bg-gray-700 rounded-full h-2 mt-2">
-                <motion.div
-                  className="bg-blue-500 h-2 rounded-full"
-                      animate={{ width: `${stats.loadingProgress}%` }}
-                />
-              </div>
-            )}
-              </CardGlass>
-          </motion.div>
-        )}
-        
-          {error && (
-            <motion.div initial={{opacity: 0}} animate={{opacity: 1}}>
-              <CardGlass className="p-4 border border-red-500/20 bg-red-500/10">
-                <div className="text-red-400 text-center">
-                  <span className="material-symbols-outlined text-2xl mb-2 block">error</span>
-                  {error}
-                </div>
+                      </div>
+                    </motion.div>
+                  ) : (
+                    <motion.div 
+                      key="renderer" 
+                      initial={{ opacity: 0 }} 
+                      animate={{ opacity: 1 }} 
+                      className="w-full h-full"
+                    >
+                      <UnifiedRenderer fileType={fileType} fileUrl={fileUrl} onStatsUpdate={handleStatsUpdate} />
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </CardGlass>
             </motion.div>
-          )}
+            
+            {/* File info and stats */}
+            {file && (
+              <motion.div 
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.4 }}
+                className="mt-6"
+              >
+                <CardGlass className="p-6 bg-gradient-to-br from-gray-900/90 to-gray-800/90 border border-cyan-900/30">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                    <div>
+                      <p className="text-gray-400 text-sm mb-1">File Name</p>
+                      <p className="font-semibold text-cyan-400 truncate">{file.name}</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-400 text-sm mb-1">File Size</p>
+                      <p className="font-semibold text-white">{formatBytes(file.size)}</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-400 text-sm mb-1">Vertices</p>
+                      <p className="font-semibold text-white">{stats.vertexCount?.toLocaleString() || 'Loading...'}</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-400 text-sm mb-1">{fileType === 'gaussian' ? 'Splats' : 'Triangles'}</p>
+                      <p className="font-semibold text-white">{stats.faceCount?.toLocaleString() || stats.splatCount?.toLocaleString() || 'Loading...'}</p>
+                    </div>
+                  </div>
+                  
+                  {stats.loadingProgress > 0 && stats.loadingProgress < 100 && (
+                    <div className="mt-4">
+                      <div className="flex justify-between text-xs text-gray-400 mb-1">
+                        <span>Loading Progress</span>
+                        <span>{Math.round(stats.loadingProgress)}%</span>
+                      </div>
+                      <div className="w-full bg-gray-700/50 rounded-full h-2 overflow-hidden">
+                        <motion.div
+                          className="bg-gradient-to-r from-cyan-500 to-blue-500 h-full rounded-full"
+                          animate={{ width: `${stats.loadingProgress}%` }}
+                          transition={{ duration: 0.3 }}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </CardGlass>
+              </motion.div>
+            )}
+            
+            {/* Error display */}
+            {error && (
+              <motion.div 
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="mt-4"
+              >
+                <CardGlass className="p-6 border border-red-500/30 bg-gradient-to-br from-red-900/20 to-red-800/20">
+                  <div className="flex items-center gap-3 text-red-400">
+                    <span className="material-symbols-outlined text-3xl">error</span>
+                    <div>
+                      <p className="font-semibold">Error Loading File</p>
+                      <p className="text-sm mt-1">{error}</p>
+                    </div>
+                  </div>
+                </CardGlass>
+              </motion.div>
+            )}
+            
+            {/* Feature cards */}
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.5 }}
+              className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4"
+            >
+              <CardGlass className="p-5 bg-gradient-to-br from-cyan-900/20 to-blue-900/20 border border-cyan-900/30">
+                <h4 className="text-cyan-400 font-semibold mb-2 flex items-center gap-2">
+                  <Zap size={18} />
+                  WebGL Accelerated
+                </h4>
+                <p className="text-sm text-gray-400">
+                  Hardware-accelerated rendering with custom shaders for optimal performance
+                </p>
+              </CardGlass>
+
+              <CardGlass className="p-5 bg-gradient-to-br from-purple-900/20 to-pink-900/20 border border-purple-900/30">
+                <h4 className="text-purple-400 font-semibold mb-2 flex items-center gap-2">
+                  <Eye size={18} />
+                  Professional Tools
+                </h4>
+                <p className="text-sm text-gray-400">
+                  Advanced measurement, annotation, and camera control tools for research
+                </p>
+              </CardGlass>
+
+              <CardGlass className="p-5 bg-gradient-to-br from-green-900/20 to-emerald-900/20 border border-green-900/30">
+                <h4 className="text-green-400 font-semibold mb-2 flex items-center gap-2">
+                  <Grid3X3 size={18} />
+                  Multiple Formats
+                </h4>
+                <p className="text-sm text-gray-400">
+                  Support for Gaussian Splats (PLY) and Triangle Splats (TSF, OFF, PLY)
+                </p>
+              </CardGlass>
+            </motion.div>
+          </div>
+          
           <SplatViewerControls />
-      </main>
+        </main>
       </ViewerSettingsProvider>
       <Footer />
     </div>

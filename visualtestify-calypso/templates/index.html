@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VisualTestify Calypso - Advanced Visual UI Comparison Tool</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #0a0a0a;
+        }
+        
+        .gradient-bg {
+            background: linear-gradient(135deg, #1e3a8a 0%, #312e81 50%, #581c87 100%);
+        }
+        
+        .glass-effect {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .hover-glow:hover {
+            box-shadow: 0 0 20px rgba(99, 102, 241, 0.5);
+            transform: translateY(-2px);
+            transition: all 0.3s ease;
+        }
+        
+        .animated-gradient {
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 25%, #f093fb 50%, #764ba2 75%, #667eea 100%);
+            background-size: 200% 100%;
+            animation: gradient 3s ease infinite;
+        }
+        
+        @keyframes gradient {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+        
+        .drop-zone {
+            border: 2px dashed rgba(99, 102, 241, 0.5);
+            transition: all 0.3s ease;
+        }
+        
+        .drop-zone.dragover {
+            border-color: #667eea;
+            background: rgba(99, 102, 241, 0.1);
+        }
+        
+        .loading-spinner {
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .result-card {
+            transform: translateY(20px);
+            opacity: 0;
+            animation: slideUp 0.5s ease forwards;
+        }
+        
+        @keyframes slideUp {
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 50;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.75);
+            animation: fadeIn 0.3s ease;
+        }
+
+        .modal.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .modal-content {
+            animation: slideInUp 0.3s ease;
+        }
+
+        @keyframes slideInUp {
+            from {
+                transform: translateY(100px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+    </style>
+</head>
+<body class="min-h-screen text-gray-100">
+    <!-- Header -->
+    <nav class="gradient-bg shadow-xl">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <div class="flex items-center space-x-3">
+                    <i class="fas fa-microscope text-2xl text-white"></i>
+                    <h1 class="text-2xl font-bold text-white">VisualTestify Calypso</h1>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <button onclick="showBatchHistory()" class="text-white hover:text-gray-200 transition-colors" title="Batch History">
+                        <i class="fas fa-history text-xl"></i>
+                    </button>
+                    <button onclick="showFilters()" class="text-white hover:text-gray-200 transition-colors" title="Advanced Filters">
+                        <i class="fas fa-filter text-xl"></i>
+                    </button>
+                    <button onclick="showSettings()" class="text-white hover:text-gray-200 transition-colors" title="Settings">
+                        <i class="fas fa-cog text-xl"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <!-- Mode Selection -->
+        <div class="glass-effect rounded-xl p-6 mb-8">
+            <h2 class="text-xl font-semibold mb-4">Comparison Mode</h2>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <button onclick="setMode('image')" class="mode-btn glass-effect rounded-lg p-4 hover-glow transition-all duration-300" id="mode-image">
+                    <i class="fas fa-images text-3xl mb-2 text-indigo-400"></i>
+                    <h3 class="font-semibold">Image Comparison</h3>
+                    <p class="text-sm text-gray-400 mt-1">Compare screenshots or UI images</p>
+                </button>
+                <button onclick="setMode('url')" class="mode-btn glass-effect rounded-lg p-4 hover-glow transition-all duration-300" id="mode-url">
+                    <i class="fas fa-globe text-3xl mb-2 text-purple-400"></i>
+                    <h3 class="font-semibold">URL Comparison</h3>
+                    <p class="text-sm text-gray-400 mt-1">Compare live websites</p>
+                </button>
+                <button onclick="setMode('batch')" class="mode-btn glass-effect rounded-lg p-4 hover-glow transition-all duration-300" id="mode-batch">
+                    <i class="fas fa-layer-group text-3xl mb-2 text-pink-400"></i>
+                    <h3 class="font-semibold">Batch Processing</h3>
+                    <p class="text-sm text-gray-400 mt-1">Compare multiple files</p>
+                </button>
+            </div>
+        </div>
+
+        <!-- Image Upload Section -->
+        <div id="image-section" class="hidden">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                <!-- Baseline Upload -->
+                <div class="glass-effect rounded-xl p-6">
+                    <h3 class="text-lg font-semibold mb-4">
+                        <i class="fas fa-upload mr-2 text-green-400"></i>
+                        Baseline Image
+                    </h3>
+                    <div class="drop-zone rounded-lg p-8 text-center cursor-pointer" id="baseline-drop">
+                        <input type="file" id="baseline-file" accept="image/*" class="hidden" onchange="handleFileSelect(event, 'baseline')">
+                        <i class="fas fa-cloud-upload-alt text-4xl text-gray-500 mb-4"></i>
+                        <p class="text-gray-400">Drop image here or click to browse</p>
+                        <p class="text-sm text-gray-500 mt-2">PNG, JPG, GIF up to 50MB</p>
+                    </div>
+                    <div id="baseline-preview" class="mt-4 hidden">
+                        <img src="" alt="Baseline" class="rounded-lg w-full">
+                        <p class="text-sm text-gray-400 mt-2"></p>
+                    </div>
+                </div>
+
+                <!-- Comparison Upload -->
+                <div class="glass-effect rounded-xl p-6">
+                    <h3 class="text-lg font-semibold mb-4">
+                        <i class="fas fa-upload mr-2 text-blue-400"></i>
+                        Comparison Image
+                    </h3>
+                    <div class="drop-zone rounded-lg p-8 text-center cursor-pointer" id="comparison-drop">
+                        <input type="file" id="comparison-file" accept="image/*" class="hidden" onchange="handleFileSelect(event, 'comparison')">
+                        <i class="fas fa-cloud-upload-alt text-4xl text-gray-500 mb-4"></i>
+                        <p class="text-gray-400">Drop image here or click to browse</p>
+                        <p class="text-sm text-gray-500 mt-2">PNG, JPG, GIF up to 50MB</p>
+                    </div>
+                    <div id="comparison-preview" class="mt-4 hidden">
+                        <img src="" alt="Comparison" class="rounded-lg w-full">
+                        <p class="text-sm text-gray-400 mt-2"></p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Test Name Input -->
+            <div class="glass-effect rounded-xl p-6 mb-8">
+                <label class="block text-sm font-medium mb-2">Test Name (Optional)</label>
+                <input type="text" id="test-name" placeholder="Enter test name..." 
+                    class="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 focus:outline-none focus:border-indigo-500 transition-colors">
+            </div>
+        </div>
+
+        <!-- URL Comparison Section -->
+        <div id="url-section" class="hidden">
+            <div class="glass-effect rounded-xl p-6 mb-8">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label class="block text-sm font-medium mb-2">
+                            <i class="fas fa-link mr-2 text-green-400"></i>
+                            Baseline URL
+                        </label>
+                        <input type="url" id="baseline-url" placeholder="https://example.com" 
+                            class="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 focus:outline-none focus:border-indigo-500 transition-colors">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-2">
+                            <i class="fas fa-link mr-2 text-blue-400"></i>
+                            Comparison URL
+                        </label>
+                        <input type="url" id="comparison-url" placeholder="https://example.com/new" 
+                            class="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 focus:outline-none focus:border-indigo-500 transition-colors">
+                    </div>
+                </div>
+                <div class="mt-4">
+                    <label class="block text-sm font-medium mb-2">Test Name (Optional)</label>
+                    <input type="text" id="url-test-name" placeholder="Enter test name..." 
+                        class="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 focus:outline-none focus:border-indigo-500 transition-colors">
+                </div>
+            </div>
+        </div>
+
+        <!-- Batch Processing Section -->
+        <div id="batch-section" class="hidden">
+            <div class="glass-effect rounded-xl p-6 mb-8">
+                <h3 class="text-lg font-semibold mb-4">
+                    <i class="fas fa-folder-open mr-2 text-yellow-400"></i>
+                    Batch File Upload
+                </h3>
+                <div class="drop-zone rounded-lg p-8 text-center cursor-pointer" id="batch-drop">
+                    <input type="file" id="batch-files" multiple accept="image/*" class="hidden" onchange="handleBatchFiles(event)">
+                    <i class="fas fa-cloud-upload-alt text-4xl text-gray-500 mb-4"></i>
+                    <p class="text-gray-400">Drop multiple image pairs here or click to browse</p>
+                    <p class="text-sm text-gray-500 mt-2">Select pairs: baseline1.png, comparison1.png, baseline2.png, comparison2.png...</p>
+                </div>
+                <div id="batch-preview" class="mt-4"></div>
+            </div>
+        </div>
+
+        <!-- Compare Button -->
+        <div class="text-center mb-8">
+            <button onclick="startComparison()" 
+                class="animated-gradient text-white font-bold py-3 px-8 rounded-full hover:shadow-xl transition-all duration-300 disabled:opacity-50"
+                id="compare-btn">
+                <i class="fas fa-search mr-2"></i>
+                Start Comparison
+            </button>
+            <button onclick="exportResults()" 
+                class="ml-4 bg-gray-700 hover:bg-gray-600 text-white font-bold py-3 px-8 rounded-full transition-all duration-300 hidden"
+                id="export-btn">
+                <i class="fas fa-download mr-2"></i>
+                Export Results
+            </button>
+        </div>
+
+        <!-- Loading State -->
+        <div id="loading-state" class="hidden">
+            <div class="glass-effect rounded-xl p-8 text-center">
+                <i class="fas fa-spinner loading-spinner text-4xl text-indigo-400 mb-4"></i>
+                <h3 class="text-xl font-semibold mb-2">Analyzing Images...</h3>
+                <p class="text-gray-400">This may take a few moments</p>
+                <div class="w-full bg-gray-700 rounded-full h-2 mt-4">
+                    <div class="bg-indigo-500 h-2 rounded-full transition-all duration-300" id="progress-bar" style="width: 0%"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Results Section -->
+        <div id="results-section" class="hidden">
+            <!-- Overall Score -->
+            <div class="glass-effect rounded-xl p-6 mb-8 result-card">
+                <h3 class="text-xl font-semibold mb-4">Overall Similarity Score</h3>
+                <div class="relative pt-1">
+                    <div class="flex mb-2 items-center justify-between">
+                        <div>
+                            <span class="text-xs font-semibold inline-block py-1 px-2 uppercase rounded-full text-indigo-600 bg-indigo-200">
+                                Composite Score
+                            </span>
+                        </div>
+                        <div class="text-right">
+                            <span class="text-2xl font-bold" id="composite-score">0%</span>
+                        </div>
+                    </div>
+                    <div class="overflow-hidden h-4 mb-4 text-xs flex rounded-full bg-gray-700">
+                        <div id="score-bar" style="width:0%" class="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-gradient-to-r from-green-400 to-blue-500 transition-all duration-1000"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Detailed Metrics -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                <div class="glass-effect rounded-xl p-6 result-card" style="animation-delay: 0.1s">
+                    <div class="flex items-center justify-between mb-2">
+                        <h4 class="font-semibold">SSIM Score</h4>
+                        <i class="fas fa-eye text-blue-400"></i>
+                    </div>
+                    <p class="text-3xl font-bold" id="ssim-score">0.00</p>
+                    <p class="text-sm text-gray-400 mt-1">Structural Similarity</p>
+                </div>
+                
+                <div class="glass-effect rounded-xl p-6 result-card" style="animation-delay: 0.2s">
+                    <div class="flex items-center justify-between mb-2">
+                        <h4 class="font-semibold">Text Match</h4>
+                        <i class="fas fa-font text-green-400"></i>
+                    </div>
+                    <p class="text-3xl font-bold" id="text-similarity">0%</p>
+                    <p class="text-sm text-gray-400 mt-1">OCR Text Similarity</p>
+                </div>
+                
+                <div class="glass-effect rounded-xl p-6 result-card" style="animation-delay: 0.3s">
+                    <div class="flex items-center justify-between mb-2">
+                        <h4 class="font-semibold">Visual Diff</h4>
+                        <i class="fas fa-exchange-alt text-purple-400"></i>
+                    </div>
+                    <p class="text-3xl font-bold" id="diff-percentage">0%</p>
+                    <p class="text-sm text-gray-400 mt-1">Pixel Differences</p>
+                </div>
+            </div>
+
+            <!-- View Report Button -->
+            <div class="text-center">
+                <a href="#" id="view-report" target="_blank" 
+                    class="inline-flex items-center bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-lg transition-colors">
+                    <i class="fas fa-file-alt mr-2"></i>
+                    View Detailed Report
+                </a>
+            </div>
+        </div>
+
+        <!-- Previous Results -->
+        <div class="glass-effect rounded-xl p-6 mt-8">
+            <h3 class="text-xl font-semibold mb-4">
+                <i class="fas fa-history mr-2 text-yellow-400"></i>
+                Recent Comparisons
+            </h3>
+            <div id="recent-results" class="space-y-3">
+                <p class="text-gray-400 text-center py-4">No recent comparisons</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settings-modal" class="modal">
+        <div class="modal-content max-w-2xl mx-auto mt-20 glass-effect rounded-xl p-6 m-4">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-2xl font-bold">Configuration Settings</h2>
+                <button onclick="closeSettings()" class="text-gray-400 hover:text-white">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+            
+            <div class="space-y-6">
+                <!-- SSIM Threshold -->
+                <div>
+                    <label class="block text-sm font-medium mb-2">SSIM Similarity Threshold</label>
+                    <input type="range" id="ssim-threshold" min="0" max="100" value="85" 
+                        class="w-full" oninput="updateThresholdValue('ssim', this.value)">
+                    <div class="flex justify-between text-xs text-gray-400">
+                        <span>0%</span>
+                        <span id="ssim-value">85%</span>
+                        <span>100%</span>
+                    </div>
+                </div>
+
+                <!-- Perceptual Threshold -->
+                <div>
+                    <label class="block text-sm font-medium mb-2">Perceptual Difference Threshold</label>
+                    <input type="range" id="perceptual-threshold" min="0" max="100" value="10" 
+                        class="w-full" oninput="updateThresholdValue('perceptual', this.value)">
+                    <div class="flex justify-between text-xs text-gray-400">
+                        <span>0%</span>
+                        <span id="perceptual-value">10%</span>
+                        <span>100%</span>
+                    </div>
+                </div>
+
+                <!-- Text Similarity Threshold -->
+                <div>
+                    <label class="block text-sm font-medium mb-2">Text Similarity Threshold</label>
+                    <input type="range" id="text-threshold" min="0" max="100" value="90" 
+                        class="w-full" oninput="updateThresholdValue('text', this.value)">
+                    <div class="flex justify-between text-xs text-gray-400">
+                        <span>0%</span>
+                        <span id="text-value">90%</span>
+                        <span>100%</span>
+                    </div>
+                </div>
+
+                <!-- Export Format -->
+                <div>
+                    <label class="block text-sm font-medium mb-2">Default Export Format</label>
+                    <select id="export-format" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2">
+                        <option value="json">JSON</option>
+                        <option value="csv">CSV</option>
+                        <option value="pdf">PDF Report</option>
+                        <option value="html">HTML Report</option>
+                    </select>
+                </div>
+
+                <div class="flex justify-end space-x-4 mt-6">
+                    <button onclick="resetSettings()" class="bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-6 rounded-lg transition-colors">
+                        Reset to Defaults
+                    </button>
+                    <button onclick="saveSettings()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-6 rounded-lg transition-colors">
+                        Save Settings
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Batch History Modal -->
+    <div id="batch-history-modal" class="modal">
+        <div class="modal-content max-w-4xl mx-auto mt-20 glass-effect rounded-xl p-6 m-4">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-2xl font-bold">Batch Comparison History</h2>
+                <button onclick="closeBatchHistory()" class="text-gray-400 hover:text-white">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+            
+            <div id="batch-history-content" class="space-y-4 max-h-96 overflow-y-auto">
+                <p class="text-gray-400 text-center py-8">No batch comparisons yet</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filters Modal -->
+    <div id="filters-modal" class="modal">
+        <div class="modal-content max-w-md mx-auto mt-20 glass-effect rounded-xl p-6 m-4">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-2xl font-bold">Advanced Filters</h2>
+                <button onclick="closeFilters()" class="text-gray-400 hover:text-white">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+            
+            <div class="space-y-4">
+                <!-- Date Range -->
+                <div>
+                    <label class="block text-sm font-medium mb-2">Date Range</label>
+                    <div class="grid grid-cols-2 gap-2">
+                        <input type="date" id="filter-date-from" class="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2">
+                        <input type="date" id="filter-date-to" class="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2">
+                    </div>
+                </div>
+
+                <!-- Score Range -->
+                <div>
+                    <label class="block text-sm font-medium mb-2">Similarity Score Range</label>
+                    <div class="grid grid-cols-2 gap-2">
+                        <input type="number" id="filter-score-min" placeholder="Min %" min="0" max="100" 
+                            class="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2">
+                        <input type="number" id="filter-score-max" placeholder="Max %" min="0" max="100" 
+                            class="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2">
+                    </div>
+                </div>
+
+                <!-- Test Name Filter -->
+                <div>
+                    <label class="block text-sm font-medium mb-2">Test Name Contains</label>
+                    <input type="text" id="filter-test-name" placeholder="Enter keyword..." 
+                        class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2">
+                </div>
+
+                <div class="flex justify-end space-x-4 mt-6">
+                    <button onclick="clearFilters()" class="bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-6 rounded-lg transition-colors">
+                        Clear Filters
+                    </button>
+                    <button onclick="applyFilters()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-6 rounded-lg transition-colors">
+                        Apply Filters
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/app.js"></script>
+</body>
+</html> 

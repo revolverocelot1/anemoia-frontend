@@ -365,14 +365,7 @@ const TriangleSplattingLanding: React.FC = () => {
                     <Box className="w-5 h-5" />
                     Start Visualizing
                   </Link>
-                  <a
-                    href="/test-garden.off"
-                    download
-                    className="px-8 py-4 bg-gray-800 hover:bg-gray-700 rounded-lg font-semibold text-lg transition-all transform hover:scale-105 shadow-lg inline-flex items-center gap-2"
-                  >
-                    <Download className="w-5 h-5" />
-                    Download Sample
-                  </a>
+
                 </div>
               </motion.div>
             </div>

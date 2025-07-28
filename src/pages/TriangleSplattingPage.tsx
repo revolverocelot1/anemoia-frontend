@@ -7,12 +7,61 @@ import HolographicStats from '../components/HolographicStats';
 import { OFFStats } from '../viewers/triangle/offLoader';
 import * as THREE from 'three';
 
+// Modern Toggle Switch Component
+const ToggleSwitch: React.FC<{
+  checked: boolean;
+  onChange: () => void;
+  label: string;
+  icon?: React.ReactNode;
+}> = ({ checked, onChange, label, icon }) => {
+  return (
+    <div className="flex items-center justify-between group">
+      <label className="text-gray-300 text-sm flex items-center gap-2 cursor-pointer flex-1">
+        {icon && <span className="text-cyan-400">{icon}</span>}
+        <span className="group-hover:text-white transition-colors">{label}</span>
+      </label>
+      <div className="relative">
+        <input
+          type="checkbox"
+          checked={checked}
+          onChange={onChange}
+          className="sr-only"
+        />
+        <button
+          onClick={onChange}
+          className={`
+            relative inline-flex h-7 w-14 items-center rounded-full 
+            transition-all duration-300 ease-in-out focus:outline-none 
+            focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-900
+            ${checked 
+              ? 'bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 shadow-lg shadow-cyan-500/30' 
+              : 'bg-gray-700 hover:bg-gray-600 shadow-inner'
+            }
+          `}
+        >
+          <span className="sr-only">{label}</span>
+          <span
+            className={`
+              ${checked ? 'translate-x-8' : 'translate-x-1'}
+              inline-block h-5 w-5 transform rounded-full bg-white shadow-lg
+              transition-all duration-300 ease-in-out
+              ${checked ? 'shadow-cyan-500/50' : 'shadow-gray-900/50'}
+            `}
+          />
+        </button>
+      </div>
+    </div>
+  );
+};
+
 const TriangleSplattingPage: React.FC = () => {
   const [fileUrl, setFileUrl] = useState<string | null>(null);
   const [fileName, setFileName] = useState<string>('');
   const [stats, setStats] = useState<OFFStats | null>(null);
   const [activeTab, setActiveTab] = useState<'rendering' | 'analysis' | 'export'>('rendering');
   const [measurements, setMeasurements] = useState<number[]>([]);
+  const [cameraPosition, setCameraPosition] = useState<[number, number, number]>([5, 5, 5]);
+  const [showControlsOverlay, setShowControlsOverlay] = useState(true);
   const [settings, setSettings] = useState({
     // Basic settings
     wireframe: false,
@@ -43,6 +92,15 @@ const TriangleSplattingPage: React.FC = () => {
   });
   const fileInputRef = useRef<HTMLInputElement>(null);
   const viewerRef = useRef<HTMLDivElement>(null);
+
+  // Auto-hide controls overlay after 8 seconds
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setShowControlsOverlay(false);
+    }, 8000);
+
+    return () => clearTimeout(timer);
+  }, []);
 
   // Add custom styles for the range sliders
   useEffect(() => {
@@ -121,7 +179,7 @@ const TriangleSplattingPage: React.FC = () => {
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     const file = e.dataTransfer.files[0];
-    if (file && file.name.endsWith('.off')) {
+    if (file && (file.name.endsWith('.off') || file.name.endsWith('.ply'))) {
       if (fileUrl) {
         URL.revokeObjectURL(fileUrl);
       }
@@ -143,10 +201,7 @@ const TriangleSplattingPage: React.FC = () => {
     setMeasurements([...measurements, distance]);
   }, [measurements]);
 
-  const loadSampleFile = useCallback(() => {
-    setFileUrl('/test-garden.off');
-    setFileName('garden.off (Sample)');
-  }, []);
+
 
   const exportScreenshot = useCallback(() => {
     if (viewerRef.current) {
@@ -206,7 +261,7 @@ const TriangleSplattingPage: React.FC = () => {
               <input
                 ref={fileInputRef}
                 type="file"
-                accept=".off"
+                accept=".off,.ply"
                 onChange={handleFileUpload}
                 className="hidden"
               />
@@ -216,19 +271,10 @@ const TriangleSplattingPage: React.FC = () => {
                 className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white py-3 px-4 rounded-lg transition-all flex items-center justify-center gap-2 shadow-lg hover:shadow-xl"
               >
                 <Upload size={18} />
-                Upload .off File
+                Upload .off/.ply File
               </button>
 
-              <div className="mt-3 text-center text-sm text-gray-500">
-                or
-              </div>
 
-              <button
-                onClick={loadSampleFile}
-                className="w-full mt-3 bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white py-3 px-4 rounded-lg transition-all shadow-lg hover:shadow-xl"
-              >
-                Load Sample Garden
-              </button>
 
               {fileName && (
                 <div className="mt-4 p-3 bg-gray-800/50 rounded-lg border border-cyan-900/20">
@@ -319,9 +365,11 @@ const TriangleSplattingPage: React.FC = () => {
               >
                 <TriangleSplattingViewer
                   url={fileUrl || undefined}
+                  fileName={fileName}
                   onStatsUpdate={handleStatsUpdate}
                   settings={settings}
                   onMeasure={handleMeasurement}
+                  cameraPosition={cameraPosition}
                   className="w-full h-full"
                 />
               </div>
@@ -331,7 +379,7 @@ const TriangleSplattingPage: React.FC = () => {
                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                   <div className="text-center">
                     <div className="text-8xl mb-4 animate-pulse">🔺</div>
-                    <p className="text-2xl text-gray-400 mb-2">Drop .off file here</p>
+                    <p className="text-2xl text-gray-400 mb-2">Drop .off/.ply file here</p>
                     <p className="text-sm text-gray-500">or use the upload button to get started</p>
                   </div>
                 </div>
@@ -384,31 +432,56 @@ const TriangleSplattingPage: React.FC = () => {
                 </h3>
                 
                 <div className="space-y-4">
+                  {/* Camera Presets */}
+                  <div className="mb-6">
+                    <h4 className="text-sm font-medium text-gray-400 mb-3 flex items-center gap-2">
+                      <Camera size={14} />
+                      Camera Presets
+                    </h4>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        onClick={() => setCameraPosition([5, 5, 5])}
+                        className="px-3 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg text-xs transition-all hover:scale-105"
+                      >
+                        Default
+                      </button>
+                      <button
+                        onClick={() => setCameraPosition([0, 10, 0])}
+                        className="px-3 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg text-xs transition-all hover:scale-105"
+                      >
+                        Top View
+                      </button>
+                      <button
+                        onClick={() => setCameraPosition([10, 0, 0])}
+                        className="px-3 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg text-xs transition-all hover:scale-105"
+                      >
+                        Side View
+                      </button>
+                      <button
+                        onClick={() => setCameraPosition([0, 0, 10])}
+                        className="px-3 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg text-xs transition-all hover:scale-105"
+                      >
+                        Front View
+                      </button>
+                    </div>
+                  </div>
+
                   {/* Basic Toggles */}
                   <div className="space-y-3">
                     {[
-                      { key: 'wireframe', label: 'Wireframe Mode', icon: Grid3X3 },
-                      { key: 'showGrid', label: 'Show Grid', icon: Grid3X3 },
-                      { key: 'showStats', label: 'Show Stats', icon: Info },
-                      { key: 'showAxes', label: 'Show Axes', icon: Maximize2 },
-                      { key: 'autoRotate', label: 'Auto Rotate', icon: Play }
-                    ].map(({ key, label, icon: Icon }) => (
-                      <div key={key} className="flex items-center justify-between">
-                        <label className="text-gray-300 text-sm flex items-center gap-2">
-                          <Icon size={14} />
-                          {label}
-                        </label>
-                        <button
-                          onClick={() => setSettings({ ...settings, [key]: !settings[key as keyof typeof settings] })}
-                          className={`w-12 h-6 rounded-full transition-all ${
-                            settings[key as keyof typeof settings] ? 'bg-gradient-to-r from-cyan-600 to-blue-600' : 'bg-gray-600'
-                          }`}
-                        >
-                          <div className={`w-5 h-5 bg-white rounded-full transition-transform ${
-                            settings[key as keyof typeof settings] ? 'translate-x-6' : 'translate-x-0.5'
-                          }`} />
-                        </button>
-                      </div>
+                      { key: 'wireframe', label: 'Wireframe Mode', icon: <Grid3X3 size={14} /> },
+                      { key: 'showGrid', label: 'Show Grid', icon: <Grid3X3 size={14} /> },
+                      { key: 'showStats', label: 'Show Stats', icon: <Info size={14} /> },
+                      { key: 'showAxes', label: 'Show Axes', icon: <Maximize2 size={14} /> },
+                      { key: 'autoRotate', label: 'Auto Rotate', icon: <Play size={14} /> }
+                    ].map(({ key, label, icon }) => (
+                      <ToggleSwitch
+                        key={key}
+                        checked={settings[key as keyof typeof settings] as boolean}
+                        onChange={() => setSettings({ ...settings, [key]: !settings[key as keyof typeof settings] })}
+                        label={label}
+                        icon={icon}
+                      />
                     ))}
                   </div>
 
@@ -556,22 +629,12 @@ const TriangleSplattingPage: React.FC = () => {
                 </h3>
                 
                 <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <label className="text-gray-300 text-sm flex items-center gap-2">
-                      <Ruler size={14} />
-                      Measurement Tool
-                    </label>
-                    <button
-                      onClick={() => setSettings({ ...settings, showMeasurements: !settings.showMeasurements })}
-                      className={`w-12 h-6 rounded-full transition-all ${
-                        settings.showMeasurements ? 'bg-gradient-to-r from-purple-600 to-pink-600' : 'bg-gray-600'
-                      }`}
-                    >
-                      <div className={`w-5 h-5 bg-white rounded-full transition-transform ${
-                        settings.showMeasurements ? 'translate-x-6' : 'translate-x-0.5'
-                      }`} />
-                    </button>
-                  </div>
+                  <ToggleSwitch
+                    checked={settings.showMeasurements}
+                    onChange={() => setSettings({ ...settings, showMeasurements: !settings.showMeasurements })}
+                    label="Measurement Tool"
+                    icon={<Ruler size={14} />}
+                  />
 
                   {measurements.length > 0 && (
                     <div className="mt-4 p-3 bg-gray-800 rounded-lg">

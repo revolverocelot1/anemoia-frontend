@@ -75,6 +75,14 @@
     <priority>0.8</priority>
   </url>
   
+  <!-- Additional Tool Pages -->
+  <url>
+    <loc>https://anemoias.me/caption-studio</loc>
+    <lastmod>2024-01-01</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  
   <!-- Result Pages -->
   <url>
     <loc>https://anemoias.me/pose-estimation/results</loc>
@@ -133,6 +141,32 @@
     <priority>0.9</priority>
   </url>
   
+  <!-- Additional Landing Pages -->
+  <url>
+    <loc>https://anemoias.me/face-swap/landing</loc>
+    <lastmod>2024-01-01</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://anemoias.me/ocr/landing</loc>
+    <lastmod>2024-01-01</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://anemoias.me/object-detection/landing</loc>
+    <lastmod>2024-01-01</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://anemoias.me/ascii-video-converter/landing</loc>
+    <lastmod>2024-01-01</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  
   <!-- Entertainment Pages -->
   <url>
     <loc>https://anemoias.me/doom</loc>
@@ -185,5 +219,45 @@
     <lastmod>2024-01-01</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.3</priority>
+  </url>
+  
+  <!-- Support Pages -->
+  <url>
+    <loc>https://anemoias.me/support</loc>
+    <lastmod>2024-01-01</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  
+  <!-- Auth Callback Pages -->
+  <url>
+    <loc>https://anemoias.me/auth/callback</loc>
+    <lastmod>2024-01-01</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.4</priority>
+  </url>
+  <url>
+    <loc>https://anemoias.me/auth/callback/google</loc>
+    <lastmod>2024-01-01</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.4</priority>
+  </url>
+  <url>
+    <loc>https://anemoias.me/auth/callback/twitter</loc>
+    <lastmod>2024-01-01</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.4</priority>
+  </url>
+  <url>
+    <loc>https://anemoias.me/auth/callback/github</loc>
+    <lastmod>2024-01-01</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.4</priority>
+  </url>
+  <url>
+    <loc>https://anemoias.me/auth/success</loc>
+    <lastmod>2024-01-01</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.4</priority>
   </url>
 </urlset> 
