@@ -116,13 +116,28 @@ self.onmessage = async (event) => {
             
             const outputBlob = await outputCanvas.convertToBlob({ type: 'image/png' });
             const arrayBuffer = await outputBlob.arrayBuffer();
-            
+
+            // Build a normalized depth Float32Array (0..1)
+            const normalizedDepth = new Float32Array(depthArray.length);
+            for (let i = 0; i < depthArray.length; i++) {
+                normalizedDepth[i] = range > 0 ? (depthArray[i] - min) / range : 0;
+            }
+
+            // Also expose the grayscale RGBA buffer directly for consumers that want ImageData-like data
+            const grayRgba = imageData2; // Uint8ClampedArray length width*height*4
+
             self.postMessage({
                 status: 'complete',
                 output: arrayBuffer,
                 width,
-                height
-            });
+                height,
+                normalizedDepth,
+                grayRgba
+            }, [
+                arrayBuffer,
+                normalizedDepth.buffer,
+                grayRgba.buffer
+            ]);
             
         } finally {
             URL.revokeObjectURL(imageUrl);

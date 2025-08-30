@@ -102,18 +102,15 @@ export const FaceSwapUI: React.FC<FaceSwapUIProps> = ({ className }) => {
     setResultImage(null);
     setProcessingTime(null);
     
-    // Detect faces in source image
     if (engineRef.current) {
       try {
         setLoadingStatus('Detecting faces in source image...');
-        const result = await engineRef.current.swapFaces(imageData, imageData);
-        
-        const faces: FaceInfo[] = result.faces.map((face, index) => ({
+        const facesDetected = await engineRef.current.detectFaces(imageData);
+        const faces: FaceInfo[] = facesDetected.map((face, index) => ({
           id: index,
           selected: index === 0,
           boundingBox: face.boundingBox
         }));
-        
         setSourceFaces(faces);
         setSelectedSourceFace(0);
         setLoadingStatus('');
@@ -131,18 +128,15 @@ export const FaceSwapUI: React.FC<FaceSwapUIProps> = ({ className }) => {
     setResultImage(null);
     setProcessingTime(null);
     
-    // Detect faces in target image
     if (engineRef.current) {
       try {
         setLoadingStatus('Detecting faces in target image...');
-        const result = await engineRef.current.swapFaces(imageData, imageData);
-        
-        const faces: FaceInfo[] = result.faces.map((face, index) => ({
+        const facesDetected = await engineRef.current.detectFaces(imageData);
+        const faces: FaceInfo[] = facesDetected.map((face, index) => ({
           id: index,
-          selected: true, // Default: select all faces
+          selected: true,
           boundingBox: face.boundingBox
         }));
-        
         setTargetFaces(faces);
         setSelectedTargetFaces(faces.map((_, index) => index));
         setLoadingStatus('');

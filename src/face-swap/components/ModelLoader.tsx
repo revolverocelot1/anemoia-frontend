@@ -57,9 +57,9 @@ export const ModelLoader: React.FC<ModelLoaderProps> = ({
             transition={{ delay: 0.3 }}
           >
             <div className="quality-icon">🎭</div>
-            <h3>Demo Mode</h3>
-            <p>Quick preview with simulated effects</p>
-            <span className="quality-size">No download required</span>
+            <h3>Fast Mode</h3>
+            <p>Optimized, quantization-friendly models</p>
+            <span className="quality-size">Downloads on first use</span>
           </motion.button>
 
           <motion.button

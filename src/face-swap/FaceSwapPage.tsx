@@ -1,8 +1,8 @@
 import React from 'react';
-import SimpleFaceSwap from './SimpleFaceSwap';
+import { FaceSwapUI } from './components/FaceSwapUI';
 
 const FaceSwapPage: React.FC = () => {
-  return <SimpleFaceSwap />;
+	return <FaceSwapUI />;
 };
 
-export default FaceSwapPage; 
+export default FaceSwapPage;

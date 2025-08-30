@@ -25,6 +25,8 @@ import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
 import TermsOfServicePage from './pages/TermsOfServicePage';
 import SplatViewerPage from './pages/SplatViewerPage';
 import TestPage from './pages/TestPage';
+import AnimeVideoToCodePage from './pages/AnimeVideoToCodePage';
+import TPoseToolPage from './pages/TPoseToolPage';
 import CoffeeDonation from './components/CoffeeDonation';
 // import FileUploadFix from './components/FileUploadFix';
 import { SupabaseAuthProvider } from './context/SupabaseAuthContext';
@@ -554,6 +556,22 @@ function App() {
               element={
                 <AnimatedPage>
                   <TriangleSplattingPage />
+                </AnimatedPage>
+              }
+            />
+            <Route
+              path="/anime-video-to-code"
+              element={
+                <AnimatedPage>
+                  <AnimeVideoToCodePage />
+                </AnimatedPage>
+              }
+            />
+            <Route
+              path="/t-poser"
+              element={
+                <AnimatedPage>
+                  <TPoseToolPage />
                 </AnimatedPage>
               }
             />

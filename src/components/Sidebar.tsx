@@ -21,6 +21,17 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onToggle }) => {
 
   const miscTools: ToolItem[] = [
     {
+      id: 't-poser',
+      name: '3D T-Pose Builder',
+      description: 'Turn a person into a T-pose and rotate 60°/90°/180°',
+      icon: 'accessibility_new',
+      onClick: () => {
+        navigate('/t-poser');
+        onToggle();
+      },
+      badge: 'AI'
+    },
+    {
       id: 'doom',
       name: 'DOOM Classic',
       description: 'Play the classic DOOM game in your browser',
@@ -30,6 +41,17 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onToggle }) => {
         onToggle();
       },
       badge: 'WebASM'
+    },
+    {
+      id: 'anime-video-to-code',
+      name: 'Anime.js Video → Code',
+      description: 'Convert a video into Anime.js DOM animation code',
+      icon: 'movie',
+      onClick: () => {
+        navigate('/anime-video-to-code');
+        onToggle();
+      },
+      badge: 'NEW'
     },
     {
       id: 'anime-gallery',

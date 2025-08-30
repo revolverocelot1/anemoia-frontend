@@ -4,8 +4,20 @@ class ApiService {
   private instance: AxiosInstance;
 
   constructor() {
+    const resolvedBaseURL = (() => {
+      const envUrl = (import.meta as any).env?.VITE_API_URL as string | undefined;
+      if (envUrl && typeof envUrl === 'string' && envUrl.length > 0) return envUrl;
+      if (typeof window !== 'undefined') {
+        if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+          return 'http://localhost:3001';
+        }
+      }
+      // Fallback for production deployments where backend is reverse-proxied
+      return '/api';
+    })();
+
     this.instance = axios.create({
-      baseURL: import.meta.env.VITE_API_URL || 'http://localhost:3000/api',
+      baseURL: resolvedBaseURL,
       timeout: 30000,
       headers: {
         'Content-Type': 'application/json',

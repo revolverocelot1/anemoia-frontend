@@ -20,23 +20,46 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const processImage = useCallback(async (file: File) => {
-    const reader = new FileReader();
-    reader.onload = async (e) => {
-      const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        canvas.width = img.width;
-        canvas.height = img.height;
-        const ctx = canvas.getContext('2d')!;
-        ctx.drawImage(img, 0, 0);
-        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        
-        setPreview(e.target?.result as string);
-        onImageUpload(imageData);
-      };
-      img.src = e.target?.result as string;
-    };
-    reader.readAsDataURL(file);
+    if (!file.type.startsWith('image/')) return;
+    const dataUrl = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onerror = () => reject(reader.error);
+      reader.onload = () => resolve(reader.result as string);
+      reader.readAsDataURL(file);
+    });
+
+    // Create an ImageBitmap for faster decode when available
+    let bitmap: ImageBitmap | null = null;
+    try {
+      bitmap = await createImageBitmap(file);
+    } catch {}
+
+    // Draw to canvas and cap max dimension for performance
+    const img = new Image();
+    await new Promise<void>((res) => {
+      img.onload = () => res();
+      img.src = dataUrl;
+    });
+
+    const MAX_DIM = 1600;
+    const scale = Math.min(1, MAX_DIM / Math.max(img.width, img.height));
+    const w = Math.max(1, Math.round(img.width * scale));
+    const h = Math.max(1, Math.round(img.height * scale));
+
+    const canvas = document.createElement('canvas');
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d', { willReadFrequently: true })!;
+    if (bitmap) {
+      ctx.drawImage(bitmap, 0, 0, w, h);
+      try { bitmap.close(); } catch {}
+    } else {
+      ctx.drawImage(img, 0, 0, w, h);
+    }
+
+    const imageData = ctx.getImageData(0, 0, w, h);
+    setPreview(canvas.toDataURL('image/jpeg', 0.9));
+    onImageUpload(imageData);
   }, [onImageUpload]);
 
   const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
