@@ -8,10 +8,10 @@ type Rotation = 'front' | '60' | '90' | '180';
 const ROTATIONS: Rotation[] = ['front', '60', '90', '180'];
 
 const ROTATION_PROMPTS: Record<Rotation, string> = {
-  'front': 'Transform this person into a perfect T-pose position with arms extended horizontally at exactly 90 degrees from the body, parallel to the ground. Legs should be straight and together. The person should be facing directly forward with a neutral expression. Ensure the entire body is visible in the frame. Keep all facial features, skin tone, hair, and clothing exactly as they appear in the original image.',
-  '60': 'Generate an image of this exact same person in a T-pose position, but rotated 60 degrees to the viewer\'s right. The person should have arms extended horizontally at 90 degrees from their body, legs together, maintaining the same clothing, appearance, and proportions as the original. Show the full body in frame.',
-  '90': 'Generate an image of this exact same person in a T-pose position, shown from a perfect side view (90 degrees rotation). Arms must be extended horizontally straight out from the shoulders, legs together. Maintain identical clothing, body proportions, and appearance. Full body must be visible.',
-  '180': 'Generate an image of this exact same person in a T-pose position, viewed from directly behind (180 degrees rotation). Arms extended horizontally at shoulder level, legs together. Keep the same clothing, hair style, body build, and all details consistent with the original. Show complete full body view.'
+  'front': 'I need you to remember every single detail about this person - their exact face shape, facial features, skin tone, hair color and style, body proportions, clothing details, and any accessories. Transform this person into a perfect T-pose: arms extended horizontally at exactly 90 degrees from the body, legs straight and together, neutral expression, looking straight ahead. The entire body must be visible in the frame. This is extremely important: maintain 100% accuracy of all physical features and clothing.',
+  '60': 'now 60 degrees',
+  '90': 'now 90 degrees', 
+  '180': 'now 180 degrees'
 };
 
 // Custom 3D-styled icons as SVG components
@@ -76,17 +76,24 @@ function TPoseToolPage() {
   const [currentRotationIndex, setCurrentRotationIndex] = useState(0);
   const [processingRotation, setProcessingRotation] = useState<Rotation | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [conversationId, setConversationId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  // Auto-process next rotation
+  // Process rotations sequentially when previous one completes
   useEffect(() => {
-    if (currentStep === 'processing' && inputFile && currentRotationIndex < ROTATIONS.length) {
+    if (currentStep === 'processing' && inputFile && conversationId && currentRotationIndex < ROTATIONS.length) {
       const rotation = ROTATIONS[currentRotationIndex];
-      if (!results[rotation] && !processingRotation) {
-        processRotation(rotation);
+      const prevRotation = currentRotationIndex > 0 ? ROTATIONS[currentRotationIndex - 1] : null;
+      
+      // Only process if previous rotation is complete and current hasn't started
+      if (!results[rotation] && !processingRotation && (!prevRotation || results[prevRotation])) {
+        // Add a small delay to ensure the image is displayed before continuing
+        setTimeout(() => {
+          processRotation(rotation);
+        }, 500);
       }
     }
-  }, [currentStep, currentRotationIndex, results, processingRotation, inputFile]);
+  }, [currentStep, currentRotationIndex, results, processingRotation, inputFile, conversationId]);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -117,8 +124,13 @@ function TPoseToolPage() {
       '180': null
     });
     setCurrentRotationIndex(0);
+    setConversationId(null);
     // Automatically start processing
     setCurrentStep('processing');
+    // Start first rotation immediately
+    setTimeout(() => {
+      processRotation('front');
+    }, 100);
   };
 
   const processRotation = async (rotation: Rotation, retryCount = 0) => {
@@ -128,26 +140,24 @@ function TPoseToolPage() {
     setError(null);
 
     try {
-      // Always use the original image for all rotations to ensure consistency
-      // This makes each rotation independent and prevents quality degradation
-      const sourceImage = { file: inputFile };
+      const isFirstRotation = rotation === 'front';
       
-      // Enhanced prompt for better results
-      let enhancedPrompt = ROTATION_PROMPTS[rotation];
-      
-      // Add extra context for non-front views
-      if (rotation !== 'front') {
-        enhancedPrompt += ' The final image should show the person in a standard T-pose from the specified angle. Ensure anatomical correctness and maintain all physical characteristics of the person.';
-      }
-
-      const { imageBase64 } = await editImageWithGemini({
-        prompt: enhancedPrompt,
-        file: sourceImage.file,
-        inputMimeType: sourceImage.file.type,
-        outputMimeType: 'image/png'
+      const result = await editImageWithGemini({
+        prompt: ROTATION_PROMPTS[rotation],
+        file: isFirstRotation ? inputFile : undefined,
+        inputMimeType: inputFile.type,
+        outputMimeType: 'image/png',
+        conversationId: isFirstRotation ? undefined : (conversationId || undefined),
+        isContinuation: !isFirstRotation
       });
 
-      setResults(prev => ({ ...prev, [rotation]: imageBase64 }));
+      setResults(prev => ({ ...prev, [rotation]: result.imageBase64 }));
+      
+      // Store conversation ID from first request
+      if (isFirstRotation && result.conversationId) {
+        setConversationId(result.conversationId);
+        console.log('Started conversation:', result.conversationId);
+      }
       
       // Move to next rotation
       if (currentRotationIndex < ROTATIONS.length - 1) {
@@ -169,10 +179,8 @@ function TPoseToolPage() {
       const errorMessage = err?.response?.data?.detail || err?.message || 'Failed to process image';
       setError(`Error on ${rotation} view: ${errorMessage}`);
       
-      // Continue with next rotation even if this one fails
-      if (currentRotationIndex < ROTATIONS.length - 1) {
-        setCurrentRotationIndex(prev => prev + 1);
-      }
+      // Don't continue if conversation fails
+      console.error('Stopping due to error in conversation chain');
     } finally {
       setProcessingRotation(null);
     }
@@ -514,6 +522,7 @@ function TPoseToolPage() {
                           setInputPreview(null);
                           setResults({ 'front': null, '60': null, '90': null, '180': null });
                           setCurrentRotationIndex(0);
+                          setConversationId(null);
                         }}
                         className="mt-4 px-6 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-xl transition-colors"
                       >
