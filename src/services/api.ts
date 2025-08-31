@@ -11,13 +11,13 @@ class ApiService {
         if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
           return 'http://localhost:8000';
         }
-        // Production URL - update this after deploying backend
-        if (window.location.hostname.includes('onrender.com')) {
-          return 'https://anemoia-backend.onrender.com';
+        // Production URL - handle both onrender.com and anemoias.me
+        if (window.location.hostname.includes('onrender.com') || window.location.hostname === 'anemoias.me') {
+          return 'https://anemoia-api.onrender.com';
         }
       }
       // Fallback for production deployments
-      return 'https://anemoia-backend.onrender.com';
+      return 'https://anemoia-api.onrender.com';
     })();
 
     this.instance = axios.create({
