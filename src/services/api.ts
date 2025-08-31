@@ -11,14 +11,18 @@ class ApiService {
         if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
           return 'http://localhost:8000';
         }
+        // Production URL - update this after deploying backend
+        if (window.location.hostname.includes('onrender.com')) {
+          return 'https://anemoia-backend.onrender.com';
+        }
       }
-      // Fallback for production deployments where backend is reverse-proxied
-      return '/api';
+      // Fallback for production deployments
+      return 'https://anemoia-backend.onrender.com';
     })();
 
     this.instance = axios.create({
       baseURL: resolvedBaseURL,
-      timeout: 30000,
+      timeout: 120000, // 2 minutes timeout for Render free tier
       headers: {
         'Content-Type': 'application/json',
       },

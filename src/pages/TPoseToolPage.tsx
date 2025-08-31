@@ -240,7 +240,7 @@ function TPoseToolPage() {
         file: shouldSendImage ? inputFile : undefined,
         inputMimeType: inputFile.type,
         outputMimeType: 'image/png',
-        conversationId: processingMode === 'chain' && !isFirstRotation ? conversationId : undefined,
+        conversationId: processingMode === 'chain' && !isFirstRotation && conversationId ? conversationId : undefined,
         isContinuation: processingMode === 'chain' && !isFirstRotation
       });
 

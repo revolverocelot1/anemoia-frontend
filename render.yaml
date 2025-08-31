@@ -36,6 +36,6 @@ services:
       - type: rewrite
         source: /*
         destination: /index.html
-
-# Environment Variables (if needed for build)
-envVarGroups: [] 
+    envVars:
+      - key: NODE_VERSION
+        value: "18" 
