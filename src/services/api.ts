@@ -9,7 +9,7 @@ class ApiService {
       if (envUrl && typeof envUrl === 'string' && envUrl.length > 0) return envUrl;
       if (typeof window !== 'undefined') {
         if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-          return 'http://localhost:3001';
+          return 'http://localhost:8000';
         }
       }
       // Fallback for production deployments where backend is reverse-proxied

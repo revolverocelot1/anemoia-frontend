@@ -4,14 +4,24 @@ import { editImageWithGemini } from '../services/gemini.service';
 
 type Step = 'upload' | 'processing';
 type Rotation = 'front' | '60' | '90' | '180';
+type ProcessingMode = 'chain' | 'separate';
 
 const ROTATIONS: Rotation[] = ['front', '60', '90', '180'];
 
-const ROTATION_PROMPTS: Record<Rotation, string> = {
+// Chain mode prompts - short prompts that rely on conversation context
+const CHAIN_PROMPTS: Record<Rotation, string> = {
   'front': 'I need you to remember every single detail about this person - their exact face shape, facial features, skin tone, hair color and style, body proportions, clothing details, and any accessories. Transform this person into a perfect T-pose: arms extended horizontally at exactly 90 degrees from the body, legs straight and together, neutral expression, looking straight ahead. The entire body must be visible in the frame. This is extremely important: maintain 100% accuracy of all physical features and clothing.',
-  '60': 'now 60 degrees',
-  '90': 'now 90 degrees', 
-  '180': 'now 180 degrees'
+  '60': 'now rotate the same person to 60 degrees while maintaining the T-pose',
+  '90': 'now rotate the same person to 90 degrees (side view) while maintaining the T-pose', 
+  '180': 'now rotate the same person to 180 degrees (back view) while maintaining the T-pose'
+};
+
+// Separate mode prompts - detailed prompts for each angle
+const SEPARATE_PROMPTS: Record<Rotation, string> = {
+  'front': 'Transform this person into a perfect T-pose viewed from the FRONT: arms extended horizontally at exactly 90 degrees from the body, legs straight and together, neutral expression, looking straight ahead. The entire body must be visible in the frame. Maintain 100% accuracy of all physical features, face shape, skin tone, hair color and style, body proportions, clothing details, and accessories.',
+  '60': 'Transform this person into a perfect T-pose rotated 60 DEGREES: arms extended horizontally at exactly 90 degrees from the body, legs straight and together, body rotated 60 degrees to show a three-quarter view. The entire body must be visible in the frame. Maintain 100% accuracy of all physical features, face shape, skin tone, hair color and style, body proportions, clothing details, and accessories.',
+  '90': 'Transform this person into a perfect T-pose viewed from the SIDE (90 degrees): arms extended horizontally at exactly 90 degrees from the body, legs straight and together, showing a complete profile/side view. The entire body must be visible in the frame. Maintain 100% accuracy of all physical features, body proportions, clothing details, and accessories.',
+  '180': 'Transform this person into a perfect T-pose viewed from the BACK (180 degrees): do a T pose, legs straight and together, showing the complete back view. The entire body must be visible in the frame. Maintain 100% accuracy of all physical features, hair style from behind, body proportions, clothing details from the back, and any visible accessories.'
 };
 
 // Custom 3D-styled icons as SVG components
@@ -77,23 +87,56 @@ function TPoseToolPage() {
   const [processingRotation, setProcessingRotation] = useState<Rotation | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [conversationId, setConversationId] = useState<string | null>(null);
+  const [processingMode, setProcessingMode] = useState<ProcessingMode>('separate');
+  const [isProcessingAll, setIsProcessingAll] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  // Process rotations sequentially when previous one completes
+  // Start processing when entering processing mode
   useEffect(() => {
-    if (currentStep === 'processing' && inputFile && conversationId && currentRotationIndex < ROTATIONS.length) {
+    if (currentStep === 'processing' && inputFile && !isProcessingAll && currentRotationIndex === 0 && !processingRotation && !results.front) {
+      console.log('Starting processing from useEffect, mode:', processingMode);
+      startProcessing();
+    }
+  }, [currentStep, inputFile, processingMode]);
+
+  // Process subsequent rotations for chain mode only
+  useEffect(() => {
+    if (processingMode !== 'chain' || !isProcessingAll) return;
+    
+    console.log('[Chain Mode] Rotation effect triggered:', {
+      currentRotationIndex,
+      conversationId,
+      processingRotation
+    });
+    
+    // Need conversation ID to continue
+    if (!conversationId && currentRotationIndex > 0) {
+      console.log('[Chain Mode] Waiting for conversation ID...');
+      return;
+    }
+    
+    if (currentStep === 'processing' && inputFile && currentRotationIndex > 0 && currentRotationIndex < ROTATIONS.length) {
       const rotation = ROTATIONS[currentRotationIndex];
-      const prevRotation = currentRotationIndex > 0 ? ROTATIONS[currentRotationIndex - 1] : null;
+      const prevRotation = ROTATIONS[currentRotationIndex - 1];
       
-      // Only process if previous rotation is complete and current hasn't started
-      if (!results[rotation] && !processingRotation && (!prevRotation || results[prevRotation])) {
-        // Add a small delay to ensure the image is displayed before continuing
-        setTimeout(() => {
-          processRotation(rotation);
-        }, 500);
+      // Only process if previous is done and current hasn't started
+      if (!results[rotation] && !processingRotation && results[prevRotation] && conversationId) {
+        console.log(`[Chain Mode] Processing next: ${rotation}`);
+        // Delay to ensure UI updates
+        const timer = setTimeout(async () => {
+          try {
+            await processRotation(rotation);
+          } catch (err) {
+            console.error(`[Chain Mode] Failed ${rotation}:`, err);
+            setError(`Chain mode failed at ${rotation}. Try separate mode.`);
+            setIsProcessingAll(false);
+          }
+        }, 1500);
+        
+        return () => clearTimeout(timer);
       }
     }
-  }, [currentStep, currentRotationIndex, results, processingRotation, inputFile, conversationId]);
+  }, [currentStep, currentRotationIndex, results, processingRotation, inputFile, conversationId, processingMode, isProcessingAll]);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -125,42 +168,98 @@ function TPoseToolPage() {
     });
     setCurrentRotationIndex(0);
     setConversationId(null);
-    // Automatically start processing
+    setIsProcessingAll(false);
+    // Don't automatically start processing - wait for mode selection
+  };
+
+  const startProcessing = async () => {
+    if (!inputFile) return;
+    
     setCurrentStep('processing');
-    // Start first rotation immediately
-    setTimeout(() => {
-      processRotation('front');
-    }, 100);
+    setIsProcessingAll(true);
+    setError(null);
+    
+    if (processingMode === 'separate') {
+      // Process all rotations independently
+      console.log('Starting separate mode processing');
+      
+      // Process each rotation with proper error handling
+      for (let i = 0; i < ROTATIONS.length; i++) {
+        const rotation = ROTATIONS[i];
+        try {
+          console.log(`[Separate Mode] Processing ${rotation}...`);
+          await processRotation(rotation);
+          // Wait a bit between requests
+          if (i < ROTATIONS.length - 1) {
+            await new Promise(resolve => setTimeout(resolve, 1000));
+          }
+        } catch (err) {
+          console.error(`[Separate Mode] Failed to process ${rotation}:`, err);
+          setError(`Failed to generate ${rotation} view. Retrying...`);
+          // Retry once
+          try {
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            await processRotation(rotation);
+          } catch (retryErr) {
+            console.error(`[Separate Mode] Retry failed for ${rotation}:`, retryErr);
+          }
+        }
+      }
+      
+      setIsProcessingAll(false);
+    } else {
+      // Start chain mode with first rotation
+      console.log('Starting chain mode processing');
+      await processRotation('front');
+    }
   };
 
   const processRotation = async (rotation: Rotation, retryCount = 0) => {
-    if (!inputFile) return;
+    console.log(`processRotation called for ${rotation}, mode: ${processingMode}, inputFile:`, inputFile);
+    if (!inputFile) {
+      console.log('No input file, returning');
+      return;
+    }
     
     setProcessingRotation(rotation);
-    setError(null);
+    if (processingMode === 'chain') {
+      setError(null);
+    }
 
     try {
       const isFirstRotation = rotation === 'front';
+      const prompts = processingMode === 'chain' ? CHAIN_PROMPTS : SEPARATE_PROMPTS;
+      console.log(`Processing ${rotation} rotation, mode: ${processingMode}, isFirstRotation:`, isFirstRotation);
+      
+      // For separate mode, always send the image with each request
+      // For chain mode, only send image on first request
+      const shouldSendImage = processingMode === 'separate' || (processingMode === 'chain' && isFirstRotation);
       
       const result = await editImageWithGemini({
-        prompt: ROTATION_PROMPTS[rotation],
-        file: isFirstRotation ? inputFile : undefined,
+        prompt: prompts[rotation],
+        file: shouldSendImage ? inputFile : undefined,
         inputMimeType: inputFile.type,
         outputMimeType: 'image/png',
-        conversationId: isFirstRotation ? undefined : (conversationId || undefined),
-        isContinuation: !isFirstRotation
+        conversationId: processingMode === 'chain' && !isFirstRotation ? conversationId : undefined,
+        isContinuation: processingMode === 'chain' && !isFirstRotation
       });
 
-      setResults(prev => ({ ...prev, [rotation]: result.imageBase64 }));
-      
-      // Store conversation ID from first request
-      if (isFirstRotation && result.conversationId) {
-        setConversationId(result.conversationId);
-        console.log('Started conversation:', result.conversationId);
+      // Validate that we got an image
+      if (!result.imageBase64) {
+        throw new Error('No image data returned from API');
       }
       
-      // Move to next rotation
-      if (currentRotationIndex < ROTATIONS.length - 1) {
+      console.log(`Successfully generated ${rotation} image`);
+      setResults(prev => ({ ...prev, [rotation]: result.imageBase64 }));
+      
+      // Store conversation ID from first request (chain mode only)
+      if (processingMode === 'chain' && isFirstRotation && result.conversationId) {
+        setConversationId(result.conversationId);
+        console.log('Started conversation for chain mode:', result.conversationId);
+      }
+      
+      // Move to next rotation for chain mode
+      if (processingMode === 'chain' && currentRotationIndex < ROTATIONS.length - 1) {
         setCurrentRotationIndex(prev => prev + 1);
       }
     } catch (err: any) {
@@ -180,9 +279,17 @@ function TPoseToolPage() {
       setError(`Error on ${rotation} view: ${errorMessage}`);
       
       // Don't continue if conversation fails
-      console.error('Stopping due to error in conversation chain');
+      if (processingMode === 'chain') {
+        console.error('Stopping chain due to error');
+        setIsProcessingAll(false);
+      }
     } finally {
       setProcessingRotation(null);
+      
+      // Check if all done for chain mode
+      if (processingMode === 'chain' && currentRotationIndex === ROTATIONS.length - 1) {
+        setIsProcessingAll(false);
+      }
     }
   };
 
@@ -235,8 +342,9 @@ function TPoseToolPage() {
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="max-w-2xl mx-auto"
+            className="max-w-2xl mx-auto space-y-6"
           >
+            {/* File Upload Area */}
             <div
               onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
               onDrop={handleDrop}
@@ -273,6 +381,108 @@ function TPoseToolPage() {
                 />
               </div>
             </div>
+
+            {/* Mode Selection - Show after file is selected */}
+            {inputFile && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="relative"
+              >
+                <div className="absolute inset-0 bg-gradient-to-r from-cyan-500/10 via-purple-500/10 to-blue-500/10 rounded-2xl blur-xl"></div>
+                <div className="relative bg-gray-900/80 backdrop-blur-xl rounded-2xl border border-cyan-500/30 p-8">
+                  <h3 className="text-xl font-bold text-white mb-6 text-center">Choose Processing Mode</h3>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Separate Mode */}
+                    <motion.button
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={() => setProcessingMode('separate')}
+                      className={`relative group p-6 rounded-xl border-2 transition-all ${
+                        processingMode === 'separate' 
+                          ? 'border-cyan-500 bg-cyan-500/10' 
+                          : 'border-gray-700 bg-gray-800/50 hover:border-cyan-500/50'
+                      }`}
+                    >
+                      <div className="flex flex-col items-center gap-3">
+                        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center">
+                          <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                            <rect x="2" y="2" width="8" height="8" rx="1" stroke="currentColor" strokeWidth="2"/>
+                            <rect x="14" y="2" width="8" height="8" rx="1" stroke="currentColor" strokeWidth="2"/>
+                            <rect x="2" y="14" width="8" height="8" rx="1" stroke="currentColor" strokeWidth="2"/>
+                            <rect x="14" y="14" width="8" height="8" rx="1" stroke="currentColor" strokeWidth="2"/>
+                          </svg>
+                        </div>
+                        <div className="text-center">
+                          <h4 className="font-bold text-white mb-1">Separate Mode</h4>
+                          <div className="inline-flex items-center gap-1 px-2 py-0.5 bg-green-500/20 text-green-400 text-xs font-semibold rounded-full mb-2">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                              <path d="M9 11L12 14L22 4" stroke="currentColor" strokeWidth="3" fill="none"/>
+                            </svg>
+                            RECOMMENDED
+                          </div>
+                          <p className="text-sm text-gray-400">Process all angles independently</p>
+                          <p className="text-xs text-cyan-400 mt-2">✓ More reliable • ✓ Works better on deployment</p>
+                        </div>
+                      </div>
+                    </motion.button>
+
+                    {/* Chain Mode */}
+                    <motion.button
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={() => setProcessingMode('chain')}
+                      className={`relative group p-6 rounded-xl border-2 transition-all ${
+                        processingMode === 'chain' 
+                          ? 'border-purple-500 bg-purple-500/10' 
+                          : 'border-gray-700 bg-gray-800/50 hover:border-purple-500/50'
+                      }`}
+                    >
+                      <div className="flex flex-col items-center gap-3">
+                        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center">
+                          <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                            <path d="M6 12L10 12M14 12L18 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                            <circle cx="6" cy="12" r="3" stroke="currentColor" strokeWidth="2"/>
+                            <circle cx="18" cy="12" r="3" stroke="currentColor" strokeWidth="2"/>
+                            <circle cx="12" cy="12" r="2" fill="currentColor"/>
+                          </svg>
+                        </div>
+                        <div className="text-center">
+                          <h4 className="font-bold text-white mb-1">Chain Mode</h4>
+                          <p className="text-sm text-gray-400">Sequential with context</p>
+                          <p className="text-xs text-purple-400 mt-2">Better consistency</p>
+                        </div>
+                      </div>
+                    </motion.button>
+                  </div>
+
+                  {/* Start Button */}
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={startProcessing}
+                    className="w-full mt-6 py-4 bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-bold rounded-xl hover:from-cyan-600 hover:to-blue-700 transition-all shadow-lg shadow-cyan-500/25"
+                  >
+                    Start T-Pose Generation
+                  </motion.button>
+
+                  {/* Preview */}
+                  {inputPreview && (
+                    <div className="mt-6 flex justify-center">
+                      <div className="relative">
+                        <div className="absolute -inset-1 bg-gradient-to-r from-cyan-500/20 to-purple-500/20 rounded-lg blur-sm"></div>
+                        <img 
+                          src={inputPreview} 
+                          alt="Selected" 
+                          className="relative w-32 h-32 object-cover rounded-lg"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </motion.div>
+            )}
           </motion.div>
         )}
 
@@ -450,7 +660,7 @@ function TPoseToolPage() {
 
                 {/* Status Messages */}
                 <AnimatePresence mode="wait">
-                  {processingRotation && (
+                  {(processingRotation || (processingMode === 'separate' && isProcessingAll && !isComplete)) && (
                     <motion.div
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
@@ -466,10 +676,13 @@ function TPoseToolPage() {
                         </motion.div>
                         <div>
                           <p className="text-cyan-300 font-medium">
-                            Processing {processingRotation === 'front' ? 'T-Pose transformation' : `${processingRotation}° rotation`}
+                            {processingMode === 'separate' && isProcessingAll && !processingRotation 
+                              ? 'Processing all angles in parallel...'
+                              : `Processing ${processingRotation === 'front' ? 'T-Pose transformation' : `${processingRotation}° rotation`}`
+                            }
                           </p>
                           <p className="text-sm text-gray-400 mt-1">
-                            Using Gemini 2.5 Flash for high-quality results
+                            Mode: {processingMode === 'chain' ? 'Sequential processing' : 'Parallel processing'}
                           </p>
                         </div>
                       </div>
@@ -513,6 +726,9 @@ function TPoseToolPage() {
                       <p className="text-gray-400 mt-4">
                         Your 3D T-pose reference set is ready for modeling
                       </p>
+                      <p className="text-sm text-gray-500 mt-2">
+                        Mode: {processingMode === 'chain' ? 'Chain (Sequential)' : 'Separate (Parallel)'}
+                      </p>
                       <motion.button
                         whileHover={{ scale: 1.05 }}
                         whileTap={{ scale: 0.95 }}
@@ -523,6 +739,7 @@ function TPoseToolPage() {
                           setResults({ 'front': null, '60': null, '90': null, '180': null });
                           setCurrentRotationIndex(0);
                           setConversationId(null);
+                          setIsProcessingAll(false);
                         }}
                         className="mt-4 px-6 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-xl transition-colors"
                       >

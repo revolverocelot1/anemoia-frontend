@@ -10,7 +10,7 @@ export type GeminiEditParams = {
   isContinuation?: boolean;
 };
 
-export async function editImageWithGemini(params: GeminiEditParams): Promise<{ imageBase64: string; mimeType: string; conversationId?: string }>{
+export async function editImageWithGemini(params: GeminiEditParams): Promise<{ imageBase64: string; mimeType: string; conversationId?: string }> {
   const form = new FormData();
   
   form.append('prompt', params.prompt);
@@ -19,10 +19,12 @@ export async function editImageWithGemini(params: GeminiEditParams): Promise<{ i
   
   // Add conversation parameters if provided
   if (params.conversationId) {
+    console.log('Adding conversation_id to form:', params.conversationId);
     form.append('conversation_id', params.conversationId);
   }
-  if (params.isContinuation) {
-    form.append('is_continuation', 'true');
+  if (params.isContinuation !== undefined) {
+    console.log('Adding is_continuation to form:', params.isContinuation);
+    form.append('is_continuation', params.isContinuation ? 'true' : 'false');
   }
 
   // Only append image for initial request, not continuations
@@ -37,16 +39,27 @@ export async function editImageWithGemini(params: GeminiEditParams): Promise<{ i
   }
 
   try {
-    console.log(`[Gemini API] Calling with prompt:`, params.prompt);
-    console.log(`[Gemini API] Conversation ID:`, params.conversationId, 'Is continuation:', params.isContinuation);
+    console.log(`[Gemini API] Calling with prompt:`, params.prompt.substring(0, 100) + '...');
+    console.log(`[Gemini API] Mode:`, params.isContinuation ? 'Chain continuation' : 'New request');
+    console.log(`[Gemini API] Has image:`, params.file ? 'Yes' : params.imageBase64 ? 'Base64' : 'No');
+    
     const res = await api.upload('/api/gemini/image-edit', form, {
       headers: {
         'Cache-Control': 'no-cache',
         'Pragma': 'no-cache'
-      }
+      },
+      timeout: 120000 // 2 minute timeout
     });
-    console.log(`[Gemini API] Response received`);
+    
+    console.log(`[Gemini API] Response received, status:`, res.status);
     const data = res.data as { image_base64: string; mime_type: string; conversation_id?: string };
+    
+    if (!data.image_base64) {
+      throw new Error('No image data in response');
+    }
+    
+    console.log(`[Gemini API] Image size:`, data.image_base64.length, 'Conv ID:', data.conversation_id);
+    
     return { 
       imageBase64: data.image_base64, 
       mimeType: data.mime_type,
@@ -55,16 +68,23 @@ export async function editImageWithGemini(params: GeminiEditParams): Promise<{ i
   } catch (error: any) {
     console.error(`[Gemini API] Error:`, error);
     console.error('Error response:', error.response?.data);
+    console.error('Error status:', error.response?.status);
     
     // Provide more user-friendly error messages
-    if (error.response?.status === 504) {
-      throw new Error('Image generation timed out. Please try again.');
+    if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+      throw new Error('Request timed out. The image generation is taking longer than expected.');
+    } else if (error.response?.status === 504) {
+      throw new Error('Server timeout. Please try again with a simpler prompt.');
     } else if (error.response?.status === 503) {
-      throw new Error('Service temporarily unavailable. Please try again in a moment.');
+      throw new Error('AI service temporarily unavailable. Please try again.');
+    } else if (error.response?.status === 502) {
+      throw new Error('Failed to generate image. The AI service may be overloaded.');
     } else if (error.response?.data?.detail) {
       throw new Error(error.response.data.detail);
+    } else if (error.message) {
+      throw new Error(`Generation failed: ${error.message}`);
     }
-    throw error;
+    throw new Error('Unknown error occurred during image generation');
   }
 }
 
