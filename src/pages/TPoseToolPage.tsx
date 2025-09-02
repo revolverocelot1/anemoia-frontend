@@ -1,6 +1,7 @@
 import React, { useCallback, useMemo, useRef, useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { editImageWithGemini } from '../services/gemini.service';
+import { useNavigate } from 'react-router-dom';
 
 type Step = 'upload' | 'processing';
 type Rotation = 'front' | '60' | '90' | '180';
@@ -74,6 +75,7 @@ const IconUpload = () => (
 );
 
 function TPoseToolPage() {
+  const navigate = useNavigate();
   const [currentStep, setCurrentStep] = useState<Step>('upload');
   const [inputFile, setInputFile] = useState<File | null>(null);
   const [inputPreview, setInputPreview] = useState<string | null>(null);
@@ -304,6 +306,16 @@ function TPoseToolPage() {
 
   return (
     <div className="relative z-10 min-h-screen w-full">
+      {/* Corner button to navigate to the normal Gemini chat */}
+      <div className="fixed top-4 right-4 z-50">
+        <button
+          onClick={() => navigate('/image-chat')}
+          className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-gray-800/80 border border-gray-700 text-gray-200 hover:bg-gray-700 transition-colors shadow-lg"
+          aria-label="Open Gemini Image Chat"
+        >
+          Normal
+        </button>
+      </div>
       {/* Background with 3D grid effect */}
       <div className="absolute inset-0 overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-gray-950 via-gray-900 to-black"></div>

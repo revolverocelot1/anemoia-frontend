@@ -37,6 +37,7 @@ import { AnimatePresence } from 'framer-motion';
 import ASCIIVideoConverter from './pages/ASCIIVideoConverter'
 import SupportPage from './pages/SupportPage'
 import AdminSupportPage from './pages/AdminSupportPage'
+import GeminiImageChatPage from './pages/GeminiImageChatPage'
 
 // Lazy load SubtitlePage to prevent ONNX runtime conflicts on app startup
 const SubtitlePage = lazy(() => import('./pages/SubtitlePageEnhanced'));
@@ -564,6 +565,14 @@ function App() {
               element={
                 <AnimatedPage>
                   <AnimeVideoToCodePage />
+                </AnimatedPage>
+              }
+            />
+            <Route
+              path="/image-chat"
+              element={
+                <AnimatedPage>
+                  <GeminiImageChatPage />
                 </AnimatedPage>
               }
             />
