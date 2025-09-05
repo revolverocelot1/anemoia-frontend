@@ -1,9 +1,23 @@
-# Anemoia WebGL Tools - Robots.txt
+# Anemoia AI Creative Tools - Robots.txt
 # https://anemoias.me
+# Last Updated: January 2025
 
 # Allow all search engine crawlers
 User-agent: *
 Allow: /
+Allow: /t-poser
+Allow: /image-chat
+Allow: /doom
+Allow: /pose-estimation
+Allow: /video-editor
+Allow: /shader-editor
+Allow: /ascii-converter
+Allow: /webcam-effects
+Allow: /3d-viewer
+Allow: /particle-system
+Allow: /webgl-playground
+Allow: /fractal-explorer
+Allow: /tool-pages/
 
 # Sitemap location
 Sitemap: https://anemoias.me/sitemap.xml
@@ -27,12 +41,18 @@ Disallow: /test
 Disallow: /api/
 Disallow: /.well-known/
 
-# Crawl-delay for respectful crawling
-Crawl-delay: 1
+# No crawl delay for fast indexing
+# Crawl-delay: 0
 
-# Block bad bots
+# Block bad bots but allow SEO analysis tools
 User-agent: AhrefsBot
+Crawl-delay: 10
+
+User-agent: SemrushBot  
+Crawl-delay: 10
+
+User-agent: MJ12bot
 Disallow: /
 
-User-agent: SemrushBot
+User-agent: DotBot
 Disallow: / 

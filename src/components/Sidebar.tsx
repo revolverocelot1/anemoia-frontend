@@ -16,6 +16,69 @@ interface ToolItem {
   badge?: string;
 }
 
+// Custom SVG icons for tools
+const customIcons: { [key: string]: React.ReactElement } = {
+  't-pose-icon': (
+    <svg viewBox="0 0 24 24" fill="none" className="w-6 h-6">
+      <circle cx="12" cy="5" r="2" stroke="currentColor" strokeWidth="2"/>
+      <path d="M12 7V14M12 14V18M12 14L8 10M12 14L16 10M12 18L10 20M12 18L14 20" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+    </svg>
+  ),
+  'image-chat-icon': (
+    <svg viewBox="0 0 24 24" fill="none" className="w-6 h-6">
+      <rect x="3" y="4" width="18" height="12" rx="2" stroke="currentColor" strokeWidth="2"/>
+      <path d="M7 11L10 8L14 12L18 9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+      <circle cx="8" cy="8" r="1" fill="currentColor"/>
+      <path d="M8 16L8 19C8 19.5523 8.44772 20 9 20H15C15.5523 20 16 19.5523 16 19V16" stroke="currentColor" strokeWidth="2"/>
+      <path d="M11 18H13" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+    </svg>
+  ),
+  'doom-icon': (
+    <svg viewBox="0 0 24 24" fill="none" className="w-6 h-6">
+      <path d="M12 2L4 8V16L12 22L20 16V8L12 2Z" stroke="currentColor" strokeWidth="2" fill="currentColor" fillOpacity="0.2"/>
+      <path d="M8 10H9V12H8V10ZM15 10H16V12H15V10Z" fill="currentColor"/>
+      <path d="M8 15C8 15 9.5 17 12 17C14.5 17 16 15 16 15" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+      <path d="M7 6L12 3L17 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+    </svg>
+  ),
+  'terminal-icon': (
+    <svg viewBox="0 0 24 24" fill="none" className="w-6 h-6">
+      <rect x="3" y="4" width="18" height="16" rx="2" stroke="currentColor" strokeWidth="2"/>
+      <path d="M7 9L10 12L7 15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+      <path d="M13 15H17" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+      <path d="M3 8H21" stroke="currentColor" strokeWidth="2"/>
+      <circle cx="6" cy="6" r="0.5" fill="currentColor"/>
+      <circle cx="8" cy="6" r="0.5" fill="currentColor"/>
+      <circle cx="10" cy="6" r="0.5" fill="currentColor"/>
+    </svg>
+  ),
+  'color-picker-icon': (
+    <svg viewBox="0 0 24 24" fill="none" className="w-6 h-6">
+      <path d="M12 2C6.48 2 2 6.48 2 12C2 17.52 6.48 22 12 22C12.55 22 13 21.55 13 21C13 20.45 12.55 20 12 20C7.58 20 4 16.42 4 12C4 7.58 7.58 4 12 4C16.42 4 20 7.58 20 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+      <circle cx="12" cy="12" r="3" fill="currentColor" fillOpacity="0.3" stroke="currentColor" strokeWidth="2"/>
+      <circle cx="19" cy="19" r="3" fill="currentColor" fillOpacity="0.5" stroke="currentColor" strokeWidth="2"/>
+      <circle cx="8" cy="8" r="2" fill="#FF0000"/>
+      <circle cx="16" cy="8" r="2" fill="#00FF00"/>
+      <circle cx="8" cy="16" r="2" fill="#0000FF"/>
+    </svg>
+  ),
+  'metadata-icon': (
+    <svg viewBox="0 0 24 24" fill="none" className="w-6 h-6">
+      <rect x="4" y="4" width="16" height="16" rx="2" stroke="currentColor" strokeWidth="2"/>
+      <path d="M4 8H20" stroke="currentColor" strokeWidth="2"/>
+      <path d="M8 12H16M8 16H14" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+      <circle cx="12" cy="6" r="1" fill="currentColor"/>
+    </svg>
+  ),
+  'batch-icon': (
+    <svg viewBox="0 0 24 24" fill="none" className="w-6 h-6">
+      <rect x="5" y="5" width="10" height="10" rx="1" stroke="currentColor" strokeWidth="2"/>
+      <rect x="9" y="9" width="10" height="10" rx="1" stroke="currentColor" strokeWidth="2" fill="currentColor" fillOpacity="0.2"/>
+      <path d="M12 12L14 14M14 12L12 14" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+    </svg>
+  )
+};
+
 const Sidebar: React.FC<SidebarProps> = ({ isOpen, onToggle }) => {
   const navigate = useNavigate();
 
@@ -24,7 +87,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onToggle }) => {
       id: 't-poser',
       name: '3D T-Pose Builder',
       description: 'Turn a person into a T-pose and rotate 60°/90°/180°',
-      icon: 'accessibility_new',
+      icon: 't-pose-icon',
       onClick: () => {
         navigate('/t-poser');
         onToggle();
@@ -32,10 +95,21 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onToggle }) => {
       badge: 'AI'
     },
     {
+      id: 'image-chat',
+      name: 'Nano Banana Chat',
+      description: 'Uncensored AI image editing with Gemini 2.5 Flash',
+      icon: 'image-chat-icon',
+      onClick: () => {
+        navigate('/image-chat');
+        onToggle();
+      },
+      badge: 'HOT'
+    },
+    {
       id: 'doom',
       name: 'DOOM Classic',
       description: 'Play the classic DOOM game in your browser',
-      icon: 'videogame_asset',
+      icon: 'doom-icon',
       onClick: () => {
         navigate('/doom');
         onToggle();
@@ -43,21 +117,10 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onToggle }) => {
       badge: 'WebASM'
     },
     {
-      id: 'anime-video-to-code',
-      name: 'Anime.js Video → Code',
-      description: 'Convert a video into Anime.js DOM animation code',
-      icon: 'movie',
-      onClick: () => {
-        navigate('/anime-video-to-code');
-        onToggle();
-      },
-      badge: 'NEW'
-    },
-    {
       id: 'anime-gallery',
       name: 'AGHPB Terminal',
       description: 'Cyberpunk terminal interface for anime girls holding programming books',
-      icon: 'terminal',
+      icon: 'terminal-icon',
       onClick: () => {
         navigate('/anime-gallery');
         onToggle();
@@ -68,7 +131,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onToggle }) => {
       id: 'color-picker',
       name: 'Color Picker',
       description: 'Extract color palettes from images',
-      icon: 'palette',
+      icon: 'color-picker-icon',
       onClick: () => {
         // TODO: Implement color picker
         console.log('Color picker clicked');
@@ -78,7 +141,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onToggle }) => {
       id: 'metadata-viewer',
       name: 'Image Metadata',
       description: 'View and edit image EXIF data',
-      icon: 'info',
+      icon: 'metadata-icon',
       onClick: () => {
         // TODO: Implement metadata viewer
         console.log('Metadata viewer clicked');
@@ -88,7 +151,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onToggle }) => {
       id: 'batch-converter',
       name: 'Batch Converter',
       description: 'Convert multiple images between formats',
-      icon: 'transform',
+      icon: 'batch-icon',
       onClick: () => {
         // TODO: Implement batch converter
         console.log('Batch converter clicked');
@@ -185,14 +248,18 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onToggle }) => {
                     transition={{ delay: index * 0.1 }}
                     className={`relative p-4 rounded-xl border-2 transition-all duration-200 cursor-pointer group ${
                       tool.id === 'doom' 
-                        ? 'bg-gradient-to-r from-red-50 to-orange-50 dark:from-red-900/20 dark:to-orange-900/20 border-red-200 dark:border-red-800 hover:border-red-400 dark:hover:border-red-600'
+                        ? 'bg-gradient-to-r from-red-50 to-orange-50 dark:from-red-900/20 dark:to-orange-900/20 border-red-300 dark:border-red-700 hover:border-red-500 dark:hover:border-red-500 hover:shadow-lg hover:shadow-red-500/20'
+                        : tool.id === 'image-chat'
+                        ? 'bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 border-purple-300 dark:border-purple-700 hover:border-purple-500 dark:hover:border-purple-500 hover:shadow-lg hover:shadow-purple-500/20'
                         : tool.id === 'anime-gallery'
-                        ? 'bg-gradient-to-r from-cyan-50 to-purple-50 dark:from-cyan-900/20 dark:to-purple-900/20 border-cyan-200 dark:border-cyan-800 hover:border-cyan-400 dark:hover:border-cyan-600'
+                        ? 'bg-gradient-to-r from-cyan-50 to-blue-50 dark:from-cyan-900/20 dark:to-blue-900/20 border-cyan-300 dark:border-cyan-700 hover:border-cyan-500 dark:hover:border-cyan-500 hover:shadow-lg hover:shadow-cyan-500/20'
                         : tool.id === 'color-picker'
-                        ? 'bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 border-purple-200 dark:border-purple-800 hover:border-purple-400 dark:hover:border-purple-600'
+                        ? 'bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-900/20 dark:to-purple-900/20 border-indigo-300 dark:border-indigo-700 hover:border-indigo-500 dark:hover:border-indigo-500 hover:shadow-lg hover:shadow-indigo-500/20'
                         : tool.id === 'metadata-viewer'
-                        ? 'bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-blue-900/20 dark:to-cyan-900/20 border-blue-200 dark:border-blue-800 hover:border-blue-400 dark:hover:border-blue-600'
-                        : 'bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 border-green-200 dark:border-green-800 hover:border-green-400 dark:hover:border-green-600'
+                        ? 'bg-gradient-to-r from-blue-50 to-teal-50 dark:from-blue-900/20 dark:to-teal-900/20 border-blue-300 dark:border-blue-700 hover:border-blue-500 dark:hover:border-blue-500 hover:shadow-lg hover:shadow-blue-500/20'
+                        : tool.id === 't-poser'
+                        ? 'bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 border-green-300 dark:border-green-700 hover:border-green-500 dark:hover:border-green-500 hover:shadow-lg hover:shadow-green-500/20'
+                        : 'bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-900/20 dark:to-gray-800/20 border-gray-300 dark:border-gray-700 hover:border-gray-500 dark:hover:border-gray-500 hover:shadow-lg hover:shadow-gray-500/20'
                     }`}
                     onClick={tool.onClick}
                     whileHover={{ scale: 1.02, y: -2 }}
@@ -203,10 +270,12 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onToggle }) => {
                         <span className={`px-2 py-1 text-xs font-medium rounded-full ${
                           tool.id === 'doom' 
                             ? 'bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-300'
+                            : tool.id === 'image-chat'
+                            ? 'bg-gradient-to-r from-purple-100 to-pink-100 text-purple-700 dark:from-purple-900/50 dark:to-pink-900/50 dark:text-purple-300'
                             : tool.id === 'anime-gallery'
                             ? 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/50 dark:text-cyan-300'
                             : tool.id === 'color-picker'
-                            ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300'
+                            ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300'
                             : 'bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300'
                         }`}>
                           {tool.badge}
@@ -217,16 +286,20 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onToggle }) => {
                     <div className="flex items-start space-x-4">
                       <div className={`w-12 h-12 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform ${
                         tool.id === 'doom' 
-                          ? 'bg-red-600 group-hover:bg-red-700'
+                          ? 'bg-gradient-to-br from-red-600 to-orange-600 group-hover:from-red-700 group-hover:to-orange-700'
+                          : tool.id === 'image-chat'
+                          ? 'bg-gradient-to-br from-purple-600 to-pink-600 group-hover:from-purple-700 group-hover:to-pink-700'
                           : tool.id === 'anime-gallery'
-                          ? 'bg-cyan-600 group-hover:bg-cyan-700'
+                          ? 'bg-gradient-to-br from-cyan-600 to-blue-600 group-hover:from-cyan-700 group-hover:to-blue-700'
                           : tool.id === 'color-picker'
-                          ? 'bg-purple-600 group-hover:bg-purple-700'
+                          ? 'bg-gradient-to-br from-purple-500 to-indigo-600 group-hover:from-purple-600 group-hover:to-indigo-700'
                           : tool.id === 'metadata-viewer'
-                          ? 'bg-blue-600 group-hover:bg-blue-700'
-                          : 'bg-green-600 group-hover:bg-green-700'
+                          ? 'bg-gradient-to-br from-blue-600 to-teal-600 group-hover:from-blue-700 group-hover:to-teal-700'
+                          : tool.id === 't-poser'
+                          ? 'bg-gradient-to-br from-green-600 to-emerald-600 group-hover:from-green-700 group-hover:to-emerald-700'
+                          : 'bg-gradient-to-br from-gray-600 to-gray-700 group-hover:from-gray-700 group-hover:to-gray-800'
                       }`}>
-                        <span className="material-symbols-outlined text-white text-xl">{tool.icon}</span>
+                        {customIcons[tool.icon] || <span className="material-symbols-outlined text-white text-xl">{tool.icon}</span>}
                       </div>
                       
                       <div className="flex-1 min-w-0">
@@ -242,9 +315,9 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onToggle }) => {
                     <div className="mt-3 flex items-center justify-between">
                       <div className="flex items-center space-x-2 text-xs text-gray-500 dark:text-gray-500">
                         <span className="material-symbols-outlined text-sm">
-                          {tool.id === 'doom' || tool.id === 'anime-gallery' ? 'launch' : 'build'}
+                          {tool.id === 'doom' || tool.id === 'anime-gallery' || tool.id === 't-poser' || tool.id === 'image-chat' ? 'launch' : 'build'}
                         </span>
-                        <span>{tool.id === 'doom' || tool.id === 'anime-gallery' ? 'Ready to explore' : 'Coming soon'}</span>
+                        <span>{tool.id === 'doom' || tool.id === 'anime-gallery' || tool.id === 't-poser' || tool.id === 'image-chat' ? 'Ready to explore' : 'Coming soon'}</span>
                       </div>
                       
                       <motion.div

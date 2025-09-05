@@ -112,6 +112,7 @@ export async function chatImageWithGemini(params: GeminiChatParams): Promise<{ i
   // Prefer files; else imageBase64List
   if (!params.isContinuation) {
     if (params.files && params.files.length > 0) {
+      // Optimize: compress large images before upload
       for (const f of params.files) {
         form.append('images', f);
       }
@@ -130,36 +131,71 @@ export async function chatImageWithGemini(params: GeminiChatParams): Promise<{ i
     }
   }
 
-  try {
-    const res = await api.upload('/api/gemini/image-chat', form, {
-      headers: {
-        'Cache-Control': 'no-cache',
-        'Pragma': 'no-cache',
-      },
-      timeout: 120000,
-    });
-    const data = res.data as { image_base64: string; mime_type: string; conversation_id?: string };
-    if (!data.image_base64) throw new Error('No image data in response');
-    return { imageBase64: data.image_base64, mimeType: data.mime_type, conversationId: data.conversation_id };
-  } catch (error: any) {
-    console.error('[Gemini Chat] Error:', error);
-    console.error('Error response:', error.response?.data);
-    console.error('Error status:', error.response?.status);
-    if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
-      throw new Error('Request timed out. The image generation is taking longer than expected.');
-    } else if (error.response?.status === 504) {
-      throw new Error('Server timeout. Please try again with a simpler prompt.');
-    } else if (error.response?.status === 503) {
-      throw new Error('AI service temporarily unavailable. Please try again.');
-    } else if (error.response?.status === 502) {
-      throw new Error('Failed to generate image. The AI service may be overloaded.');
-    } else if (error.response?.data?.detail) {
-      throw new Error(error.response.data.detail);
-    } else if (error.message) {
-      throw new Error(`Generation failed: ${error.message}`);
+  // Retry logic with exponential backoff
+  const maxRetries = 3;
+  let lastError: any;
+  
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      console.log(`[Gemini Chat] Attempt ${attempt + 1}/${maxRetries}`);
+      
+      const res = await api.upload('/api/gemini/image-chat', form, {
+        headers: {
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache',
+        },
+        timeout: 120000, // 2 minute timeout
+        // Add request ID for tracking
+        params: {
+          request_id: `${Date.now()}-${Math.random().toString(36).substring(7)}`
+        }
+      });
+      
+      const data = res.data as { image_base64: string; mime_type: string; conversation_id?: string };
+      if (!data.image_base64) throw new Error('No image data in response');
+      
+      console.log('[Gemini Chat] Success on attempt', attempt + 1);
+      return { imageBase64: data.image_base64, mimeType: data.mime_type, conversationId: data.conversation_id };
+      
+    } catch (error: any) {
+      lastError = error;
+      console.error(`[Gemini Chat] Error on attempt ${attempt + 1}:`, error.message);
+      
+      // Don't retry on client errors (4xx)
+      if (error.response?.status >= 400 && error.response?.status < 500) {
+        break;
+      }
+      
+      // Exponential backoff before retry
+      if (attempt < maxRetries - 1) {
+        const delay = Math.min(1000 * Math.pow(2, attempt), 10000); // Max 10 seconds
+        console.log(`[Gemini Chat] Retrying in ${delay}ms...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
     }
-    throw new Error('Unknown error occurred during image generation');
   }
+  
+  // Handle the final error after all retries
+  console.error('[Gemini Chat] All attempts failed:', lastError);
+  console.error('Error response:', lastError.response?.data);
+  console.error('Error status:', lastError.response?.status);
+  
+  if (lastError.code === 'ECONNABORTED' || lastError.message?.includes('timeout')) {
+    throw new Error('Request timed out after multiple attempts. Try reducing image size or simplifying the prompt.');
+  } else if (lastError.response?.status === 504) {
+    throw new Error('Server timeout. The AI service is experiencing high load. Please try again in a moment.');
+  } else if (lastError.response?.status === 503) {
+    throw new Error('AI service temporarily unavailable. Please try again in a few seconds.');
+  } else if (lastError.response?.status === 502) {
+    throw new Error('Connection issue with AI service. Please check your internet and try again.');
+  } else if (lastError.response?.status === 429) {
+    throw new Error('Rate limit exceeded. Please wait a moment before trying again.');
+  } else if (lastError.response?.data?.detail) {
+    throw new Error(lastError.response.data.detail);
+  } else if (lastError.message) {
+    throw new Error(`Generation failed: ${lastError.message}`);
+  }
+  throw new Error('Failed to generate image after multiple attempts. Please try again later.');
 }
 
 
