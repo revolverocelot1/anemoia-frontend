@@ -161,12 +161,21 @@ function VideoObjectRemoverPage() {
     console.log('Video dimensions:', video.videoWidth, 'x', video.videoHeight);
 
     const fps = 25; // Target FPS
-    const framesToExtract: number[] = [0]; // First frame
+    const frameInterval = 5; // Extract every 5th frame for processing
+    const framesToExtract: number[] = [];
     
-    // Extract every 5th frame
+    // Calculate total frames based on duration and FPS
     const totalFrames = Math.floor(effectiveDuration * fps);
-    for (let i = 5; i < totalFrames; i += 5) {
+    
+    // Extract frames at regular intervals
+    for (let i = 0; i < totalFrames; i += frameInterval) {
       framesToExtract.push(i);
+    }
+    
+    // Always include the last frame if not already included
+    const lastFrame = totalFrames - 1;
+    if (framesToExtract[framesToExtract.length - 1] !== lastFrame && lastFrame > 0) {
+      framesToExtract.push(lastFrame);
     }
 
     console.log('Frames to extract:', framesToExtract);
@@ -298,7 +307,7 @@ function VideoObjectRemoverPage() {
       return framesToInterpolate.filter(f => f.processedDataUrl).sort((a, b) => a.frameNumber - b.frameNumber).map(f => f.processedDataUrl!);
     }
 
-    const processedFrames = framesToInterpolate.filter(f => f.processedDataUrl);
+    const processedFrames = framesToInterpolate.filter(f => f.processedDataUrl).sort((a, b) => a.frameNumber - b.frameNumber);
     console.log(`Found ${processedFrames.length} processed frames for interpolation`);
     
     if (processedFrames.length < 2) {
@@ -307,15 +316,16 @@ function VideoObjectRemoverPage() {
     }
 
     // Calculate how many frames we need between each pair
-    const targetFps = 25;
     const framePairs: Array<{frame1: ProcessingFrame, frame2: ProcessingFrame, numIntermediate: number}> = [];
     
     for (let i = 0; i < processedFrames.length - 1; i++) {
       const frame1 = processedFrames[i];
       const frame2 = processedFrames[i + 1];
       const frameGap = frame2.frameNumber - frame1.frameNumber;
+      // We need to fill in the missing frames between the two keyframes
       const numIntermediate = Math.max(0, frameGap - 1);
       
+      console.log(`Frames ${frame1.frameNumber} -> ${frame2.frameNumber}: need ${numIntermediate} intermediate frames`);
       framePairs.push({ frame1, frame2, numIntermediate });
     }
 
@@ -357,16 +367,27 @@ function VideoObjectRemoverPage() {
     }
 
     // Compose final ordered frames: processed + interpolated between
+    console.log(`Total interpolated frames: ${totalInterpolated}`);
     const processedFramesSorted = processedFrames.sort((a, b) => a.frameNumber - b.frameNumber);
     const composed: string[] = [];
+    
+    // Build the complete frame sequence
     for (let i = 0; i < processedFramesSorted.length - 1; i++) {
+      // Add the keyframe
       composed.push(processedFramesSorted[i].processedDataUrl!);
-      const mids = pairInterpolations[i] || [];
-      for (const m of mids) composed.push(m);
+      
+      // Add interpolated frames between this keyframe and the next
+      const interpolatedFrames = pairInterpolations[i] || [];
+      console.log(`Adding ${interpolatedFrames.length} interpolated frames after frame ${processedFramesSorted[i].frameNumber}`);
+      for (const frame of interpolatedFrames) {
+        composed.push(frame);
+      }
     }
-    // add last processed frame
+    
+    // Add the last keyframe
     composed.push(processedFramesSorted[processedFramesSorted.length - 1].processedDataUrl!);
-
+    
+    console.log(`Final composed sequence: ${composed.length} frames total (${processedFrames.length} keyframes + ${totalInterpolated} interpolated)`);
     return composed;
   };
 
@@ -402,23 +423,53 @@ function VideoObjectRemoverPage() {
       const ctx = canvas.getContext('2d');
       if (!ctx) throw new Error('Canvas 2D unavailable');
 
-      // Calculate actual FPS based on original video duration and frame count
-      const fps = 25;
+      // Calculate actual FPS and timing
+      const targetFps = 25;
       const targetDuration = effectiveDuration; // Use the original video duration
       const totalFrames = orderedDataUrls.length;
-      const actualFps = totalFrames / targetDuration;
       
-      console.log(`Video reconstruction: ${totalFrames} frames, ${targetDuration}s duration, ${actualFps} FPS`);
+      // Calculate the actual frame time to match duration
+      const frameTime = targetDuration / totalFrames; // seconds per frame
+      const effectiveFps = 1 / frameTime;
+      
+      console.log(`Video reconstruction: ${totalFrames} frames, ${targetDuration}s duration`);  
+      console.log(`Target FPS: ${targetFps}, Effective FPS: ${effectiveFps.toFixed(2)}`);  
+      console.log(`Frame time: ${(frameTime * 1000).toFixed(2)}ms per frame`);
 
-      // Capture stream and record
-      const stream = (canvas as HTMLCanvasElement).captureStream(fps);
-      const recorder = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp9', videoBitsPerSecond: 6_000_000 });
+      // MediaRecorder doesn't support MP4, so we'll use WebM and convert it
+      // We'll use a higher bitrate for better quality
+      const stream = (canvas as HTMLCanvasElement).captureStream(targetFps);
+      
+      // Try to use the best codec available
+      let mimeType = 'video/webm;codecs=vp9';
+      let videoBitsPerSecond = 10_000_000; // 10 Mbps for better quality
+      
+      // Check codec support
+      const codecs = [
+        { mime: 'video/webm;codecs=vp9', bitrate: 10_000_000 },
+        { mime: 'video/webm;codecs=vp8', bitrate: 8_000_000 },
+        { mime: 'video/webm', bitrate: 6_000_000 }
+      ];
+      
+      for (const codec of codecs) {
+        if (MediaRecorder.isTypeSupported(codec.mime)) {
+          mimeType = codec.mime;
+          videoBitsPerSecond = codec.bitrate;
+          console.log(`Using codec: ${codec.mime} with bitrate: ${codec.bitrate}`);
+          break;
+        }
+      }
+      
+      const recorder = new MediaRecorder(stream, { 
+        mimeType, 
+        videoBitsPerSecond 
+      });
       const chunks: BlobPart[] = [];
       recorder.ondataavailable = e => { if (e.data && e.data.size > 0) chunks.push(e.data); };
 
       const done = new Promise<string>((resolve) => {
         recorder.onstop = () => {
-          const blob = new Blob(chunks, { type: 'video/webm' });
+          const blob = new Blob(chunks, { type: mimeType.split(';')[0] });
           const url = URL.createObjectURL(blob);
           resolve(url);
         };
@@ -426,38 +477,56 @@ function VideoObjectRemoverPage() {
 
       recorder.start();
 
-      // Use requestAnimationFrame for accurate frame timing
-      const frameDuration = 1000 / actualFps; // Duration each frame should be displayed
-      let frameIndex = 0;
-      let lastFrameTime = performance.now();
+      // Preload all images for smoother playback
+      console.log('Preloading frames...');
+      const preloadedImages = await Promise.all(
+        orderedDataUrls.map(url => loadImage(url))
+      );
+      console.log('All frames preloaded');
       
-      const drawFrame = async () => {
-        if (frameIndex >= orderedDataUrls.length) {
-          recorder.stop();
+      // Use precise timing for frame rendering
+      const frameDuration = (targetDuration * 1000) / totalFrames; // ms per frame
+      let frameIndex = 0;
+      let startTime = performance.now();
+      
+      const drawFrame = () => {
+        if (frameIndex >= preloadedImages.length) {
+          // Add a small delay to ensure the last frame is captured
+          setTimeout(() => {
+            recorder.stop();
+            console.log(`Video encoding complete. Final frame count: ${frameIndex}`);
+            console.log(`Actual duration: ${(performance.now() - startTime) / 1000}s`);
+          }, 100);
           return;
         }
         
         const currentTime = performance.now();
-        const elapsed = currentTime - lastFrameTime;
+        const expectedTime = startTime + (frameIndex * frameDuration);
         
-        if (elapsed >= frameDuration) {
-          const img = await loadImage(orderedDataUrls[frameIndex]);
-          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-          frameIndex++;
-          lastFrameTime = currentTime;
-        }
+        // Draw the current frame
+        ctx.drawImage(preloadedImages[frameIndex], 0, 0, canvas.width, canvas.height);
         
-        requestAnimationFrame(drawFrame);
+        // Calculate when to draw the next frame
+        frameIndex++;
+        const nextFrameTime = startTime + (frameIndex * frameDuration);
+        const delay = Math.max(0, nextFrameTime - currentTime);
+        
+        // Use setTimeout for precise timing
+        setTimeout(drawFrame, delay);
       };
       
       // Start the frame drawing loop
-      requestAnimationFrame(drawFrame);
+      drawFrame();
 
       const outUrl = await done;
+      
+      // Log final video information
+      console.log('Video reconstruction complete! URL:', outUrl);
+      console.log(`Output video: ${totalFrames} frames at ${effectiveFps.toFixed(2)} FPS = ${targetDuration}s`);
+      
       setFinalVideoUrl(outUrl);
       setProgress(100);
       setCurrentStep('complete');
-      console.log('Video reconstruction complete! URL:', outUrl);
     } catch (err: any) {
       console.error('Video reconstruction failed:', err);
       setError(err.message || 'Failed to reconstruct video');
