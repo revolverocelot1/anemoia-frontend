@@ -58,6 +58,7 @@ function GeminiImageChatPage() {
     topP: 0.95,
     topK: 40
   });
+  const [showApiKeyDisclaimer, setShowApiKeyDisclaimer] = useState(true);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const onSelectFiles = (selected: FileList | null) => {
@@ -106,6 +107,60 @@ function GeminiImageChatPage() {
 
   return (
     <div className="relative z-10 min-h-screen w-full">
+      {/* API Key Exhaustion Disclaimer */}
+      <AnimatePresence>
+        {showApiKeyDisclaimer && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-50 bg-black bg-opacity-90 backdrop-blur-md flex items-center justify-center p-4"
+              onClick={() => setShowApiKeyDisclaimer(false)}
+            >
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.9, opacity: 0 }}
+                transition={{ type: "spring", duration: 0.3 }}
+                className="bg-gradient-to-br from-red-900/90 to-neutral-900/90 border border-red-500/50 rounded-3xl p-8 max-w-md w-full relative shadow-2xl"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="text-center space-y-6">
+                  <div className="w-20 h-20 mx-auto bg-red-500/20 rounded-full flex items-center justify-center animate-pulse">
+                    <svg className="w-10 h-10 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                  </div>
+                  <h3 className="text-2xl font-bold text-white">Service Temporarily Unavailable</h3>
+                  <div className="space-y-3">
+                    <p className="text-red-200 leading-relaxed">
+                      The Nano Banana Image Chat is currently out of commission due to API key exhaustion. We've reached our usage limits for the Nano Banana (Gemini 2.5 Flash) API.
+                    </p>
+                    <p className="text-neutral-300 text-sm">
+                      We're working on obtaining additional API credits. Please check back later or try our other available tools.
+                    </p>
+                  </div>
+                  <div className="flex gap-3 justify-center pt-2">
+                    <button
+                      onClick={() => window.location.href = '/'}
+                      className="bg-white text-black font-medium px-6 py-2.5 rounded-lg hover:bg-neutral-200 transition-colors"
+                    >
+                      Back to Home
+                    </button>
+                    <button
+                      onClick={() => setShowApiKeyDisclaimer(false)}
+                      className="bg-red-500/20 text-red-200 font-medium px-6 py-2.5 rounded-lg hover:bg-red-500/30 transition-colors border border-red-500/30"
+                    >
+                      View Anyway
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
       {/* Enhanced Background */}
       <div className="absolute inset-0 overflow-hidden">
         {/* Deep gradient */}
