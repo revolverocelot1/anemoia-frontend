@@ -27,6 +27,7 @@ import SplatViewerPage from './pages/SplatViewerPage';
 import TestPage from './pages/TestPage';
 import AnimeVideoToCodePage from './pages/AnimeVideoToCodePage';
 import TPoseToolPage from './pages/TPoseToolPage';
+import VideoObjectRemoverPage from './pages/VideoObjectRemoverPage';
 import CoffeeDonation from './components/CoffeeDonation';
 // import FileUploadFix from './components/FileUploadFix';
 import { SupabaseAuthProvider } from './context/SupabaseAuthContext';
@@ -581,6 +582,14 @@ function App() {
               element={
                 <AnimatedPage>
                   <TPoseToolPage />
+                </AnimatedPage>
+              }
+            />
+            <Route
+              path="/video-object-remover"
+              element={
+                <AnimatedPage>
+                  <VideoObjectRemoverPage />
                 </AnimatedPage>
               }
             />

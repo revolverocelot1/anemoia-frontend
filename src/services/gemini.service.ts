@@ -43,7 +43,7 @@ export async function editImageWithGemini(params: GeminiEditParams): Promise<{ i
     console.log(`[Gemini API] Mode:`, params.isContinuation ? 'Chain continuation' : 'New request');
     console.log(`[Gemini API] Has image:`, params.file ? 'Yes' : params.imageBase64 ? 'Base64' : 'No');
     
-    const res = await api.upload('/api/gemini/image-edit', form, {
+    const res = await api.upload('/api/google/image-edit', form, {
       headers: {
         'Cache-Control': 'no-cache',
         'Pragma': 'no-cache'
