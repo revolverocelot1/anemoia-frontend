@@ -86,6 +86,7 @@ function VideoObjectRemoverPage() {
   const [finalVideoUrl, setFinalVideoUrl] = useState<string | null>(null);
   const [allFrames, setAllFrames] = useState<{type: 'edited' | 'interpolated', url: string, index: number}[]>([]);
   const [showFrameSidebar, setShowFrameSidebar] = useState(false);
+  const [showDisclaimer, setShowDisclaimer] = useState(true);
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -604,6 +605,48 @@ function VideoObjectRemoverPage() {
 
   return (
     <div className="relative z-10 min-h-screen w-full">
+      {/* Hardware Performance Disclaimer Popup */}
+      <AnimatePresence>
+        {showDisclaimer && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-50 bg-black bg-opacity-80 backdrop-blur-sm flex items-center justify-center p-4"
+              onClick={() => setShowDisclaimer(false)}
+            >
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.9, opacity: 0 }}
+                transition={{ type: "spring", duration: 0.3 }}
+                className="bg-neutral-900 border border-neutral-800 rounded-2xl p-8 max-w-md w-full relative"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="text-center space-y-4">
+                  <div className="w-16 h-16 mx-auto bg-amber-500/20 rounded-full flex items-center justify-center">
+                    <svg className="w-8 h-8 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                  </div>
+                  <h3 className="text-xl font-semibold text-white">Performance Notice</h3>
+                  <p className="text-neutral-400 text-sm leading-relaxed">
+                    Video processing speed depends on your hardware capabilities. More powerful GPUs and CPUs will provide faster generation times. Processing may take longer on lower-end devices.
+                  </p>
+                  <button
+                    onClick={() => setShowDisclaimer(false)}
+                    className="bg-white text-black font-medium px-6 py-2 rounded-lg hover:bg-neutral-200 transition-colors"
+                  >
+                    Got it
+                  </button>
+                </div>
+              </motion.div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
       {/* Hidden elements for processing */}
       {videoUrl && (
         <>
@@ -619,8 +662,9 @@ function VideoObjectRemoverPage() {
         {/* Header - Minimal dark */}
         <div className="mb-12 text-center">
           <h1 className="text-white text-4xl md:text-5xl font-black tracking-tight">Video Object Remover</h1>
-          <p className="text-neutral-400 mt-3">Minimal dark interface. Powered by Nano Banana & FILM.</p>
+          <p className="text-neutral-400 mt-3">Powered by Nano Banana & FILM.</p>
         </div>
+
 
         {/* Main Content */}
         <AnimatePresence mode="wait">
