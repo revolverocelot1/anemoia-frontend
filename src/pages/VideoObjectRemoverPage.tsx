@@ -83,6 +83,8 @@ function VideoObjectRemoverPage() {
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [finalVideoUrl, setFinalVideoUrl] = useState<string | null>(null);
+  const [allFrames, setAllFrames] = useState<{type: 'edited' | 'interpolated', url: string, index: number}[]>([]);
+  const [showFrameSidebar, setShowFrameSidebar] = useState(false);
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -304,7 +306,9 @@ function VideoObjectRemoverPage() {
     if (!interpolationWorkerRef.current || framesToInterpolate.length < 2) {
       console.log('Skipping interpolation - no worker or not enough frames');
       // Return processed frames as-is without interpolation
-      return framesToInterpolate.filter(f => f.processedDataUrl).sort((a, b) => a.frameNumber - b.frameNumber).map(f => f.processedDataUrl!);
+      const editedFrames = framesToInterpolate.filter(f => f.processedDataUrl).sort((a, b) => a.frameNumber - b.frameNumber);
+      setAllFrames(editedFrames.map((f, i) => ({ type: 'edited', url: f.processedDataUrl!, index: i })));
+      return editedFrames.map(f => f.processedDataUrl!);
     }
 
     const processedFrames = framesToInterpolate.filter(f => f.processedDataUrl).sort((a, b) => a.frameNumber - b.frameNumber);
@@ -370,23 +374,29 @@ function VideoObjectRemoverPage() {
     console.log(`Total interpolated frames: ${totalInterpolated}`);
     const processedFramesSorted = processedFrames.sort((a, b) => a.frameNumber - b.frameNumber);
     const composed: string[] = [];
+    const allFramesList: {type: 'edited' | 'interpolated', url: string, index: number}[] = [];
     
     // Build the complete frame sequence
+    let frameIndex = 0;
     for (let i = 0; i < processedFramesSorted.length - 1; i++) {
       // Add the keyframe
       composed.push(processedFramesSorted[i].processedDataUrl!);
+      allFramesList.push({ type: 'edited', url: processedFramesSorted[i].processedDataUrl!, index: frameIndex++ });
       
       // Add interpolated frames between this keyframe and the next
       const interpolatedFrames = pairInterpolations[i] || [];
       console.log(`Adding ${interpolatedFrames.length} interpolated frames after frame ${processedFramesSorted[i].frameNumber}`);
       for (const frame of interpolatedFrames) {
         composed.push(frame);
+        allFramesList.push({ type: 'interpolated', url: frame, index: frameIndex++ });
       }
     }
     
     // Add the last keyframe
     composed.push(processedFramesSorted[processedFramesSorted.length - 1].processedDataUrl!);
+    allFramesList.push({ type: 'edited', url: processedFramesSorted[processedFramesSorted.length - 1].processedDataUrl!, index: frameIndex });
     
+    setAllFrames(allFramesList);
     console.log(`Final composed sequence: ${composed.length} frames total (${processedFrames.length} keyframes + ${totalInterpolated} interpolated)`);
     return composed;
   };
@@ -425,19 +435,17 @@ function VideoObjectRemoverPage() {
 
       // Calculate actual FPS and timing
       const targetFps = 25;
-      const targetDuration = effectiveDuration; // Use the original video duration
       const totalFrames = orderedDataUrls.length;
+      const frameTime = 1 / targetFps; // 0.04 seconds per frame for 25 FPS
+      const targetDuration = totalFrames * frameTime; // Calculate duration from frame count
       
-      // Calculate the actual frame time to match duration
-      const frameTime = targetDuration / totalFrames; // seconds per frame
-      const effectiveFps = 1 / frameTime;
-      
-      console.log(`Video reconstruction: ${totalFrames} frames, ${targetDuration}s duration`);  
-      console.log(`Target FPS: ${targetFps}, Effective FPS: ${effectiveFps.toFixed(2)}`);  
+      console.log(`Video reconstruction: ${totalFrames} frames, ${targetDuration.toFixed(3)}s duration, ${targetFps} FPS`);
       console.log(`Frame time: ${(frameTime * 1000).toFixed(2)}ms per frame`);
+      console.log(`Expected duration: ${targetDuration.toFixed(3)}s (original was ${effectiveDuration}s)`);
 
-      // MediaRecorder doesn't support MP4, so we'll use WebM and convert it
-      // We'll use a higher bitrate for better quality
+      // Note: MediaRecorder doesn't support MP4 natively. We're using WebM with VP9 codec.
+      // The output file will be WebM format but renamed to .mp4 for compatibility.
+      // For true MP4 conversion, we would need to use FFmpeg.js or server-side processing.
       const stream = (canvas as HTMLCanvasElement).captureStream(targetFps);
       
       // Try to use the best codec available
@@ -484,35 +492,28 @@ function VideoObjectRemoverPage() {
       );
       console.log('All frames preloaded');
       
-      // Use precise timing for frame rendering
-      const frameDuration = (targetDuration * 1000) / totalFrames; // ms per frame
+      // Use precise timing for frame rendering at exactly 25 FPS
+      const frameDuration = 40; // 40ms per frame for 25 FPS
       let frameIndex = 0;
       let startTime = performance.now();
       
       const drawFrame = () => {
         if (frameIndex >= preloadedImages.length) {
-          // Add a small delay to ensure the last frame is captured
-          setTimeout(() => {
-            recorder.stop();
-            console.log(`Video encoding complete. Final frame count: ${frameIndex}`);
-            console.log(`Actual duration: ${(performance.now() - startTime) / 1000}s`);
-          }, 100);
+          // Stop recording immediately when all frames are drawn
+          recorder.stop();
+          const actualDuration = (performance.now() - startTime) / 1000;
+          console.log(`Video encoding complete. Final frame count: ${frameIndex}`);
+          console.log(`Actual duration: ${actualDuration.toFixed(3)}s`);
+          console.log(`Output FPS: ${(frameIndex / actualDuration).toFixed(2)}`);
           return;
         }
         
-        const currentTime = performance.now();
-        const expectedTime = startTime + (frameIndex * frameDuration);
-        
         // Draw the current frame
         ctx.drawImage(preloadedImages[frameIndex], 0, 0, canvas.width, canvas.height);
-        
-        // Calculate when to draw the next frame
         frameIndex++;
-        const nextFrameTime = startTime + (frameIndex * frameDuration);
-        const delay = Math.max(0, nextFrameTime - currentTime);
         
-        // Use setTimeout for precise timing
-        setTimeout(drawFrame, delay);
+        // Schedule next frame at exactly 40ms intervals (25 FPS)
+        setTimeout(drawFrame, frameDuration);
       };
       
       // Start the frame drawing loop
@@ -522,7 +523,7 @@ function VideoObjectRemoverPage() {
       
       // Log final video information
       console.log('Video reconstruction complete! URL:', outUrl);
-      console.log(`Output video: ${totalFrames} frames at ${effectiveFps.toFixed(2)} FPS = ${targetDuration}s`);
+      console.log(`Output video: ${totalFrames} frames at ${targetFps} FPS = ${targetDuration.toFixed(3)}s`);
       
       setFinalVideoUrl(outUrl);
       setProgress(100);
@@ -1036,7 +1037,7 @@ function VideoObjectRemoverPage() {
                         onClick={() => {
                           const a = document.createElement('a');
                           a.href = finalVideoUrl;
-                          a.download = `${videoFile?.name.replace(/\.[^/.]+$/, '')}_no_${objectToRemove.replace(/\s+/g, '_')}.webm`;
+                          a.download = `${videoFile?.name.replace(/\.[^/.]+$/, '')}_no_${objectToRemove.replace(/\s+/g, '_')}.mp4`;
                           a.click();
                         }}
                         className="px-6 py-3 bg-gradient-to-r from-emerald-500 to-green-500 text-white font-bold rounded-xl"
@@ -1050,6 +1051,14 @@ function VideoObjectRemoverPage() {
                         className="px-6 py-3 bg-gray-800 hover:bg-gray-700 text-gray-300 font-bold rounded-xl transition-colors"
                       >
                         Process Another Video
+                      </motion.button>
+                      <motion.button
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={() => setShowFrameSidebar(true)}
+                        className="px-6 py-3 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-xl transition-colors"
+                      >
+                        All Frames
                       </motion.button>
                     </div>
                   </div>
@@ -1115,6 +1124,62 @@ function VideoObjectRemoverPage() {
           )}
         </AnimatePresence>
       </div>
+      
+      {/* Frame Sidebar */}
+      {showFrameSidebar && (
+        <motion.div 
+          initial={{ x: '100%' }}
+          animate={{ x: 0 }}
+          exit={{ x: '100%' }}
+          transition={{ type: 'tween', duration: 0.3 }}
+          className="fixed inset-y-0 right-0 w-96 bg-gray-900 border-l border-gray-700 shadow-xl z-50 overflow-y-auto"
+        >
+          <div className="sticky top-0 bg-gray-900 border-b border-gray-700 p-4 flex justify-between items-center">
+            <h3 className="text-xl font-bold text-white">All Frames ({allFrames.length})</h3>
+            <button
+              onClick={() => setShowFrameSidebar(false)}
+              className="text-gray-400 hover:text-white transition-colors"
+            >
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+              </svg>
+            </button>
+          </div>
+          
+          <div className="p-4 space-y-4">
+            <div className="flex gap-4 text-sm">
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 bg-emerald-500 rounded"></div>
+                <span className="text-gray-300">Edited Frames ({allFrames.filter(f => f.type === 'edited').length})</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 bg-purple-500 rounded"></div>
+                <span className="text-gray-300">Interpolated ({allFrames.filter(f => f.type === 'interpolated').length})</span>
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-3 gap-2">
+              {allFrames.map((frame, idx) => (
+                <div key={idx} className="relative group">
+                  <img 
+                    src={frame.url} 
+                    alt={`Frame ${frame.index}`}
+                    className={`w-full h-auto rounded border-2 ${
+                      frame.type === 'edited' ? 'border-emerald-500' : 'border-purple-500'
+                    }`}
+                  />
+                  <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-xs text-white p-1 text-center">
+                    #{frame.index}
+                  </div>
+                  <div className={`absolute top-1 right-1 w-2 h-2 rounded-full ${
+                    frame.type === 'edited' ? 'bg-emerald-500' : 'bg-purple-500'
+                  }`}></div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </motion.div>
+      )}
     </div>
   );
 }
