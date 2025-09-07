@@ -1,6 +1,7 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { editImageWithGemini } from '../services/gemini.service';
+import { FFmpegService } from '../services/ffmpegService';
 
 type ProcessingStep = 'upload' | 'configure' | 'processing' | 'complete';
 
@@ -407,7 +408,7 @@ function VideoObjectRemoverPage() {
   
   const reconstructVideo = async (composedFrames?: string[]) => {
     try {
-      console.log('Starting video reconstruction...');
+      console.log('Starting video reconstruction with FFmpeg...');
       console.log('Composed frames available:', composedFrames?.length || 0);
       console.log('Processed frames available:', frames.filter(f => f.processedDataUrl).length);
       
@@ -425,127 +426,66 @@ function VideoObjectRemoverPage() {
         return;
       }
 
-      // Create an offscreen canvas to play frames to MediaRecorder
-      const canvas = document.createElement('canvas');
-      const img0 = await loadImage(orderedDataUrls[0]);
-      canvas.width = img0.naturalWidth;
-      canvas.height = img0.naturalHeight;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) throw new Error('Canvas 2D unavailable');
-
       // Calculate actual FPS and timing
       const targetFps = 25;
       const totalFrames = orderedDataUrls.length;
-      const frameTime = 1 / targetFps; // 0.04 seconds per frame for 25 FPS
-      const targetDuration = totalFrames * frameTime; // Calculate duration from frame count
+      const targetDuration = totalFrames / targetFps; // Calculate duration from frame count
       
       console.log(`Video reconstruction: ${totalFrames} frames, ${targetDuration.toFixed(3)}s duration, ${targetFps} FPS`);
-      console.log(`Frame time: ${(frameTime * 1000).toFixed(2)}ms per frame`);
-      console.log(`Expected duration: ${targetDuration.toFixed(3)}s (original was ${effectiveDuration}s)`);
 
-      // Note: MediaRecorder doesn't support MP4 natively. We're using WebM with VP9 codec.
-      // The output file will be WebM format but renamed to .mp4 for compatibility.
-      // For true MP4 conversion, we would need to use FFmpeg.js or server-side processing.
-      const stream = (canvas as HTMLCanvasElement).captureStream(targetFps);
+      // Initialize FFmpeg service
+      const ffmpegService = new FFmpegService();
       
-      // Try to use the best codec available
-      let mimeType = 'video/webm;codecs=vp9';
-      let videoBitsPerSecond = 10_000_000; // 10 Mbps for better quality
-      
-      // Check codec support
-      const codecs = [
-        { mime: 'video/webm;codecs=vp9', bitrate: 10_000_000 },
-        { mime: 'video/webm;codecs=vp8', bitrate: 8_000_000 },
-        { mime: 'video/webm', bitrate: 6_000_000 }
-      ];
-      
-      for (const codec of codecs) {
-        if (MediaRecorder.isTypeSupported(codec.mime)) {
-          mimeType = codec.mime;
-          videoBitsPerSecond = codec.bitrate;
-          console.log(`Using codec: ${codec.mime} with bitrate: ${codec.bitrate}`);
-          break;
-        }
-      }
-      
-      const recorder = new MediaRecorder(stream, { 
-        mimeType, 
-        videoBitsPerSecond 
-      });
-      const chunks: BlobPart[] = [];
-      recorder.ondataavailable = e => { if (e.data && e.data.size > 0) chunks.push(e.data); };
-
-      const done = new Promise<string>((resolve) => {
-        recorder.onstop = () => {
-          const blob = new Blob(chunks, { type: mimeType.split(';')[0] });
-          const url = URL.createObjectURL(blob);
-          resolve(url);
-        };
+      // Set progress callback for FFmpeg operations
+      ffmpegService.onProgress((progress) => {
+        const overallProgress = 95 + (progress.ratio * 5); // Map to 95-100% range
+        setProgress(overallProgress);
       });
 
-      recorder.start();
+      console.log('Loading FFmpeg...');
+      await ffmpegService.load();
+      console.log('FFmpeg loaded successfully');
 
-      // Preload all images for smoother playback
-      console.log('Preloading frames...');
-      const preloadedImages = await Promise.all(
-        orderedDataUrls.map(url => loadImage(url))
+      // Convert data URLs to Blobs
+      console.log('Converting frames to blobs...');
+      const frameBlobs: Blob[] = await Promise.all(
+        orderedDataUrls.map(async (dataUrl) => {
+          const response = await fetch(dataUrl);
+          return await response.blob();
+        })
       );
-      console.log('All frames preloaded');
-      
-      // Use precise timing for frame rendering at exactly 25 FPS
-      const frameDuration = 40; // 40ms per frame for 25 FPS
-      let frameIndex = 0;
-      let startTime = performance.now();
-      
-      const drawFrame = () => {
-        if (frameIndex >= preloadedImages.length) {
-          // Stop recording immediately when all frames are drawn
-          recorder.stop();
-          const actualDuration = (performance.now() - startTime) / 1000;
-          console.log(`Video encoding complete. Final frame count: ${frameIndex}`);
-          console.log(`Actual duration: ${actualDuration.toFixed(3)}s`);
-          console.log(`Output FPS: ${(frameIndex / actualDuration).toFixed(2)}`);
-          return;
-        }
-        
-        // Draw the current frame
-        ctx.drawImage(preloadedImages[frameIndex], 0, 0, canvas.width, canvas.height);
-        frameIndex++;
-        
-        // Schedule next frame at exactly 40ms intervals (25 FPS)
-        setTimeout(drawFrame, frameDuration);
-      };
-      
-      // Start the frame drawing loop
-      drawFrame();
+      console.log(`Converted ${frameBlobs.length} frames to blobs`);
 
-      const outUrl = await done;
+      // Create MP4 video from frames using FFmpeg
+      console.log('Creating MP4 video with FFmpeg...');
+      const videoBlob = await ffmpegService.createVideoFromFrames(frameBlobs, {
+        fps: targetFps,
+        format: 'mp4',
+        codec: 'libx264',
+        quality: 18 // Lower CRF = higher quality (18 is visually lossless)
+      });
+      
+      console.log('Video creation complete, blob size:', videoBlob.size);
+      
+      // Create URL for the video
+      const videoUrl = URL.createObjectURL(videoBlob);
       
       // Log final video information
-      console.log('Video reconstruction complete! URL:', outUrl);
+      console.log('Video reconstruction complete! URL:', videoUrl);
       console.log(`Output video: ${totalFrames} frames at ${targetFps} FPS = ${targetDuration.toFixed(3)}s`);
+      console.log('Output format: MP4 (H.264)');
       
-      setFinalVideoUrl(outUrl);
+      setFinalVideoUrl(videoUrl);
       setProgress(100);
       setCurrentStep('complete');
     } catch (err: any) {
       console.error('Video reconstruction failed:', err);
       setError(err.message || 'Failed to reconstruct video');
-      // Don't set the original video as final video - that's misleading
       setFinalVideoUrl(null);
       setCurrentStep('complete');
     }
   };
 
-  function sleep(ms: number) { return new Promise(res => setTimeout(res, ms)); }
-  function loadImage(src: string): Promise<HTMLImageElement> {
-    return new Promise((resolve, reject) => {
-      const img = new Image();
-      img.onload = () => resolve(img);
-      img.onerror = reject;
-      img.src = src;
-    });
-  }
 
   const startProcessing = async () => {
     if (!videoFile || !objectToRemove) return;
