@@ -408,7 +408,7 @@ function VideoObjectRemoverPage() {
   
   const reconstructVideo = async (composedFrames?: string[]) => {
     try {
-      console.log('Starting video reconstruction with FFmpeg...');
+      console.log('Starting video reconstruction...');
       console.log('Composed frames available:', composedFrames?.length || 0);
       console.log('Processed frames available:', frames.filter(f => f.processedDataUrl).length);
       
@@ -433,47 +433,115 @@ function VideoObjectRemoverPage() {
       
       console.log(`Video reconstruction: ${totalFrames} frames, ${targetDuration.toFixed(3)}s duration, ${targetFps} FPS`);
 
-      // Initialize FFmpeg service
-      const ffmpegService = new FFmpegService();
+      let videoUrl: string | null = null;
       
-      // Set progress callback for FFmpeg operations
-      ffmpegService.onProgress((progress) => {
-        const overallProgress = 95 + (progress.ratio * 5); // Map to 95-100% range
-        setProgress(overallProgress);
-      });
+      try {
+        // Try FFmpeg first for MP4 output
+        console.log('Attempting to use FFmpeg for MP4 output...');
+        
+        // Initialize FFmpeg service
+        const ffmpegService = new FFmpegService();
+        
+        // Set progress callback for FFmpeg operations
+        ffmpegService.onProgress((progress) => {
+          const overallProgress = 95 + (progress.ratio * 5); // Map to 95-100% range
+          setProgress(overallProgress);
+        });
 
-      console.log('Loading FFmpeg...');
-      await ffmpegService.load();
-      console.log('FFmpeg loaded successfully');
+        console.log('Loading FFmpeg...');
+        await ffmpegService.load();
+        console.log('FFmpeg loaded successfully');
 
-      // Convert data URLs to Blobs
-      console.log('Converting frames to blobs...');
-      const frameBlobs: Blob[] = await Promise.all(
-        orderedDataUrls.map(async (dataUrl) => {
-          const response = await fetch(dataUrl);
-          return await response.blob();
-        })
-      );
-      console.log(`Converted ${frameBlobs.length} frames to blobs`);
+        // Convert data URLs to Blobs
+        console.log('Converting frames to blobs...');
+        const frameBlobs: Blob[] = await Promise.all(
+          orderedDataUrls.map(async (dataUrl) => {
+            const response = await fetch(dataUrl);
+            return await response.blob();
+          })
+        );
+        console.log(`Converted ${frameBlobs.length} frames to blobs`);
 
-      // Create MP4 video from frames using FFmpeg
-      console.log('Creating MP4 video with FFmpeg...');
-      const videoBlob = await ffmpegService.createVideoFromFrames(frameBlobs, {
-        fps: targetFps,
-        format: 'mp4',
-        codec: 'libx264',
-        quality: 18 // Lower CRF = higher quality (18 is visually lossless)
-      });
-      
-      console.log('Video creation complete, blob size:', videoBlob.size);
-      
-      // Create URL for the video
-      const videoUrl = URL.createObjectURL(videoBlob);
+        // Create MP4 video from frames using FFmpeg
+        console.log('Creating MP4 video with FFmpeg...');
+        const videoBlob = await ffmpegService.createVideoFromFrames(frameBlobs, {
+          fps: targetFps,
+          format: 'mp4',
+          codec: 'libx264',
+          quality: 18 // Lower CRF = higher quality (18 is visually lossless)
+        });
+        
+        console.log('Video creation complete, blob size:', videoBlob.size);
+        
+        // Create URL for the video
+        videoUrl = URL.createObjectURL(videoBlob);
+        console.log('Output format: MP4 (H.264)');
+      } catch (ffmpegError) {
+        console.error('FFmpeg failed, falling back to WebM:', ffmpegError);
+        
+        // Fallback to WebM using Canvas and MediaRecorder
+        console.log('Using fallback WebM encoding...');
+        
+        // Create an offscreen canvas
+        const canvas = document.createElement('canvas');
+        const firstFrame = await loadImage(orderedDataUrls[0]);
+        canvas.width = firstFrame.naturalWidth;
+        canvas.height = firstFrame.naturalHeight;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) throw new Error('Canvas 2D unavailable');
+
+        // Use high-quality WebM codec
+        const stream = canvas.captureStream(targetFps);
+        const mimeType = 'video/webm;codecs=vp9';
+        const recorder = new MediaRecorder(stream, { 
+          mimeType, 
+          videoBitsPerSecond: 10_000_000 // 10 Mbps for high quality
+        });
+        
+        const chunks: BlobPart[] = [];
+        recorder.ondataavailable = e => { if (e.data && e.data.size > 0) chunks.push(e.data); };
+
+        const done = new Promise<string>((resolve) => {
+          recorder.onstop = () => {
+            const blob = new Blob(chunks, { type: 'video/webm' });
+            const url = URL.createObjectURL(blob);
+            resolve(url);
+          };
+        });
+
+        recorder.start();
+
+        // Preload all images
+        console.log('Preloading frames...');
+        const preloadedImages = await Promise.all(
+          orderedDataUrls.map(url => loadImage(url))
+        );
+        
+        // Draw frames with precise timing
+        const frameDuration = 1000 / targetFps; // ms per frame
+        let frameIndex = 0;
+        
+        const drawFrame = () => {
+          if (frameIndex >= preloadedImages.length) {
+            recorder.stop();
+            console.log(`WebM encoding complete. Total frames: ${frameIndex}`);
+            return;
+          }
+          
+          ctx.drawImage(preloadedImages[frameIndex], 0, 0, canvas.width, canvas.height);
+          frameIndex++;
+          
+          setTimeout(drawFrame, frameDuration);
+        };
+        
+        drawFrame();
+        videoUrl = await done;
+        console.log('Output format: WebM (VP9)');
+      }
       
       // Log final video information
       console.log('Video reconstruction complete! URL:', videoUrl);
       console.log(`Output video: ${totalFrames} frames at ${targetFps} FPS = ${targetDuration.toFixed(3)}s`);
-      console.log('Output format: MP4 (H.264)');
       
       setFinalVideoUrl(videoUrl);
       setProgress(100);
@@ -485,6 +553,15 @@ function VideoObjectRemoverPage() {
       setCurrentStep('complete');
     }
   };
+  
+  function loadImage(src: string): Promise<HTMLImageElement> {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = reject;
+      img.src = src;
+    });
+  }
 
 
   const startProcessing = async () => {

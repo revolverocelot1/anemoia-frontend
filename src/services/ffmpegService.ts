@@ -42,45 +42,53 @@ export class FFmpegService {
     if (this.loaded) return;
     
     try {
-      // Check if we're in development or production
-      const isDevelopment = import.meta.env.DEV;
+      // For FFmpeg 0.12.x, we need to use toBlobURL for loading
+      console.log('Loading FFmpeg.wasm...');
       
-      // Load FFmpeg with WebAssembly files from local public directory
-      if (isDevelopment) {
-        // In development, use local files directly
-        await this.ffmpeg.load({
-          coreURL: '/ffmpeg/ffmpeg-core.js',
-          wasmURL: '/ffmpeg/ffmpeg-core.wasm',
-        });
-      } else {
-        // In production, use local files with proper base URL
-        const base = import.meta.env.BASE_URL || '/';
-        await this.ffmpeg.load({
-          coreURL: `${base}ffmpeg/ffmpeg-core.js`,
-          wasmURL: `${base}ffmpeg/ffmpeg-core.wasm`,
-        });
-      }
+      // First, try loading from CDN which is more reliable
+      const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.10/dist/esm';
+      
+      await this.ffmpeg.load({
+        coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
+        wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
+      });
       
       this.loaded = true;
-      console.log('FFmpeg.wasm loaded successfully from local files');
+      console.log('FFmpeg.wasm loaded successfully');
     } catch (error) {
-      console.error('Failed to load FFmpeg:', error);
+      console.error('Failed to load FFmpeg from CDN:', error);
       
-      // Fallback to CDN if local loading fails
+      // Try alternative CDN URL
       try {
-        console.log('Attempting to load FFmpeg from CDN as fallback...');
-        const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd';
+        console.log('Attempting alternative CDN URL...');
+        const altBaseURL = 'https://unpkg.com/@ffmpeg/core-st@0.11.1/dist/umd';
         
         await this.ffmpeg.load({
-          coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
-          wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
+          coreURL: await toBlobURL(`${altBaseURL}/ffmpeg-core.js`, 'text/javascript'),
+          wasmURL: await toBlobURL(`${altBaseURL}/ffmpeg-core.wasm`, 'application/wasm'),
         });
         
         this.loaded = true;
-        console.log('FFmpeg.wasm loaded successfully from CDN');
-      } catch (cdnError) {
-        console.error('Failed to load FFmpeg from CDN:', cdnError);
-        throw new Error('Failed to load FFmpeg. Please check your internet connection.');
+        console.log('FFmpeg.wasm loaded successfully from alternative CDN');
+      } catch (altError) {
+        console.error('Failed to load FFmpeg from alternative CDN:', altError);
+        
+        // Last resort: try local files
+        try {
+          console.log('Attempting to load FFmpeg from local files...');
+          const base = import.meta.env.BASE_URL || '/';
+          
+          await this.ffmpeg.load({
+            coreURL: await toBlobURL(`${base}ffmpeg/ffmpeg-core.js`, 'text/javascript'),
+            wasmURL: await toBlobURL(`${base}ffmpeg/ffmpeg-core.wasm`, 'application/wasm'),
+          });
+          
+          this.loaded = true;
+          console.log('FFmpeg.wasm loaded successfully from local files');
+        } catch (localError) {
+          console.error('Failed to load FFmpeg from local files:', localError);
+          throw new Error('Failed to load FFmpeg. Please ensure you have an internet connection or that FFmpeg files are available locally.');
+        }
       }
     }
   }
