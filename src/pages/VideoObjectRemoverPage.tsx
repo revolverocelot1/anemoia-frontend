@@ -758,6 +758,22 @@ function VideoObjectRemoverPage() {
                         </p>
                       </label>
 
+                      {/* Processing Tip */}
+                      {objectToRemove && (
+                        <motion.div
+                          initial={{ opacity: 0, y: -10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className="bg-amber-900/20 border border-amber-600/30 rounded-xl p-3"
+                        >
+                          <p className="text-amber-400 text-sm flex items-center gap-2">
+                            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="shrink-0">
+                              <path d="M8 2v6M8 11v.01M14 8A6 6 0 112 8a6 6 0 0112 0z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                            </svg>
+                            <span>Press the start button only once and be patient - processing happens in the background</span>
+                          </p>
+                        </motion.div>
+                      )}
+
                       {/* Start Button */}
                       <motion.button
                         type="button"
@@ -1241,6 +1257,18 @@ function VideoObjectRemoverPage() {
           </div>
         </motion.div>
       )}
+
+      {/* Hardware Speed Notice */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 0.7 }}
+        transition={{ delay: 1 }}
+        className="fixed bottom-4 left-1/2 transform -translate-x-1/2 z-10 pointer-events-none"
+      >
+        <p className="text-neutral-400/70 text-sm text-center px-4 py-2 bg-black/50 backdrop-blur-sm rounded-full border border-neutral-800/50">
+          Generation speed depends on your hardware capabilities
+        </p>
+      </motion.div>
     </div>
   );
 }
