@@ -96,28 +96,6 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onToggle }) => {
 
   const miscTools: ToolItem[] = [
     {
-      id: 't-poser',
-      name: '3D T-Pose Builder',
-      description: 'Turn a person into a T-pose and rotate 60°/90°/180°',
-      icon: 't-pose-icon',
-      onClick: () => {
-        navigate('/t-poser');
-        onToggle();
-      },
-      badge: 'AI'
-    },
-    {
-      id: 'image-chat',
-      name: 'Nano Banana Chat',
-      description: 'Uncensored AI image editing with Gemini 2.5 Flash',
-      icon: 'image-chat-icon',
-      onClick: () => {
-        navigate('/image-chat');
-        onToggle();
-      },
-      badge: 'HOT'
-    },
-    {
       id: 'video-object-remover',
       name: 'Video Object Remover',
       description: 'Remove objects from videos with AI & frame interpolation',
