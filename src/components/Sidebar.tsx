@@ -96,15 +96,15 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onToggle }) => {
 
   const miscTools: ToolItem[] = [
     {
-      id: 'video-object-remover',
-      name: 'Video Object Remover',
-      description: 'Remove objects from videos with AI & frame interpolation',
-      icon: 'video-object-remover-icon',
+      id: 't-poser',
+      name: 'T-Pose Generator',
+      description: 'Generate 3D-ready T-poses from any photo with AI',
+      icon: 't-pose-icon',
       onClick: () => {
-        navigate('/video-object-remover');
+        navigate('/t-poser');
         onToggle();
       },
-      badge: 'NEW'
+      badge: 'AI'
     },
     {
       id: 'doom',
