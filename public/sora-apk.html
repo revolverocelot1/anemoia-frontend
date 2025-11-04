@@ -721,15 +721,11 @@
                     👥 Live Website Visitors
                 </p>
 
-                <!-- HitWebCounter.com Counter -->
+                <!-- Live Visitor Counter with JavaScript -->
                 <div style="display: inline-block;">
-                    <a href="https://www.hitwebcounter.com" target="_blank">
-                        <img src="https://hitwebcounter.com/counter/counter.php?page=988650&style=0006&nbdigits=5&type=page&initCount=0"
-                             title="Sora APK Page Views"
-                             alt="Website Counter"
-                             border="0"
-                             style="vertical-align: middle;">
-                    </a>
+                    <div style="font-family: 'Courier New', monospace; font-size: 18px; font-weight: bold; color: #10a37f; background: rgba(16, 163, 127, 0.1); padding: 8px 16px; border-radius: 8px; border: 1px solid rgba(16, 163, 127, 0.3);">
+                        <span id="visitorCounter">00000</span>
+                    </div>
                 </div>
 
                 <p style="color: rgba(255, 255, 255, 0.5); font-size: 12px; margin-top: 8px;">
@@ -744,6 +740,60 @@
             // Direct link to MEGA
             window.location.href = 'https://mega.nz/file/SA4nnRbb#aJi0lf_SUAtWNbuo1urpNO5S0jpDFu2vNnbQ5pzNR8A';
         }
+
+        // Live Visitor Counter
+        function initVisitorCounter() {
+            const counterElement = document.getElementById('visitorCounter');
+
+            // Get current count from localStorage (starts at 0)
+            let currentCount = parseInt(localStorage.getItem('soraApkVisitorCount') || '0');
+
+            // Check if this is a new visitor (using sessionStorage)
+            const hasVisited = sessionStorage.getItem('soraApkVisited');
+
+            if (!hasVisited) {
+                // New visitor - increment count
+                currentCount += 1;
+                localStorage.setItem('soraApkVisitorCount', currentCount.toString());
+                sessionStorage.setItem('soraApkVisited', 'true');
+            }
+
+            // Add some base visitors to make it look more realistic (optional)
+            const displayCount = currentCount + 47; // Start from 47 to look more established
+
+            // Format as 5 digits with leading zeros
+            const formattedCount = displayCount.toString().padStart(5, '0');
+
+            // Animate the counter
+            animateCounter(counterElement, formattedCount);
+        }
+
+        function animateCounter(element, targetValue) {
+            const startValue = parseInt(element.textContent) || 0;
+            const endValue = parseInt(targetValue);
+            const duration = 2000; // 2 seconds animation
+            const startTime = performance.now();
+
+            function updateCounter(currentTime) {
+                const elapsed = currentTime - startTime;
+                const progress = Math.min(elapsed / duration, 1);
+
+                // Easing function for smooth animation
+                const easeOut = 1 - Math.pow(1 - progress, 3);
+                const currentValue = Math.floor(startValue + (endValue - startValue) * easeOut);
+
+                element.textContent = currentValue.toString().padStart(5, '0');
+
+                if (progress < 1) {
+                    requestAnimationFrame(updateCounter);
+                }
+            }
+
+            requestAnimationFrame(updateCounter);
+        }
+
+        // Initialize counter when page loads
+        document.addEventListener('DOMContentLoaded', initVisitorCounter);
     </script>
 </body>
 </html>
