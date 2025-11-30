@@ -88,6 +88,13 @@ const customIcons: { [key: string]: React.ReactElement } = {
       <path d="M17 11L19 13M19 11L17 13" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
       <circle cx="18" cy="12" r="3" stroke="currentColor" strokeWidth="2" strokeDasharray="2 2"/>
     </svg>
+  ),
+  'synthid-remover-icon': (
+    <svg viewBox="0 0 24 24" fill="none" className="w-6 h-6">
+      <path d="M12 2C6.48 2 2 6.48 2 12C2 17.52 6.48 22 12 22C17.52 22 22 17.52 22 12C22 6.48 17.52 2 12 2ZM12 20C7.59 20 4 16.41 4 12C4 7.59 7.59 4 12 4C16.41 4 20 7.59 20 12C20 16.41 16.41 20 12 20Z" fill="currentColor" fillOpacity="0.2"/>
+      <path d="M12 6V18M6 12H18" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+      <path d="M16 16L8 8" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+    </svg>
   )
 };
 
@@ -127,6 +134,17 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onToggle }) => {
         onToggle();
       },
       badge: 'TERMINAL'
+    },
+    {
+      id: 'synthid-remover',
+      name: 'SynthID Remover',
+      description: 'Neutralize AI watermarks from Google/DeepMind images using signal processing',
+      icon: 'synthid-remover-icon',
+      onClick: () => {
+        navigate('/synthid-remover/landing');
+        onToggle();
+      },
+      badge: 'CLASSIFIED'
     },
     {
       id: 'color-picker',
@@ -262,6 +280,8 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onToggle }) => {
                         ? 'bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 border-green-300 dark:border-green-700 hover:border-green-500 dark:hover:border-green-500 hover:shadow-lg hover:shadow-green-500/20'
                         : tool.id === 'video-object-remover'
                         ? 'bg-gradient-to-r from-violet-50 to-fuchsia-50 dark:from-violet-900/20 dark:to-fuchsia-900/20 border-violet-300 dark:border-violet-700 hover:border-violet-500 dark:hover:border-violet-500 hover:shadow-lg hover:shadow-violet-500/20'
+                        : tool.id === 'synthid-remover'
+                        ? 'bg-gradient-to-r from-cyan-50 to-teal-50 dark:from-cyan-900/20 dark:to-teal-900/20 border-cyan-300 dark:border-cyan-700 hover:border-cyan-500 dark:hover:border-cyan-500 hover:shadow-lg hover:shadow-cyan-500/20'
                         : 'bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-900/20 dark:to-gray-800/20 border-gray-300 dark:border-gray-700 hover:border-gray-500 dark:hover:border-gray-500 hover:shadow-lg hover:shadow-gray-500/20'
                     }`}
                     onClick={tool.onClick}
@@ -281,6 +301,8 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onToggle }) => {
                             ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300'
                             : tool.id === 'video-object-remover'
                             ? 'bg-gradient-to-r from-violet-100 to-fuchsia-100 text-violet-700 dark:from-violet-900/50 dark:to-fuchsia-900/50 dark:text-violet-300'
+                            : tool.id === 'synthid-remover'
+                            ? 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/50 dark:text-cyan-300'
                             : 'bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300'
                         }`}>
                           {tool.badge}
@@ -304,6 +326,8 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onToggle }) => {
                           ? 'bg-gradient-to-br from-green-600 to-emerald-600 group-hover:from-green-700 group-hover:to-emerald-700'
                           : tool.id === 'video-object-remover'
                           ? 'bg-gradient-to-br from-violet-600 to-fuchsia-600 group-hover:from-violet-700 group-hover:to-fuchsia-700'
+                          : tool.id === 'synthid-remover'
+                          ? 'bg-gradient-to-br from-cyan-600 to-teal-600 group-hover:from-cyan-700 group-hover:to-teal-700'
                           : 'bg-gradient-to-br from-gray-600 to-gray-700 group-hover:from-gray-700 group-hover:to-gray-800'
                       }`}>
                         {customIcons[tool.icon] || <span className="material-symbols-outlined text-white text-xl">{tool.icon}</span>}
@@ -322,9 +346,9 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onToggle }) => {
                     <div className="mt-3 flex items-center justify-between">
                       <div className="flex items-center space-x-2 text-xs text-gray-500 dark:text-gray-500">
                         <span className="material-symbols-outlined text-sm">
-                          {tool.id === 'doom' || tool.id === 'anime-gallery' || tool.id === 't-poser' || tool.id === 'image-chat' || tool.id === 'video-object-remover' ? 'launch' : 'build'}
+                          {['doom', 'anime-gallery', 't-poser', 'image-chat', 'video-object-remover', 'synthid-remover'].includes(tool.id) ? 'launch' : 'build'}
                         </span>
-                        <span>{tool.id === 'doom' || tool.id === 'anime-gallery' || tool.id === 't-poser' || tool.id === 'image-chat' || tool.id === 'video-object-remover' ? 'Ready to explore' : 'Coming soon'}</span>
+                        <span>{['doom', 'anime-gallery', 't-poser', 'image-chat', 'video-object-remover', 'synthid-remover'].includes(tool.id) ? 'Ready to explore' : 'Coming soon'}</span>
                       </div>
                       
                       <motion.div

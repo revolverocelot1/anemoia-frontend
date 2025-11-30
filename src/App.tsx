@@ -28,6 +28,8 @@ import TestPage from './pages/TestPage';
 import AnimeVideoToCodePage from './pages/AnimeVideoToCodePage';
 import TPoseToolPage from './pages/TPoseToolPage';
 import VideoObjectRemoverPage from './pages/VideoObjectRemoverPage';
+import SynthIDRemoverPage from './pages/SynthIDRemoverPage';
+import SynthIDRemoverLanding from './pages/landing/SynthIDRemoverLanding';
 import CoffeeDonation from './components/CoffeeDonation';
 // import FileUploadFix from './components/FileUploadFix';
 import { SupabaseAuthProvider } from './context/SupabaseAuthContext';
@@ -55,6 +57,11 @@ import UpscalerLanding from './pages/landing/UpscalerLanding';
 import PoseEstimationLanding from './pages/landing/PoseEstimationLanding';
 import SplatViewerLanding from './pages/landing/SplatViewerLanding';
 import TriangleSplattingLanding from './pages/landing/TriangleSplattingLanding';
+import OCRCompareLanding from './pages/landing/OCRCompareLanding';
+import AnimeGalleryLanding from './pages/landing/AnimeGalleryLanding';
+import TPoseLanding from './pages/landing/TPoseLanding';
+import ImageChatLanding from './pages/landing/ImageChatLanding';
+import ASCIIVideoLanding from './pages/landing/ASCIIVideoLanding';
 
 // Lazy load R3FCanvas to ensure proper module loading
 const R3FCanvas = lazy(() => import('./three/R3FCanvas'));
@@ -317,7 +324,50 @@ function App() {
                 </AnimatedPage>
               }
             />
+            <Route
+              path="/ocr/landing"
+              element={
+                <AnimatedPage>
+                  <OCRCompareLanding />
+                </AnimatedPage>
+              }
+            />
+            <Route
+              path="/anime-gallery/landing"
+              element={
+                <AnimatedPage>
+                  <AnimeGalleryLanding />
+                </AnimatedPage>
+              }
+            />
+            <Route
+              path="/t-poser/landing"
+              element={
+                <AnimatedPage>
+                  <TPoseLanding />
+                </AnimatedPage>
+              }
+            />
+            <Route
+              path="/image-chat/landing"
+              element={
+                <AnimatedPage>
+                  <ImageChatLanding />
+                </AnimatedPage>
+              }
+            />
+            <Route
+              path="/ascii-video-converter/landing"
+              element={
+                <AnimatedPage>
+                  <ASCIIVideoLanding />
+                </AnimatedPage>
+              }
+            />
 
+            {/* Redirects for SEO */}
+            <Route path="/ocr" element={<Navigate to="/compare" replace />} />
+            <Route path="/triangle-splat" element={<Navigate to="/triangle-splatting" replace />} />
             
             <Route
               path="/depth-map"
@@ -590,6 +640,22 @@ function App() {
               element={
                 <AnimatedPage>
                   <VideoObjectRemoverPage />
+                </AnimatedPage>
+              }
+            />
+            <Route
+              path="/synthid-remover"
+              element={
+                <AnimatedPage>
+                  <SynthIDRemoverPage />
+                </AnimatedPage>
+              }
+            />
+            <Route
+              path="/synthid-remover/landing"
+              element={
+                <AnimatedPage>
+                  <SynthIDRemoverLanding />
                 </AnimatedPage>
               }
             />
