@@ -1,0 +1,1252 @@
+ynthID-Image: Image watermarking at
+ internet scale
+ Sven Gowal1,*,¶, Rudy Bunel1,*, Florian Stimberg1,*, David Stutz1,*, Guillermo Ortiz-Jimenez1,*, Christina
+ Kouridi1,*, Mel Vecerik1,*, Jamie Hayes1,*, Sylvestre-Alvise Rebuffi1,*, Paul Bernard1,§, Chris Gamble1,§, Miklós
+ Z. Horváth1,§, Fabian Kaczmarczyck1,§, Alex Kaskasoli1,§, Aleksandar Petrov1,§, Ilia Shumailov1,§, Meghana
+ Thotakuri1,§, Olivia Wiles1,§, Jessica Yung1,§, Zahra Ahmed1,†, Victor Martin1,†, Simon Rosen1,†, Christopher
+ Savčak1,†, Armin Senoner1,†, Nidhi Vyas1,† and Pushmeet Kohli1,¶,‡
+ *Core contributor (randomized order), §Contributor, †Support, ‡Sponsor, ¶Lead, 1Google DeepMind
+ arXiv:2510.09263v1  [cs.CR]  10 Oct 2025
+ We introduce SynthID-Image, a deep learning-based system for invisibly watermarking AI-generated
+ imagery. This paper documents the technical desiderata, threat models, and practical challenges of de
+ploying such a system at internet scale, addressing key requirements of effectiveness, fidelity, robustness,
+ and security. SynthID-Image has been used to watermark over ten billion images and video frames
+ across Google’s services and its corresponding verification service is available to trusted testers. For
+ completeness, we present an experimental evaluation of an external model variant, SynthID-O, which
+ is available through partnerships. We benchmark SynthID-O against other post-hoc watermarking
+ methods from the literature, demonstrating state-of-the-art performance in both visual quality and
+ robustness to common image perturbations. While this work centers on visual media, the conclusions
+ on deployment, constraints, and threat modeling generalize to other modalities, including audio. This
+ paper provides a comprehensive documentation for the large-scale deployment of deep learning-based
+ media provenance systems.
+ Keywords: provenance, watermarking, robustness
+ 1. Introduction
+ In the wake of powerful generative artificial intelligence (AI) systems and their accessibility in
+ products such as Gemini, ChatGPT, Midjourney or ElevenLabs including their corresponding open
+source alternatives (Rombach et al., 2022; Scao et al., 2022; Touvron et al., 2023), leading AI
+ companies including Google committed to advancing responsible practices in deploying AI. One
+ such practice consists of establishing the provenance of generated media artifacts. In this context,
+ the Coalition for Content Provenance and Authenticity (C2PA; Coalition for Content Provenance
+ and Authenticity, 2023), describes provenance as serving two main purposes: allowing leading
+ AI companies to responsibly disclose that content is AI-generated and allowing users to verify the
+ authenticity of these artifacts. The latter, in particular, has received considerable attention due to
+ worries of widespread misinformation (Weidinger et al., 2021; Zellers et al., 2019) or impersonation
+ (e.g., so-called “deep fakes”; Agarwal et al., 2019; Carlini and Farid, 2020; Vaccari and Chadwick,
+ 2020; Yu et al., 2021). Importantly, we note that establishing provenance is materially different
+ from detecting AI-generated content, as the public discourse tends to focus on.1 Not only are such
+ detectors2 generally less reliable, but even if we could reliably detect AI-generated content, they
+ do not necessarily establish provenance. Fine-grained origins are typically still unknown and we
+ believe that the increase of fidelity of future generative models will also increase the complexity of
+ establishing provenance through detection alone.
+ 1https://www.technologyreview.com/2023/11/06/1082996/the-inside-scoop-on-watermarking-and-content-authentication
+ 2https://contentatscale.ai/ai-content-detector/, https://www.compilatio.net/en/blog/best-ai-detectors, https://gptzero.me/
+ Corresponding author(s): sgowal@google.com, pushmeet@google.com
+ © 2025Google DeepMind. All rights reserved
+SynthID-Image: Image watermarking at internet scale
+ While C2PA establishes a standard for encoding and verifying provenance through metadata that
+ is attached to the content, this approach is vulnerable to removing said metadata (Zhao et al., 2025).3
+ Watermarking is a promising responsible disclosure mechanism that allows to embed provenance
+ information within the generated content directly. As visible watermarks (Braudaway, 1997) have
+ been shown to be ineffective in the age of deep learning (Dekel et al., 2017), there has been a recent
+ revival of deep learning based methods for invisible watermarking. Originating in the information
+ hiding community (Anderson, 1996; Cox, 2007), invisible watermarks aim to hide information within
+ a multimedia artifact. Classical methods use wavelet or Fourier transforms for this purpose and
+ recently deep learning based methods have been introduced for this task (Adi et al., 2018; Zhu et al.,
+ 2018) as they promise to store more information with higher robustness to removal attempts. However,
+ this exposes these methods to a wide array of attacks that exploit vulnerabilities in the underlying
+ deep neural networks. Furthermore, many methods still lack robustness to common post-processing
+ or manipulations of the content and, unsurprisingly, they are vulnerable to adversarial attempts to
+ remove or fake the watermark, e.g. by utilizing a rich body of work on adversarial examples (Biggio
+ et al., 2013; Szegedy et al., 2014). Building (adversarially) robust watermarking systems remains an
+ extremely challenging problem. More importantly, there is little to no guidance on how to deploy
+ such systems in a robust manner at internet scale.
+ Tosuccessfully enable provenance of AI-generated content at internet scale, a watermarking system
+ needs to balance a number of potentially conflicting desiderata. As the main objective during the
+ development of generative AI models is quality, it is crucial for watermarking systems not to impact
+ it. This is commonly implied by demanding invisible watermarking. Then, we want the produced
+ watermarks to be effective in verifying provenance which also includes robustness to expected and
+ unexpected changes in the underlying media artifact due to every day use. Deviating from every
+ day use, we explicitly want watermarks to be secure against malicious use, ranging from watermark
+ removal or forgery attacks to attempts on model extraction. To enable watermarking at internet scale,
+ it also needs to be sufficiently efficient in terms of runtime, with minimal overhead during generation
+ and high throughput during detection and verification. A rich literature on watermarking, see surveys
+ by Cox (2007); Wan et al. (2022) and benchmarks by An et al. (2024); Petitcolas (2000), hints that
+ many of these desiderata are conflicting and trade-offs have to be made. This is particularly important
+ in light of our final desiderata, large-scale deployment. This means that, ultimately, decisions have
+ to be made on how to handle trade-offs and deal with imperfect robustness and security in practice.
+ With SynthID-Image,4 we built a watermarking system that is currently watermarking all of
+ Google’s AI-generated imagery. Throughout development, we found that many existing surveys,
+ benchmarks and methods do not realistically capture the above desiderata and their trade-offs, often
+ ignoring key threat models, evaluations or deployment considerations. In this paper, we want to share
+ a detailed account of our learnings from developing, deploying and maintaining SynthID-Image
+ since its first public announcement in August 2023.5 Moreover, with this work, we evaluate our
+ external variant of SynthID-Image which is available via partnerships. Our contributions can be
+ summarized along the structure of this paper:
+ SynthID-Image (Section 2) followsapost-hocandmodel-independentapproachtowatermarking.
+ This means the watermark is applied on top of the AI-generated content using an encoder, not
+ as part of the generation process, and detected using a corresponding decoder. This makes
+ SynthID applicable to any generative model and thus maximizes utility, deployability and
+ organizational flexibility at the cost of stringent constraints on quality and efficiency.
+ 3Metadata is often stripped accidentally and can also be trivially removed.
+ 4https://deepmind.google/technologies/synthid/
+ 5https://deepmind.google/discover/blog/identifying-ai-generated-images-with-synthid/
+ 2
+SynthID-Image: Image watermarking at internet scale
+ Invisibility (Section 3): Because quality dictates many trade-off among relevant desiderata, we
+ meticulously benchmark the watermarks impact on quality by predominantly using human
+ judgement on corner-case content. We frequently run internal studies and complement this
+ with external ones. Framing these studies correctly is key. These studies are complemented
+ using proxy metrics that enable auto-evaluation.
+ Robustness (Section 4) requires comprehensive and reproducible benchmarking of numerous possi
+ble transformations. This is informed by manually deciding on appropriate ranges, essentially
+ defining when transformed content can visibly be determined as heavily tampered or when
+ transformations change the underlying (semantic) content significantly.
+ Payload (Section 5): Trackingandestablishingprovenancegoesbeyond“just”detectingawatermark.
+ While manyapproaches allow multi-bit watermarks, it is often neglected how a multi-bit payload
+ is best used. Adapting SynthID-Image’s payload to its use case allows us to serve different
+ generative models, users and deployment scenarios.
+ Ensuring security (Section 6) of the watermarking system involves understanding a wide range
+ of threat models, setting them up for benchmarking and prioritizing them. The relevance of
+ each threat model depends on how the system is deployed, i.e., what information of is publicly
+ available or can be extracted under reasonable assumptions. Achieving perfect security is
+ impossible; thus, we focused our efforts on making key attacks as difficult and expensive as
+ possible.
+ Deployment (Section 7): Aiming for internet-scale deployment requires solving a wide range of
+ additional problems, including decision making (i.e., what constitutes a positive and when to
+ abstain), defining payload use, and putting watermarking in context of other methods such as
+ C2PA or retrieval (e.g., reverse image search).
+ New state-of-the-art (Section 8): We present experimental results for one variant of SynthID
+Image. This model achieves state-of-the-art performance across the most comprehensive range
+ of transformations to date. We also provide a usage recommendation of how to adopt this
+ external variant securely. Figure 1 demonstrates that our models establish a new state-of-the-art
+ in terms of quality, detection performance and robustness across a wide range or transformations.
+ We believe this to be the first comprehensive account of deploying image watermarking models at
+ internet scale.
+ 2. Our approach
+ Digital watermarking is commonly defined as “the practice of hiding a message about an image, audio
+ clip, video clip, or other work of media within that work itself (Cox, 2007).” Generally, this implies the
+ ability to detect and extract this hidden message, which we refer to as the watermark payload, in a
+ way that is robust to post-processing of the watermarked artifact. While watermarking can be used
+ for many modalities (e.g., text; Dathathri et al., 2024), in this paper, we solely consider multimedia
+ watermarking and focus on images. Besides its original use for steganography (i.e., the practice of
+ “undetectably embedding a secret message”; Cox, 2007), watermarking in the context of generative AI
+ is primarily associated with tackling misinformation, impersonation (Yu et al., 2021) and copyright
+ protection (Kadian et al., 2021; Xuehua, 2010).
+ The application to AI-generated content provenance is the dominant motivation of recent deep
+ learning based watermarking methods. It deviates significantly from earlier research (Wan et al.,
+ 3
+SynthID-Image: Image watermarking at internet scale
+ 40
+ 35
+ Perceptibility (percent point increase in artifact rates)
+ 30
+ 25
+ 20
+ 15
+ 10
+ 5
+ StegaStamp
+ TrustMark-Q
+ VideoSeal 0.0
+ WAM
+ VideoSeal 1.0
+ TrustMark-P
+ InvisMark
+ SynthID-O
+ 0
+ 0%
+ 5% 10% 15% 20% 25% 30% 35% 40%
+ Brittleness (FNR at 0.1% FPR)
+ Figure 1 | Quality as evaluated by human raters against
+ FNR at 0.1% FPR averaged across various image trans
+formations. Each model is calibrated to obtain 0.1% FPR
+ (more details to follow in Section 8). The quality is mea
+sured on the y-axis by looking at the difference in arti
+fact rates between watermarked and non-watermarked
+ content. SynthID-O (our external variant of SynthID
+Image available via partnerships) achieves the highest
+ quality (i.e., lowest perceptibility) and robustness (i.e.,
+ lowest brittleness) compared to other baselines.
+ 2022). For example, we exclusively consider blind watermarking which assumes that we only have
+ access to the watermarked content for detection, not pairs of original and watermarked content. In
+ the context of text-to-image models, blind watermarking also excludes knowledge of the used prompt.
+ Moreover, in contrast to steganography, we may not care about users or the general public knowing
+ that content gets watermarked. In fact, companies have been vocal about their plans to watermark
+ AI-generated content as demonstrated through the ongoing dialogue with legislators and participation
+ in C2PA.6
+ Irrespective of the approach, there are several desiderata that we expect SynthID-Image to
+ fulfill. Most prominently, these include quality preservation, robustness to every-day changes to the
+ watermarked content, and hiding a sufficiently large payload in the watermark. The difficulty of
+ developing any watermarking system stems from unfavorable trade-offs between these desiderata,
+ namely the quality-robustness-payload trade-off. For example, without requiring an invisible water
+mark, it becomes trivial to perform robust watermarking with large payload. Thus, in the following,
+ we start with an overview of these desiderata and trade-offs.
+ 2.1. Desiderata
+ Quality and diversity. Product and research teams (especially those that build generative models)
+ are keen to demonstrate and release their most powerful models. This race to higher quality content
+ means that watermarking can be an afterthought and must, as a result, maintain the quality and
+ diversity of the generated content. While some ad-hoc watermarking schemes are provably lossless
+ (Christ et al., 2024; Yang et al., 2024), they can reduce diversity (Gunn et al., 2025). Post-hoc schemes
+ do not suffer from diversity degradation by construction, but may affect quality. In practice, all
+ methods require careful empirical assessment. Unfortunately, quality is the most difficult requirement
+ to properly measure and ensure. Common automated metrics are unreliable and can only be used
+ as proxies during development. Thus, in developing SynthID-Image, we focused heavily on human
+ studies to evaluate quality, as discussed in detail in Section 3.
+ 6In the context of soft-binding schemes (https://c2pa.org/specifications/specifications/1.0/specs/C2PA_Specification.html#_soft_
+ bindings).
+ 4
+SynthID-Image: Image watermarking at internet scale
+ Effectiveness and robustness. It is important to properly define under which assumptions a
+ watermarking system is expected to work reliably. For a start, the watermark should always be
+ perfectly detectable when the watermarked content is not transformed or manipulated. Good
+ detection performance is commonly evaluated using the true positive rate (TPR) at a specific (low)
+ false positive rate (FPR). Achieving high TPR at low FPR is what we call an effective watermarking
+ scheme. Beyond effectiveness, we require watermark detection to be robust to general purpose,
+ everyday changes such as compression, quantization, basic geometric transformations or image
+ effects. While evaluating watermarking schemes against various such transformations is common
+ practice, as shown in older as well as more recent benchmarks (An et al., 2024; Petitcolas, 2000; Piet
+ et al., 2025), there is little agreement on which exact transformations to consider (across modalities)
+ and evaluations are often not exhaustive, leading to misleading claims about the effectiveness of
+ watermarking (Zhang et al., 2023). For SynthID-Image, we hand-picked and-tuned a large variety
+ of transformations, as detailed in Section 4.
+ Payload. Beyond detection, we require watermarks to include an additional multi-bit payload.
+ Again, we expect this payload to be robust to everyday content changes. This is commonly evaluated
+ using bit accuracy, i.e., accuracy of predicting individual bits, or code accuracy, i.e., accuracy of
+ predicting a full multi-bit code. While most state-of-the-art methods (Fernandez et al., 2023; Yang
+ et al., 2024; Zhang et al., 2019) directly tackle this multi-bit watermarking problem, the exact use of
+ the payload at test time is rarely discussed and thus evaluation usually focuses on detection only. For
+ SynthID-Image, we tackle the detection and payload problems separately and found the payload to
+ play a crucial role in how provenance is established, see Section 5.
+ Security. Thesecurity of a watermarking system entails both worst-case robustness of the watermark
+ as well as security of the watermarking scheme itself. This includes a variety of threat models,
+ including evasion of watermark detection, watermark forgery, model stealing or secret extraction
+ attacks. Depending on the threat model, ensuring security might result in a number of secondary
+ desiderata. Avoiding evasion and forgery attacks on the decoder generally requires an adversarially
+ robust detector (see Section 2.3). Thus, adversarial robustness is an important but not the only part
+ of security. For example, to avoid model extraction attacks we may require generated watermarks
+ to be sufficiently diverse across different payloads or hard to train surrogate models on (Orekondy
+ et al., 2020). Some aspects of security can also be addressed using infrastructure changes such as
+ limiting the number of queries per second for the detector or providing only an encoder to trusted
+ customers. We give a comprehensive overview of threat models and their practical relevance for
+ SynthID-Image in Section 6.
+ Efficiency. Deploying watermarking at scale requires reasonably low latency for both encoding and
+ decoding the watermark. For encoding, this is usually measured relative to the latency of content
+ generation. Because this is often user-facing, we aim for a single-digit percentage of additional
+ overhead. For decoding, it is important to realize that it may be run orders of magnitude more
+ frequently than encoding. This fact is commonly ignored in the literature where decoding is framed
+ as an ad-hoc action initiated by a user who wants to check for the watermark. However, we expect
+ watermark decoders to be run at increasingly large scale to check the majority of content that is
+ shared on the web, e.g., as part of social media, web search and scraping, training data creation, etc.
+ Thus, decoding efficiency might often be the bottleneck. It is also important to realize that decoding
+ may be run in addition to other checks such as verifying C2PA (Coalition for Content Provenance and
+ Authenticity, 2023) metadata and content pre- or post-processing (e.g., video encoding/decoding).
+ We benchmark efficiency in terms of throughput per second and hardware unit (e.g., GPU). At
+ 5
+SynthID-Image: Image watermarking at internet scale
+ encoding time, batch size will be pre-determined by generation requests; for decoding, batch size can
+ be chosen to optimize throughput.
+ Deployment. As SynthID-Image is intended for internet-scale deployment, it clearly distinguishes
+ itself from prior work (see Section 9 for a discussion). This introduces a number of additional
+ requirements not sufficiently considered previously. Most importantly, different deployment settings– including internal deployment, watermarking-as-a-service or open watermarking models– have
+ significant influence on the above desiderata and key design choices. This includes proper decision
+ making, versioning of watermarks and how SynthID-Image fits into a larger landscape of methods
+ for provenance, e.g., C2PA or search-based methods (Balan et al., 2023; Bharati et al., 2021; Nguyen
+ et al., 2021; Zhang et al., 2020b). We found that such deployment considerations had the largest
+ impact on deciding what approach to use and which operating point in terms of the above desiderata
+ to choose.
+ 2.2. Post-hoc, model-independent watermarking
+ Watermarking schemes can be categorized along several, partly orthogonal dimensions. Because we
+ focus on blind watermarking only, watermarking has to shift the distribution of generated content in
+ a detectable manner. Thus, blind watermarking is also referred to as distributional watermarking.
+ Additionally, recent literature typically distinguishes between ad-hoc and post-hoc watermarking
+ depending on whether the process of watermarking happens during the generative process (ad-hoc)
+ (Fernandez et al., 2023; Wen et al., 2023; Yang et al., 2024) or as a post-processing step (post
+hoc) (Bui et al., 2025; Hayes and Danezis, 2017; Hayes et al., 2020; Luo et al., 2020; Tancik et al.,
+ 2020; Wen and Aydöre, 2019). Ad-hoc methods are typically integrated into the corresponding
+ generative model and thus require at least partial access to the underlying generative model. Post-hoc
+ watermarking, in contrast, can be performed without any knowledge or assumptions on the generative
+ model and is thus model-independent. We deliberately designed SynthID-Image as a post-hoc,
+ model-independent approach, a choice largely based on deployment considerations while ensuring
+ the best trade-off between the remaining desiderata.
+ Advantages. First and foremost, SynthID-Image must consistently watermark all of Google’s
+ current and future AI-generated content, stemming from a variety of different models. We believe that
+ the promise of watermarking in the context of preventing misinformation stems from this consistency,
+ i.e., being able to mark all content using a single (or as few as possible) watermarking scheme(s).
+ Because ad-hoc approaches are inherently tied to the respective generative model architectures and
+ versions, they are unable to fulfill this promise at scale. For example, having different watermarks
+ for different generative models or versions necessitates running many multiple detectors or cleverly
+ training “meta-detectors”. With a post-hoc approach, this can be handled using a payload. We
+ also found that this creates less organizational dependencies and allows more flexibility in how the
+ watermarking system is deployed internally and externally. For example, in contrast to most ad-hoc
+ approaches, SynthID-Image could be open-sourced or deployed as-a-service without implications
+ for any generative model. Moreover, it is easier to debug, update or simply turn on or off. We
+ appreciate that some ad-hoc methods can be used in a post-hoc way (Fernandez et al., 2023); but the
+ dependence on details of the underlying generative model remains, combining the disadvantages of
+ ad- and post-hoc approaches rather than their advantages.
+ Drawbacks. The main disadvantage of post-hoc approaches is that they are inherently lossy, i.e.,
+ they impact the quality of the generated content. This is in contrast to ad-hoc approaches which can
+ 6
+SynthID-Image: Image watermarking at internet scale
+ be completely lossless (Yang et al., 2024). However, we found that reaching a level of quality where
+ the watermark is essentially invisible to (expert) users is possible in practice. We also believe that the
+ impact of watermarking on quality is also easier to measure for post-hoc approaches. This is because
+ we can directly compare watermarked and non-watermarked content to judge invisibility, as done in
+ our human studies, see Section 3. For ad-hoc approaches, by construction, judging quality is more
+ entangled with the quality of the underlying generative model. Ad-hoc approaches risk reducing
+ diversity of generations (Gunn et al., 2025), which is incredibly difficult to test for.
+ There are various other implications of our choice. For example, post-hoc watermarking causes
+ additional computational overhead for adding the watermark compared to ad-hoc approaches. This
+ overhead can be limited using architectural changes, but cannot be entirely eliminated. This is rather
+ critical for image generation where watermarking has to be performed after generation; for audio
+ and video, generation and watermarking can be parallelized to a large extent. On the other hand,
+ watermark detection can be less efficient for ad-hoc methods, for example, if they require expensive
+ inversion of the diffusion process (Wen et al., 2023; Yang et al., 2024). As we expect detection to be
+ run several orders of magnitude more often, this is an important consideration. We also noticed that
+ robustness of post-hoc approaches is easier to benchmark, since content to be watermarked can be
+ f
+ ixed independent of the generative model, and more controllable. Watermark robustness of ad-hoc
+ approaches may be entangled with internal representations of the underlying generative models.
+ 2.3. Training formulation
+ As a post-hoc scheme, we used an encoder-decoder approach for SynthID-Image following prior
+ work (Bui et al., 2023, 2025; Hayes and Danezis, 2017; Hayes et al., 2020; Luo et al., 2020; Tancik
+ et al., 2020; Wen and Aydöre, 2019). To be more specific, let 𝒙 ∈ X be an image, where X ⊆ ℝ𝑛
+ represents the set of all images (in practice, the set of all images is finite and countable). We assume
+ there exists a metric 𝑑 : X ×X → ℝ+ that encodes the perceptual similarity between two images. We
+ will use this metric to formalize the concept of invisibility of a watermark. A post-hoc watermarking
+ scheme is a pair ⟨𝑓,𝑔⟩ consisting of an encoder function 𝑓 : X → X, which adds an identification
+ mark, and a decoder function 𝑔 : X → {±1}, which tries to detect if the mark is present. Let ℙX be a
+ target distribution that we would like to watermark. Given a perceptual threshold 𝜖 > 0, the optimal
+ watermarking scheme on ℙX solves
+ min
+ 𝑓 ,𝑔
+ 𝔼𝒙∼ℙX 
+[ℓ(𝑔(𝑓(𝒙)),+1) + ℓ(𝑔(𝒙),−1)]
+ s. t. 𝑑(𝒙, 𝑓(𝒙)) ≤ 𝜖,
+ (1)
+ where ℓ represents a suitable classification loss function. Assuming that 𝑔 makes a decision by
+ thresholding some logit using a threshold 𝜅, the classification loss we are ideally interested in is
+ ℓ(𝑔𝜅( 𝑓(𝒙)), 𝑘) = 1[sign(𝑔𝜅(𝑓(𝒙))) = 𝑘]. In practice, an appropriate approximation such as cross
+entropy is used to train 𝑔 and the threshold 𝜅 is calibrated for a target FPR post-training. Minimizing
+ this loss will ensure that the watermarking scheme is effective, i.e., is able to watermark content and
+ detect them. The constraint on 𝑑, in contrast, will ensure quality, i.e., the watermark being invisible.
+ It is important to note that Equation (1) assumes that images to watermark and non-watermarked
+ images comefromthesamedistribution ℙX. Whilewemakethisassumptiontokeepourwatermarking
+ scheme future-proof and universal across various generative models, this is clearly sub-optimal when
+ targeting specific AI-generated content (e.g., coming from a family of text-to-image models). We
+ account for this discrepancy during the calibration process which is applied post-training.
+ We are particularly interested in robust watermarking schemes. That is, schemes that are robust
+ to everyday alterations of watermarked samples that still preserve the usefulness and semantic content
+ 7
+SynthID-Image: Image watermarking at internet scale
+ of the samples. We define a distribution of valid transformations ℙT that semantically preserve the
+ content and require robustness on average, i.e.,
+ min
+ 𝑓 ,𝑔
+ 𝔼𝒙∼ℙX,𝜏∼ℙT 
+[ℓ(𝑔(𝜏( 𝑓(𝒙))),+1) + ℓ(𝑔(𝜏(𝒙)),−1)]
+ s. t. 𝑑(𝒙, 𝑓(𝒙)) ≤ 𝜖.
+ (2)
+ The difficulty of this problem is clearly determined by the perceptual threshold 𝜖 and the distribution
+ over transformations ℙT, resulting in a robustness-quality trade-off. Clearly, allowing more visible
+ watermarks will render the system more robust to stronger transformations. Note again that Equa
+tion (2) assumes that the same transformations are applied to watermarked and non-watermarked
+ images. This is not necessarily the case in practice but it simplifies analysis and evaluation of the
+ resulting scheme.
+ For a watermarking scheme to be secure, we might also need to be robust to specific malicious
+ modifications of the content. Attackers may want to manipulate the images 𝒙 or 𝑓(𝒙) to provoke
+ false positives and false negatives, respectively. This leads to a worst-case formulation of the above
+ optimization problem that requires adversarial training (Madry et al., 2018) which remains largely
+ unsolved. For SynthID-Image, we found that it is sufficient to enforce adversarial robustness only in
+ settings where adversaries have limited information (e.g., black-box access) and constrained compute.
+ As training a perfectly robust and secure watermarking scheme may be infeasible, this shifts the focus
+ to making malicious attacks as difficult as possible.
+ An important aspect of a useful provenance system is the ability to discern content from different
+ actors. As such, having the ability to embed a hidden message, called payload, in the watermark
+ is fundamental. In this setting, training a watermarking scheme becomes a multi-bit classification
+ problem rather than a detection problem. More formally, let 𝒄 ∈ {±1}𝐶 be a 𝐶-bit binary payload.
+ The encoder function 𝑓 : X × {±1}𝐶 → X now crafts a watermark based on both 𝒙 and 𝒄 and the
+ decoder function 𝑔 : X → {±1}𝐶 is now tasked with recovering the payload 𝒄 rather than detecting
+ the presence of the watermark alone. The robust watermarking problem then becomes:
+ min
+ 𝑓 ,𝑔
+ s. t. 𝑑(𝒙, 𝑓(𝒙)) ≤ 𝜖,
+ (3)
+ 𝔼𝒙∼ℙX,𝒄∼𝕌{±1}𝐶,𝜏∼ℙT 
+[ℓ(𝑔(𝜏( 𝑓 (𝒙, 𝒄))), 𝒄)]
+ where 𝕌𝔸 represents the uniform distribution over the set 𝔸. Clearly, this problem becomes more
+ difficult for longer payloads, i.e., larger 𝐶. This means we are now dealing with a robustness-quality
+payload trade-off. For SynthID-Image, we solve both the detection and the payload problem, i.e.,
+ Equations (2) and (3), separately, without making any assumptions on the payload 𝒄 such that it can
+ serve a variety of purposes.
+ 2.4. Benchmarking to control trade-offs
+ Primary trade-off. The most important trade-off between our desiderata is the robustness-quality
+payload trade-off. More visible watermarks are easier and more robust to detect and can store more
+ bits. In a nutshell, we want the watermark to be as robust and contain as many bits as possible while
+ staying invisible. As we will see in Section 3, the main bottleneck of this approach is objectively
+ ensuring invisibility through appropriate metrics and studies. In practice, we control these trade-offs
+ using a combination of different losses, data augmentation methods and payload encoding strategies.
+ Moreover, the data distribution has a large impact on this trade-off. For example, requiring invisible
+ watermarks can be harder for some images (e.g., with less structure). Requiring high quality on
+ these examples leads to less robustness overall. Thus, deciding to not watermark specific content can
+ improve the trade-off significantly.
+ 8
+SynthID-Image: Image watermarking at internet scale
+ Secondary trade-offs. Besides the robustness-quality-payload trade-off, there are various secondary
+ trade-offs. For example, requiring adversarial robustness or preventing watermark extraction or
+ exchange attacks may worsen quality. Another example is using a cascade of decoders, with more
+ efficient decoders offering less robustness first, which allows to trade-off robustness and efficiency.
+ For SynthID-Image, we found that the most effective way of controlling these trade-offs is proper
+ end-to-end benchmarking of all desiderata of interest. While we will discuss appropriate metrics in
+ detail in the following sections, we want to emphasize that end-to-end benchmarking in itself is a
+ non-trivial endeavor. Critically, benchmarking needs to include all key metrics and threat models to
+ highlight relevant trade-offs. This requires a high degree of automation and tooling around model
+ development. Training and evaluation will also inherently include randomness. It is important to be
+ able to control this randomness appropriately for debugging and reproducibility. For transformations
+ and attacks this also includes appropriately tuning hyper-parameters. Moreover, the choice of datasets
+ for evaluation is important: key considerations are whether to benchmark on natural or generated
+ images and how to include corner-case content, especially for quality evaluation.
+ 3. Invisibility
+ Quality is the most difficult requirement to properly evaluate in practice because “invisibiliy” or any
+ quality change in generated content is tricky to objectively quantify. So far, in Section 2.3, we worked
+ with a perceptual metric 𝑑 (many prior publications also work with an unknown oracle instead; Zhang
+ et al., 2023). Of course, there exist automated metrics and proxies, including PSNR, SSIM (Wang
+ et al., 2004) or pre-trained perceptual models such as L-PIPS (Zhang et al., 2018), FID (Heusel et al.,
+ 2017), CLIP (Radford et al., 2021) or CMMD (Jayasumana et al., 2024). However, none of these
+ metrics can ultimately replace human evaluation. This is particularly relevant when dealing with
+ a wide distribution of generated content that might not match benign, natural content. Learned
+ metrics will always be biased to the content distribution that these metrics have been developed for.
+ In the case of images, these are typically ImageNet-style natural images. For SynthID-Image, we
+ decided to go with rather basic metrics such as PSNR or SSIM, using them with extreme caution and
+ mostly to perform relative comparisons while relying heavily on human evaluation, both internally
+ and externally, to decide invisibility in absolute terms. The latter also includes hand-tuning relevant
+ transformations considered during robustness evaluation, as detailed in Section 4. While we also rely
+ heavily on standard datasets, we took particular care to run human studies on actual AI-generated
+ content from state-of-the-art generative models, using a diverse set of prompts.
+ Setups. Independent of the metric, there are two modes of quality evaluation. First, we can compare
+ pairs of original and watermarked content. This side-by-side comparison allows to directly quantify
+ a perceptual distance and is the default for most post-hoc approaches where we have a one-to-one
+ correspondence between original and watermarked content. In Equation (2), this means directly
+ evaluating the distance 𝑑. Second, as users do not typically have access to the original content
+ alongside the watermarked content, we can also compare the distributions of a metrics. This is how
+ ad-hoc approaches are typically evaluated, e.g., by computing FID or CLIP scores for original and
+ watermarked content and performing hypotheses tests to see if both distributions are distinguishable
+ (Yang et al., 2024). However, using CLIP also assumes access to the corresponding prompts and is thus
+ limited to ad-hoc approaches. This approach is typically more difficult as we cannot directly judge,
+ for a fixed prompt or image, to what extent quality changes. For SynthID-Image, we generally
+ found the first approach to be more appropriate for internal evaluation as it allows for more scrutiny.
+ For studies with external users, in contrast, we follow the second approach because it represents the
+ more realistic setting.
+ 9
+SynthID-Image: Image watermarking at internet scale
+ Internal rater studies. More specifically, during fast-paced development, we used a reasonably
+ small set of generated images to run side-by-side comparison studies within the team for most model
+ candidates. This involves showing the original and watermarked content side-by-side, randomizing
+ which is the watermarked and asking ourselves to identify the watermarked one. Across the team, we
+ usually target a performance close to random chance 50%±10%. This is a particularly high bar since
+ watermarks are easier to spot side-by-side, with the ability to zoom in and out of the image. Moreover,
+ throughout development, we learned to spot watermarks well as we usually know how watermarks
+ of specific model versions look. Over time, as watermarks got less visible, we also added an option
+ to abstain. We included hand-picked examples of generated content, often those that we found
+ difficult to watermark or informed by direct feedback from colleagues working on the corresponding
+ generative models. This also contributed to these studies being extremely conservative. In between
+ these studies, we typically compare models in relative terms using PSNR, SSIM or similar automatic
+ metrics, especially to hill-climb on quality or other desiderata.
+ External rater studies. For evaluation using external raters, this side-by-side approach was replaced
+ by showing either the original or the watermarked content and asking raters to find “artifacts”. This
+ is the more realistic setup, simulating that users usually do not have access to pairs of original
+ and watermarked content. In contrast to the very specific, hand-picked content examples in our
+ internal evaluation, we constructed a set of hundreds of prompts across various categories. For
+ our image watermark evaluation, example categories are shown in Figure 2 with images generated
+ (and watermarked) using Imagen and SynthID-Image. These categories also illustrate that the
+ distribution of generated images tends to be significantly different from natural images; this, however,
+ reflects many use-cases of such generative models. In the study, we also included training examples for
+ the raters to highlight common types of artifacts. Here, it was important to include both watermark
+related artifacts as well as generation-related artifacts. We also had to use dummy examples to
+ double-check that raters pay attention. If, after the study, we cannot distinguish the rate of artifacts
+ between the watermarked and non-watermarked with statistical significance, we concluded the
+ watermark to be invisible.
+ Additional considerations. There are several considerations that affect quality. For images, this
+ mainly concerns resolution and color space. While resolution could be set by the corresponding
+ generative model whose output must be watermarked; we intend SynthID-Image to be independent
+ of such dependencies as generative models will likely change going forward. While higher resolution
+ allows less visible watermarks at similar robustness and payload size, we found that efficiency
+ constraints ended up determining resolution. This choice required taking care of not introducing any
+ artifacts due to re-sizing during encoding. The color space largely impacts which pixel-level changes
+ are actually perceptible. We found this matters particularly for black-and-white images or images
+ with few colors or low contrast.
+ Corner-cases. An important realization in terms of quality, but also relevant for robustness and
+ security, is the frequency of corner-case imagery when working at internet scale. We already mentioned
+ the tricky case of black-and-white images– typically ignored in the literature. Other examples include
+ logos with very few but uniform coloring, images with slow gradients, abstract paintings, pixel art,
+ sparse drawings, etc. See Figure 2 for some examples. These types of images are rarely included in
+ standard vision datasets that perceptual metrics are trained on. As corner-cases, we generally define
+ any category of content that poses a challenge to watermarking in terms of quality and is not well
+ represented in many standard datasets. This might mean that such content is difficult to watermark in
+ an invisible way, or that the watermark becomes fragile in terms of robustness. For SynthID-Image,
+ 10
+SynthID-Image: Image watermarking at internet scale
+ 3D Rendering
+ Defocused Blurry
+ Landscape Photo
+ Pencil Drawing
+ SciFi Photo
+ Abstract art
+ Fantasy Painting
+ Line Drawing
+ Pixel art
+ Shapes
+ Animal Painting
+ Flat art
+ Logo
+ Portrait Painting
+ Stock Photo
+ Animal Photo
+ Historic Photo
+ Object Painting
+ Portrait Photo
+ Text
+ Cartoon
+ Landscape Painting
+ Object Photo
+ Poster Art
+ Wallpaper
+ Figure 2 | Illustrative images generated using Imagen for different categories of prompt. These images (either
+ watermarked or not) are shown to external human raters and include corner-case images such as grayscale
+ photographs, sketches or close-to-uniform color images.
+ 11
+SynthID-Image: Image watermarking at internet scale
+ we found it important to identify and track such content throughout development. Large parts of the
+ content used for internal studies included such corner cases.
+ 4. Transformation robustness
+ To consistently detect watermarks, it is important that they are robust to common transformations
+ and content post-processing. This generally includes a pre-determined set of transformations that we
+ expect to be readily available on personal computers or smartphones, including resizing or cropping,
+ quantization and compression, or common image processing filters (e.g. Instagram’s photo filters).
+ This is similar to the notion of corruption robustness in the computer vision literature (Hendrycks and
+ Dietterich, 2019; Hendrycks et al., 2019) and has to be contrasted with adversarial transformations
+ (Alaifari et al., 2019; Engstrom et al., 2017) that assume malicious intent. Concretely, this means
+ that we expect robustness to a random transformation with reasonable strength.
+ The main metrics to evaluate detection performance are true and false positive rates (TPR and
+ FPR)withandwithouttransformations. Formally, given adistribution ℙT overcontenttransformations,
+ we can measure the watermarking scheme’s nominal rates as
+ 𝔼𝒙∼ℙX,𝜏∼ℙT 
+[𝑔𝜅(𝜏(𝒙))] (TPR)
+ 𝔼¯𝒙∼ℙ¯X 
+[𝑔𝜅(¯𝒙)]
+ (FPR)
+ with ℙ¯X representing the distribution over all possible non-watermarked content and 𝑔𝜅 indicating the
+ decoder at the operating point (commonly a threshold) 𝜅. Note that we can also measure the worst
+case across transformations for analysis purposes (replacing 𝔼𝜏∼ℙT 
+with max𝜏∼ℙT
+ ). Some papers also
+ report the area under the receiver operating characteristic (AUROC), considering TPR and FPR across
+ various detection thresholds 𝜅. However, we found that AUROC is not sensitive enough in practice.
+ This is because we are particularly interested in operating points with very low FPR (i.e., ≪ 1%),
+ disregarding the majority of the ROC curve. Note that prior work (Fernandez et al., 2023; Yang
+ et al., 2024) often simulates results at such low FPRs based on assumptions of the detection/payload
+ logits distribution. But this has been found to be misleading (Fernandez et al., 2023) which is
+ why we rely purely on sufficiently large datasets to avoid simulation. For evaluating TPR and FPR
+ consistently across transformations, it is important to choose the operating point 𝜅 consistently across
+ transformations. This is because, for deployment, we have to choose a single 𝜅; evaluation on different
+ subsets of transformations with different operating points can thus be misleading. To the best of our
+ knowledge, this is neglected in prior work, resulting in overly optimistic robustness evaluations.
+ Prior work on watermarking quickly realized that properly specifying and training for relevant
+ transformations is key for robustness. Thus, many previous works include concrete transformations
+ and parameters to be tested for robustness (Tancik et al., 2020; Wen et al., 2023; Zhang et al.,
+ 2024). However, we found that none of these works are exhaustive, as also seen in the surveyed
+ methods and transforms by Wan et al. (2022). Commonly overlooked transformations can be simple
+ ones, such as small rotations, left/right and up/down flips, or different types of noise (Gaussian,
+ salt&pepper, speckle). For example, GaussianShading (Yang et al., 2024) misses rotations and
+ f
+ lips; StableSignature (Fernandez et al., 2023) and WAVES (An et al., 2024) ignore various noise
+ types. This is despite common knowledge that these type of transformations are extremely common
+ and work on corruption robustness indicates that deep neural networks are not inherently robust
+ to them. Moreover, many methods are benchmarked against “fixed-strength” transformations, e.g.,
+ f
+ ixed rotations or crops, or a fixed JPEG quality (Fernandez et al., 2023; Saberi et al., 2024b; Yang
+ et al., 2024). While these usually correspond to rather strong transformations, it is not guaranteed
+ that the methods are also the least robust against them; for example, neural networks may be more
+ vulnerable to small rotations than 90, 180 or 270 degree rotations (Dumont et al., 2018; Engstrom
+ et al., 2017). It has also been shown that combinations of transforms can be effective ways to fool
+ 12
+SynthID-Image: Image watermarking at internet scale
+ All rotations
+ Combined Rotate
+ Exposure
+ Gaussian noise
+ Instagram
+ Sharpness
+ Brightness
+ Contrast
+ File format
+ Grayscale
+ Light text overlay
+ Shot noise
+ Combined
+ Crop resize
+ Flip left-right
+ Hue
+ Resize
+ Small rotation
+ Combined NoCrop
+ Denoise
+ f
+ lip up-down
+ Identity
+ Rotation
+ Speckle noise
+ Combined NoCrop Rotate
+ Emoji overlay
+ Gaussian blur
+ Impulse noise
+ Saturation
+ Zoom out
+ Figure 3 | Illustrative examples of the 30 “basic” transformations used in our evaluation (alphabetically listed).
+ 13
+SynthID-Image: Image watermarking at internet scale
+ networks. For example, StableSignature has combinations based on cropping, brightness changes
+ and JPEG compression. As generalization of neural networks between transformations is still poorly
+ understood, a key component of SynthID-Image is exhaustively listing, implementing and tuning
+ relevant transformations. We developed a set of “basic” transformations that we believe any large-scale
+ watermarking system should be robust to. Our two guiding principles for inclusion in this basic set of
+ transformations are accessibility and detectability. Rotations, flips, brightness changes, etc. are all
+ very accessible on every smartphone camera or social media app. This also includes Instagram-like
+ f
+ ilters7 or overlaying texts and logos. To tune strengths, we consider all transformations reasonable
+ if they have reasonable quality and preserve the underlying semantics of the content (as judged by
+ human raters). It is also important to consider any possible transformations that any software might
+ automatically include as pre- or post-processing, such as compression and quantization. All of our
+ basic transformations are shown in Figure 3.
+ 5. Payload
+ For SynthID-Image, where we aim to serve several generative models across different partners,
+ the payload is a crucial component of turning watermarking into a tool for provenance. While some
+ recent work (Yang et al., 2024) simulates multiple users, details are scarce and suggest that a simple
+ integer user identifier is encoded in the payload, without any redundancy or additional logic.
+ During development, we evaluate the payload robustness in terms of bit and code accuracy, across
+ all relevant transformations. Letting 𝒄 = (𝑐1, . . ., 𝑐𝐶) be the originally encoded payload code and 𝑔𝑖(·)
+ the logit corresponding to 𝑐𝑖 (with 𝑔0(·) corresponding to the detection logit), we define bit accuracy
+ as the accuracy of the predicted payload bits in expectation over bit positions:
+ 𝔼𝒙∼ℙX,𝜏∼ℙT
+ 1
+ 𝐶 
+�
+�
+ ∑
+ ︁
+ 𝑖=1
+ 1
+ [sign(𝑔𝑖(𝜏( 𝑓 (𝒙)))) = 𝑐𝑖] .
+ (4)
+ Bit accuracy is comparable across models with different payload sizes. In some cases, it is also
+ interesting to monitor bit accuracy individually as their accuracy can vary widely by location depending
+ on the exact training procedure. This might inform how to robustly encode information in the payload
+ in practice. Bit accuracy does not explicitly measure what we might be interested in, which is how
+ often we get the entire payload right, i.e., code accuracy:
+ 𝔼𝒙∼ℙX,𝜏∼ℙT 1[∀𝐶
+ 𝑖=1 sign(𝑔𝑖(𝜏( 𝑓(𝒙)))) = 𝑐𝑖] .
+ (5)
+ Code accuracy generally degrades with larger payload size and degrades more quickly with chal
+lenging transformations than bit accuracy. As before, it is important to monitor these metrics across
+ transformations. This is because bit and code accuracy are highly relevant for many deployment
+ scenarios where pure detection performance in terms of TPR/FPR is not sufficient. Note that both
+ metrics are defined conditional on watermarked examples. That is, we generally neglect what happens
+ to the payload on non-watermarked content. This is somewhat unique to SynthID-Image, as we
+ explicitly separate detection and payload recovery (see Section 2.3). For approaches that directly use
+ the payload for detection, TPR and FPR needs to be defined following Equation (5). For example,
+ Fernandez et al. (2023); Yang et al. (2024) select a random but fixed payload for each watermarked
+ example and make a detection decision by thresholding on the number of matching bits between this
+ payload and the predicted one. Of course, if the reference payload is not available, this test is not
+ applicable.
+ 7https://github.com/akiomik/pilgram
+ 14
+SynthID-Image: Image watermarking at internet scale
+ In the setting from Yang et al. (2024) where each user has an integer identifier, code accuracy
+ becomes the relevant metric for provenance (in this case, watermark detection and payload recovery
+ coincide). Essentially, this turns watermark detection into a multi-class problem, where the number
+ of classes grows with the number of users. For SynthID-Image, where we deliberately disentangled
+ watermark detection and payload decoding for flexibility, we do not always need to invoke the logic
+ for decoding the payload.
+ 6. Ensuring security
+ There is a wide range of attacks on watermarking systems that SynthID-Image has to defend
+ against (Zhao et al., 2025). In the following, we discuss the relevant threat models we considered. A
+ threat model describes an attacker’s objective, capabilities, and knowledge. Even though attackers
+ might have different objectives, they often use a common set of tools that can inform which defenses
+ to prioritize.
+ 6.1. Threat Models: Objectives, Capabilities, and Tools
+ An attacker’s primary objectives are either watermark removal (creating a false negative) to obscure
+ content and possibly claim ownership or watermark forgery (creating a false positive) to wrongly
+ attribute ownership of a potentially incriminating piece of content. Further objectives that aim at
+ facilitating these goals include model extraction (Oh et al., 2019; Orekondy et al., 2019; Tramèr et al.,
+ 2016) to steal the models themselves (or information about them, e.g., hyper-parameters,architecture
+ details), secret extraction (Jovanovic et al., 2024) to find hidden keys (e.g., used for payload
+ encoding), or payload attacks to manipulate the embedded information.
+ The success of these attacks depends on the attacker’s capabilities. This includes their level of
+ access, ranging from black-box (API-only) to white-box (full model weights and architecture). An
+ attacker may also have privileged access to secrets (e.g., private keys) or possess paired information
+ (both original and watermarked content), which significantly simplifies attacks, especially for post
+hoc systems like SynthID-Image. Finally, their available resources, such as query limits and
+ computational power, constrain the feasibility of an attack. To execute an attack, adversaries can
+ employ various tools, largely from the adversarial machine learning community (Papernot et al.,
+ 2018).
+ (Universal) adversarial examples These are inputs with small, often imperceptible, perturbations
+ designed to cause misclassification (Carlini and Wagner, 2017b; Szegedy et al., 2014). For
+ watermarking, they can be used to make the decoder fail (removal) or fire incorrectly (forgery).
+ While defenders aim for invisibility, attackers may tolerate visible artifacts, making attacks
+ easier (Brown et al., 2017).
+ Surrogate models Since adversarial examples often transfer between different models, an attacker
+ can train a local substitute model to craft attacks in a black-box setting (Papernot et al., 2017;
+ Tramèr et al., 2016).
+ Re-generation attacks These attacks use other powerful generative models (like diffusion models)
+ to reconstruct a watermarked image, potentially washing out the watermark in the process (An
+ et al., 2024; Zhao et al., 2024).
+ 15
+SynthID-Image: Image watermarking at internet scale
+ 6.2. Defenses and discussion
+ The main difficulty of defending against many of the above threat models is anticipating future
+ attacks within relevant threat models (Papernot et al., 2018). These generally depend on how the
+ watermarking scheme is deployed in practice (see Section 7). Our strategy for SynthID-Image has
+ been to defend against attacks that are stronger than what we expect in a real-world deployment.
+ For example, ensuring robustness against white-box attacks provides a strong defense against more
+ realistic black-box threats (Croce and Hein, 2020). We identified relevant attacks through red-teaming
+ and integrated them into our automated evaluation benchmarks to monitor trade-offs.
+ Robust training and fine-tuning. The foundation of our defense is robust training. The watermark
+ encoder and decoder are trained on a wide range of data augmentations and transformations to help
+ them withstand common image manipulations (Hayes, 2020; Zhu et al., 2018). Robust training may
+ include adversarial training of the decoder (Kurakin et al., 2017; Madry et al., 2018), which aims
+ to harden it against constrained adversarial manipulations. Additionally, for SynthID-Image, we
+ specifically tested and ensured robustness against off-the-shelf weak re-generation attack models (e.g.,
+ using variational autoencoders). Ultimately, robustness to a large range of different threat models
+ has been shown to be particularly tricky (Maini et al., 2020; Stutz et al., 2020; Tramèr and Boneh,
+ 2019), as this will either reduce performance or require a more visible watermark. However, since
+ SynthID-Image is deployed in a proprietary setting, our main goal is to make black-box attacks
+ computationally infeasible at scale, a more achievable goal than defending against a determined
+ white-box adversary.
+ Randomness. Appropriate randomness in the watermarking process is crucial for countering certain
+ extraction or exchange attacks. For a given generative model, using the same seed and prompt should
+ ideally produce the exact same watermarked output every time. This deterministic behavior prevents
+ an attacker from re-generating the image to reveal differences in watermark patterns, a technique
+ known as a collusion attack. On the other hand, for content that is highly predictable (e.g., due
+ to severe memorization) or simple, an attacker might anticipate the output and attempt to forge
+ or remove a watermark. To mitigate this, the watermark generation process should incorporate
+ stochastic elements, ensuring sufficient diversity in the watermarks applied to semantically similar
+ but non-identical images.
+ Specificity. To prevent watermark exchange attacks, the watermark pattern should be inextricably
+ linked to the content it marks. We enforce this property by making the watermark generation process
+ content-dependent. During training, we introduce specific loss functions designed to minimize the
+ chance that a watermark extracted from one piece of content can be successfully applied to another.
+ This ensures the watermark is not merely a generic stamp but a specific signature of the content itself.
+ Filtering. While detecting and filtering various types of adversarial attacks have been shown
+ ineffective (Bryniarski et al., 2022; Carlini and Wagner, 2017a; Stutz et al., 2020), we can decide
+ not to watermark specific content. In text watermarking (Kirchenbauer et al., 2023), for example,
+ zero-entropy generations (e.g., due to memorization) are automatically not watermarked. Similarly,
+ we can decide not to watermark specific corner-case content such as nearly uniform images. Such
+ content can easily be filtered by looking at basic statistics of the content.
+ 16
+SynthID-Image: Image watermarking at internet scale
+ 7. Internet-scale deployment
+ Our final desiderata, requiring us to actually deploy SynthID-Image in various settings at scale,
+ implies various practical considerations that we found rarely discussed in prior work. Some of these
+ depend on the actual deployment scenario, while others address practicalities like decision making,
+ versioning and combinations with other tools for provenance.
+ Deployment settings. For SynthID-Image, we considered the following three deployment sce
+narios:
+ As-an-internal-service: Here, either encoder, decoder or both are purely used for internal purposes.
+ A common construction is to allow watermarking of content generated by internal models (even
+ if the content is then publicly served) and have detection run only internally, too. A variation
+ of this is to allow internal watermarking but expose detection externally to trusted partners
+ or even the end-user. Note that paired information is only available internally and access to
+ queries and secrets can be tightly controlled.
+ As-a-service: Here, both encoder and decoder are offered as-a-service to third party companies.
+ In this setting, third parties have access to paired information and potential secrets. More
+over, payloads need to be used to distinguish between different customers all using the same
+ watermarking system. Again, third parties can decide to open the detection part to the end user.
+ Open models: In this setting, either encoder, decoder or both are publicly available. This makes
+ paired information more widely available and payloads derived from private keys become more
+ important.
+ In all these scenarios it is important to realize that SynthID-Image has two different components,
+ the encoder and the decoder that are deployed differently. Also, models from the same model family,
+ i.e., multiple SynthID-based models, might be deployed in different scenarios.
+ The deployment specifics also affect the relevance of certain threat models in practice. This is
+ because the attacker’s knowledge and level of access changes. Internal use has the smallest attack
+ surface as access to models, paired information, and secret keys can be controlled tightly. Giving
+ customers the possibility to produce paired information or opening encoder and/or decoder models
+ increases the attack surface. Along this, threat models like watermark removal/false negatives become
+ less relevant as they are particularly easy to provoke using (universal) adversarial examples against
+ open models. False positives, in contrast, gain in importance and can be reduced through clever
+ payload selection. In the setting where multiple similar models are released through different avenues,
+ open models may also increase the risk to internal models by simplifying surrogate and transfer-based
+ attacks.
+ Decision-making. Previous work on watermarking used statistical tests for decision making on top
+ of the decoder’s predictions. These approaches are often based on assuming Bernoulli distributions on
+ the individual bits (Fernandez et al., 2023; Lukas and Kerschbaum, 2023; Roman et al., 2024; Yang
+ et al., 2024; Yu et al., 2021) or exploit that diffusion models start from a Gaussian distribution (Wen
+ et al., 2023; Zhang et al., 2024). These are essentially parametric approaches; it has already been
+ shown that individual bits can usually not be modeled using fair coin flips (Fernandez et al., 2023,
+ Appendix B.5). Nevertheless, we believe that proper decision-making is important for deploying
+ watermarking systems at large scale in a responsible and reliable manner. To avoid any parametric
+ 17
+SynthID-Image: Image watermarking at internet scale
+ assumptions, we found conformal 𝑝-values particularly scalable as they are non-parametric and
+ recent work showed how to incorporate robustness considerations (Stutz et al., 2023). Moreover,
+ as this approach is based on a held-out set of calibration examples, it also offers an additional level
+ of configuration before deployment. This can be important when having to react to distributional
+ changes or minor issues for which updating the model is not an option (see Versioning below).
+ We define the following hypotheses: 𝐻0: “input is not watermarked” and 𝐻1: “input is water
+marked”. Wethencomputevalid 𝑝-valuesfollowingBatesetal.(2021,2023)forbothhypothesesusing
+ a held-out set of calibration examples {𝒙(0)
+ 𝑖
+ samples, respectively:
+ }𝑛
+ 𝑖=1 and {𝒙(1)}𝑛
+ 𝑖=1 of non-watermarked and watermarked
+ 𝜌𝑘(𝒙) = 1+ 𝑛
+ 𝑖=1𝛿[(2𝑘 −1)𝑓0(𝒙) ≥ (2𝑘 −1)𝑓0(𝒙(𝑘)
+ 𝑖
+ )]
+ (6)
+ 𝑛 +1
+ where 𝑓0(·) correspond to the detection logit. As these are valid 𝑝-values, i.e., 𝜌𝑘 is uniformly
+ distributed over [0,1] iff 𝐻𝑘 is true, thresholding 𝜌0 (𝜌1) at 𝛼 guarantees a FPR (TPR) of at most 𝛼
+ (at least 1 − 𝛼). We can control FPR and TPR simultaneously by allowing a variable abstention rate.
+ The calibration set can be updated online if necessary and include different transformations of the
+ same image for robustness.8
+ Assuming an individual logit 𝑓𝑗(·) for each bit 𝑐𝑗 ∈ {±1}, 𝑗 ∈ {1,...,𝐶}, we can also compute
+ 𝑝-values for each bit 𝑐𝑗 being positive or negative. Given an encoded payload 𝒄 = (𝑐1,...,𝑐𝐶), we
+ can then test whether the payload is likely the original one using any standard multiple hypothesis
+ testing procedure (Hochberg, 1988; Holm, 1979; Simes, 1986). These methods usually come with
+ a confidence level 𝛼 which controls the rate of correctly accepting the true payload. However, with
+ larger 𝐶, these methods become more conservative. Especially in light of transformations this leads to
+ possibly multiple payloads being accepted. This can be countered using redundant coding techniques.
+ Again, an abstention mechanism can be created easily: if all used payloads 𝒄 can be enumerated, we
+ can abstain if multiple payloads are accepted and the number of accepted payloads is often a good
+ mirror of whether the artifact has been tampered with or not.
+ Versioning. Versioning is an important aspect of deploying at scale and for the long term. In the
+ case of SynthID-Image, the encoder always determines the main version. This is because once
+ watermarked content is out in the wild, we have to be able to detect it. The decoder, in contrast, can
+ be updated much more easily. In a sense this means that we need strict versioning for the encoder
+ while the decoder can be updated continuously. This also implies that threat models that can be
+ addressed in the encoder are more important. For example, once an encoder has been deployed, it is
+ difficult to increase the diversity of watermarks or prevent watermark extraction. The decoder, in
+ contrast, can be updated on the fly to address new attacks. Having the encoder determine the version
+ means that eventually there will be multiple versions in production, assuming that watermarking
+ quality, robustness and payload size will be improved over the coming years. This entails having
+ to detect multiple versions of watermarks over time. This adds additional resource requirements,
+ complicates decision making, and vulnerability might be “inherited” between versions.
+ Combination with search and C2PA. For tackling provenance of AI-generated content, watermark
+ing is a promising but not the only tool at our disposal (Collomosse and Parsons, 2024). Generally,
+ we expect watermarking to be deployed alongside a metadata-based standard like C2PA which major
+ companies vowed to implement. Moreover, there are also technologies based on search and retrieval.
+ 8Following Stutz et al. (2023), this reduces the guaranteed FPR (TPR) to 2𝛼 (1 − 2𝛼); however, this drop is never
+ observed empirically.
+ 18
+SynthID-Image: Image watermarking at internet scale
+ For SynthID-Image, we explored various combinations, and focused on fingerprinting, which refers
+ to the practice of computing low-dimensional embeddings for multimedia artifacts and storing them in
+ an internal database. Learning such embeddings in a robust way (Gowal et al., 2021) allows verifying
+ the origin of AI-generated content using similarity search. Various works have applied variations of
+ this idea to attribution and content provenance in the widest sense (Balan et al., 2023; Bharati et al.,
+ 2021; Nguyen et al., 2021; Saberi et al., 2024b; Zhang et al., 2020b). In comparison to watermarking,
+ similarity search is more prone to false positives rather than false negatives. On its own, fingerprinting
+ suffers from increased cost for storing embeddings (on top of the embedding cost) and poor scaling as
+ false positives increase with database size. This means that there needs to be retention rules that e.g.
+ store embeddings of generated content only within a specific time-frame. However, as fingerprinting
+ has complementary failure modes, it is natural to combine both approaches. For example, to mitigate
+ forgery attacks, an image must not only contain the correct watermark payload but also match one of
+ the stored embeddings.
+ 8. Experimental results
+ Weevaluate the robustness and quality of our external SynthID-Image watermarking model variant,
+ denoted SynthID-O. SynthID-O can encode 136-bit payloads within 512×512 pixel images. We
+ compare this variant against a wide range of baselines. Our experiments show that SynthID-O
+ establishes new state-of-the-art watermarking performance. Specifically, we find that it outperforms
+ others in terms of quality, considering an extensive human rating study, and shows superior detection
+ performance across a comprehensive list of image transformations. Results are summarized in
+ Figure 1. In this section, we provide further details.
+ Baselines. To measure detection performance of a given model, we leverage the model’s detection
+ score if available or use the number of correct payload bits as a score proxy (as proposed previously,
+ e.g., Fernandez et al., 2023). To measure payload recovery performance, we directly measure the bit
+ accuracy for models that provide it.9 We evaluate all models without any error code correction. We
+ compare against the following:
+ StegaStamp(Tancik et al., 2020): We use the model checkpoint released in the official repository.10
+ It can encode 100-bit payloads within 400×400 pixel images.
+ TrustMark(Buietal., 2025): Our primary results leverage the TrustMark-Q and TrustMark-P
+ variants. 11 We chose TrustMark-Q over TrustMark-B because, even though it prioritizes
+ image quality over robustness compared to TrustMark-B, our evaluation found it to be more
+ robust overall. All TrustMark variants can encode 100-bit payloads within 256×256 pixel
+ images.
+ InvisMark(Xu et al., 2025): We use the model checkpoint released in the official repository.12 It
+ can encode 100-bit payloads within 256×256 pixel images.
+ WAM(Sander et al., 2025): We use the model checkpoint released in the official repository.13 It can
+ encode 32-bit payloads within 256×256 pixel images. Note that WAM can be used to watermark
+ individual areas within an image, we use it here to watermark full images. As detection score,
+ we use the area of the detection mask returned by the model. For payload recovery, we use the
+ “semi-hard” strategy.
+ 9Note that bit accuracy performance depends heavily on the payload length 𝐶 and this might not be a useful point of
+ comparison.
+ 10https://github.com/tancik/StegaStamp
+ 11https://github.com/adobe/trustmark/tree/main/python
+ 12https://github.com/microsoft/InvisMark
+ 13https://github.com/facebookresearch/watermark-anything
+ 19
+SynthID-Image: Image watermarking at internet scale
+ VideoSeal(Fernandez et al., 2024): We use the model checkpoints released in the official reposi
+tory.14 VideoSeal-0.0 and VideoSeal-1.0 can encode 96-bit payloads and 256-bit payloads
+ within 256×256 pixel images, respectively. Note that VideoSeal was primarily developed to
+ add watermarks to videos. However, it can be used for images. As detection score, we use the
+ number of correct payload bits as using the available detection logit performs badly for the
+ available checkpoints.
+ For all methods, we use the default parameters provided by the authors in their individual code
+ repositories. We use the watermark rescaling method presented by Bui et al. (2023) with bicubic
+ resizing (which we found to outperform bilinear resizing consistently across all methods).
+ 8.1. Quality evaluations
+ Setup. AsexplainedinSection3, weperformhumanevaluationstoassess thequality of SynthID-O
+ and the models listed above. For each model, we collect 10,000 ratings (5,000 for watermarked and
+ 5,000 for non-watermarked samples) using 1,000 images generated by Imagen.15 Unlike ImageNet
+ which is used in the robustness evaluation, all images have a resolution of 1536×1536, which reflects
+ real-world product conditions with the focus placed on quality (as desired by creators). Images are
+ generated across 25 high-level creative categories shown in Figure 2. Each high-level category is
+ further sub-divided into different styles such as “black & white” and “colorful” for “abstract art”. All
+ prompts are listed in the appendix (see Section B). We introduce 10 additional dummy images that
+ exhibit clear artifacts. Ratings from raters with less than 70% success rate at correctly identifying
+ dummy images are excluded from the study.
+ Results. Figure 1 and 4 (top-left) report the average difference in human identified artifact rate
+ between watermarked and non-watermarked samples. A 5 percent point increase indicates that
+ the corresponding watermarking method creates newly visible artifacts in at least 5% of the images
+ (it is a lower bound). SynthID-O performs best, followed by VideoSeal-1.0, InvisMark and
+ WAM. StegaStamp has the largest reported artifacts rate, validating our observation that its high
+ robustness relative to existing watermarking models comes at the cost of a large degradation in
+ quality. We also report computational quality metrics on the same clean and watermarked image
+ pairs in Figure 4. While computational metrics tend to correlate with human judgment, they fail
+ to capture obvious artifacts (especially when those are small in size). This is clearly noticeable for
+ VideoSeal-0.0 and TrustMark-Q which exhibit strong performance on computational metrics,
+ but do poorly on the human evaluation.16
+ 8.2. Robustness evaluation
+ Setup. Weevaluate all models on a consistent set of 10,000 images from ImageNet’s validation set.
+ We focus this evaluation on photo-realistic content which is the most likely source of misinformation.
+ The robustness of detection and payload recovery is assessed under 30 common image transformations
+ (shown on Figure 3). In this section, we evaluate images at a resolution of 512×512. Evaluations at
+ native image resolutions are shown in Appendix A.1. Evaluations where images are transformed after
+ being resized at each method’s preferred resolution are shown in Appendix A.2.
+ We group image transformations into six categories: Color, Combination, Noise, Overlay, Quality and
+ 14https://github.com/facebookresearch/videoseal
+ 15https://deepmind.google/technologies/imagen-2/
+ 16It is worth noting that in side-by-side evaluations where trained raters are asked to tell which one between two almost
+ identical images is watermarked, all methods (except SynthID) do poorly.
+ 20
+SynthID-Image: Imagewatermarkingatinternetscale
+ SynthID-O
+ VideoSeal 1.0
+ InvisMark
+ WAM
+ TrustMark-P
+ VideoSeal 0.0
+ TrustMark-Q
+ StegaStamp
+ 0
+ 5
+ 10
+ 15
+ 20
+ 25
+ 30
+ 35
+ 40
+ Human evaluation study (percent point increase in artifact rates) 
+InvisMark
+ SynthID-O
+ TrustMark-P
+ VideoSeal 1.0
+ VideoSeal 0.0
+ TrustMark-Q
+ WAM
+ StegaStamp
+ 0
+ 5
+ 10
+ 15
+ 20
+ 25
+ 30
+ 35
+ FID 
+SynthID-O
+ TrustMark-Q
+ VideoSeal 0.0
+ InvisMark
+ TrustMark-P
+ VideoSeal 1.0
+ WAM
+ StegaStamp
+ 0.00
+ 0.05
+ 0.10
+ 0.15
+ 0.20
+ 0.25
+ 0.30
+ 0.35
+ 0.40
+ CMMD 
+VideoSeal 0.0
+ InvisMark
+ SynthID-O
+ TrustMark-P
+ VideoSeal 1.0
+ TrustMark-Q
+ WAM
+ StegaStamp
+ 0.00
+ 0.05
+ 0.10
+ 0.15
+ 0.20
+ 0.25
+ 0.30
+ LPIPS VGG 
+VideoSeal 0.0
+ InvisMark
+ TrustMark-P
+ SynthID-O
+ VideoSeal 1.0
+ TrustMark-Q
+ WAM
+ StegaStamp
+ 0
+ 10
+ 20
+ 30
+ 40
+ 50
+ PSNR 
+VideoSeal 0.0
+ InvisMark
+ TrustMark-P
+ VideoSeal 1.0
+ TrustMark-Q
+ SynthID-O
+ WAM
+ StegaStamp
+ 0.0
+ 0.2
+ 0.4
+ 0.6
+ 0.8
+ 1.0
+ SSIM 
+Figure4 |Qualitymetricsforallmethodscomputedon1,000watermarkedandunwatermarkedimages.
+ Thetop-leftpanelshowstheaveragedifferenceinidentifiedartifactratebetweenwatermarkedandnon
+watermarkedsamples(lowerisbetter).A5percentpointincreaseindicatesthatthewatermarkingmethod
+ createsvisibleartifactsin5%oftheimages.ForFID,CMMDandLPIPSthelowerisbetterandforPSNRand
+ SSIMthehigherisbetter.Overall,weseelittlecorrelationbetweencomputationalmetricsandhumanratings.
+ Spatial.Aggregatedincludesalltransformationsacrosscategories,andIdentityappliesnotransforma
+tion.Additionally,weusetwoevaluationsettings:
+ Random: Thestrengthofeachtransformationissampleduniformlyfromwithinaspecifiedrange.
+ Worst: Thestrengthofeachtransformationissettoitsmostseverevalue,typicallyanextremewithin
+ therangedescribedabove.
+ Whiletherandomsettingsimulatesreal-worldvariability,worstsettingallowsustodiscernthelimits
+ ofmodelperformanceunderextremeimagemanipulation.Unlessstatedotherwise,themodelsare
+ calibratedtoobtaina0.1%falsepositiverateinaverageonworst-casetransformations.
+ Detectionresults. Inthissection,wefocusexclusivelyonthedetectionperformanceundervarious
+ imagetransformations.Formodelsthatofferadetectionscoreindependentofpayloadrecovery(i.e.,
+ SynthID-OandWAM),weusethisscore. Formodelsthatsolelyperformpayloadrecovery,we
+ computethedetectionscorebycountingthenumberofcorrectlydecodedbits(asdonebyFernandez
+ etal.,2023).17Wedonotobserveanysignificantdifferencewhenusingaweightedsumoverpayload
+ logits.Wealsoincludetheperformanceof SynthID-OandWAMusingpayloadmatchingina
+ separatetable.
+ Table1summarizestheresults. Itreportsthetruepositiverate(TPR)atafixedfalsepositiverate
+ 17Thisimpliesthat, forallmethodsexceptSynthID-OandWAM,weassumethatthereisasingle,uniqueknown
+ payloadwecanmatch.
+ 21
+SynthID-Image: Imagewatermarkingatinternetscale
+ SynthID-O
+ InvisMark
+ StegaStamp
+ TrustMark-P
+ TrustMark-Q
+ VideoSeal-0.0
+ VideoSeal-1.0
+ WAM
+ Identity(excl.resizing) 100.00% 100.00% 100.00% [99.95%,99.96%] 100.00% 100.00% 99.98% 100.00%
+ Aggregated 99.98% [70.06%,70.41%] [72.41%,72.57%] [66.25%,66.74%] [78.61%,79.02%] [78.35%,78.91%] [88.75%,88.87%] 90.62%
+ Color 100.00% [75.34%,75.49%] 99.95% [79.22%,79.82%] [99.65%,99.69%] [75.97%,76.22%] [99.86%,99.87%] 81.29%
+ Combination 99.96% [22.28%,23.19%] [49.62%,49.75%] [23.06%,24.46%] [64.00%,66.25%] [77.67%,79.65%] [84.59%,84.91%] 96.08%
+ Noise 99.98% [92.10%,92.73%] 100.00% [95.10%,95.49%] 100.00% [96.93%,97.37%] [99.11%,99.18%] 100.00%
+ Overlay 100.00% 100.00% 100.00% [99.71%,99.73%] 99.99% [99.93%,99.95%] 99.99% 100.00%
+ Quality 99.99% [89.51%,89.78%] 100.00% [97.56%,97.72%] 100.00% [98.60%,98.76%] 99.99% 99.97%
+ Spatial 99.98% [61.09%,61.32%] [25.23%,25.73%] [38.05%,38.32%] [40.75%,41.04%] [55.95%,56.46%] [67.47%,67.72%] 84.34%
+ AggregatedWorst 99.72% [60.11%,60.53%] [66.51%,66.79%] [54.15%,54.68%] [68.73%,68.87%] [61.22%,61.91%] [76.74%,76.89%] 83.37%
+ ColorWorst 100.00% [69.58%,69.67%] [99.79%,99.82%] [66.32%,67.16%] [98.93%,99.05%] [66.19%,66.49%] [99.69%,99.71%] 84.00%
+ CombinationWorst 98.06% [6.83%,7.89%] [27.07%,27.83%] [4.16%,4.76%] [21.22%,21.72%] [27.71%,29.05%] [31.00%,31.38%] 55.96%
+ NoiseWorst 99.96% [80.86%,82.05%] 100.00% [88.13%,89.02%] 99.99% [90.77%,91.93%] [97.73%,97.89%] 100.00%
+ OverlayWorst 100.00% 100.00% 100.00% [98.76%,98.85%] [99.87%,99.89%] [99.79%,99.83%] 99.97% 100.00%
+ QualityWorst 99.99% [76.24%,76.73%] 100.00% [84.65%,85.36%] 99.99% [81.84%,82.97%] 99.98% 99.38%
+ SpatialWorst 99.97% [50.06%,50.13%] [15.25%,15.87%] [25.09%,25.17%] [25.76%,25.92%] [38.89%,39.32%] [51.62%,51.86%] 76.04%
+ Table1|TPRat0.1%FPRaggregatedacrosseachtransformationcategorywhenimagesareresizedto512×512.
+ Foreachmodel,thedetectionthresholdiscalibratedtoreach0.1%FPRacrossallworsttransformationsin
+ average.Whenbracketsareused,wedisplaytherangeofTPRvaluesthatcanaccommodatethetargetFPR
+ (thisnumberisnotuniquewhenthereareties).
+ SynthID-O
+ WAM
+ Identity(excl.resizing) 100.00% [99.96%,99.98%]
+ Aggregated [99.96%,99.97%] [81.26%,81.85%]
+ Color [99.99%,100.00%] [77.16%,77.31%]
+ Combination [99.92%,99.93%] [89.68%,92.56%]
+ Noise [99.89%,99.90%] [99.95%,99.98%]
+ Overlay 100.00% [99.96%,99.98%]
+ Quality [99.96%,99.97%] [99.70%,99.79%]
+ Spatial 99.98% [57.39%,57.91%]
+ AggregatedWorst [98.84%,98.90%] [69.11%,69.91%]
+ ColorWorst 99.99% [69.78%,69.82%]
+ CombinationWorst [91.96%,92.36%] [36.25%,39.52%]
+ NoiseWorst [99.74%,99.77%] [99.95%,99.98%]
+ OverlayWorst 100.00% [99.97%,99.98%]
+ QualityWorst 99.97% [95.21%,96.29%]
+ SpatialWorst 99.97% [48.76%,49.45%]
+ Table2|TPRat0.1%FPRaggregatedacrosseachtransform
+ categorywhenimagesareresizedto512×512.Thedetection
+ isperformedbycomputingthenumberofcorrectbitsinthe
+ payload.Foreachmodel,thedetectionthresholdiscalibrated
+ toreach0.1%FPRacrossallworst transformations. Models
+ thatarenot listedherearealreadylistedinTable1. When
+ bracketsareused,wedisplaytherangeofTPRvaluesthatcan
+ accommodatethetargetFPR(thisnumberisnotuniquewhen
+ thereareties).
+ of0.1%inaverageonworst-casetransformations.Weobservethatoveraggregatedrandomand
+ aggregatedworsttransformations,SynthID-Ooutperformsallothermethodsbysignificantmargins
+ (i.e.,+9.36and+16.35percentagepointsrespectively). Intheworstsetting,SynthID-Oistheonly
+ modelssurpassing99%TPRinaggregateanditreachesmorethan98%TPRoncombinationsof
+ transformations(whichisthemostchallengingsetting).Overall,itisworthnotingthatnotasingle
+ modeloutperformsallothersacrossallcategories.Comparisonsaremademoredifficultwhenwe
+ startconsideringquality:StegaStampistheworstoffenderintermsofqualityand,asaresult, itis
+ regularlytoppingindividualcategoriesintermsofrobustness.
+ Forcompleteness,wealsoreportthedetectionperformanceofSynthID-OandWAMiftheywere
+ tousetheirpayloadfordetectioninTable2.
+ Payloadrecoveryresults. Wereportthebitaccuracymeasuredonwatermarkedimages(asdetailed
+ inSection5).Table3comparesSynthID-Otoothermodels.WeobservethatSynthID-Ooften
+ surpassesothermodelsdespitehavingalargerpayload(exceptVideoSeal-1.0)andbetterquality.
+ WAMwhichtopsafewcategoriesonlyhasa32-bitpayload.
+ 22
+SynthID-Image: Imagewatermarkingatinternetscale
+ SynthID-O
+ (136bits)
+ InvisMark
+ (100bits)
+ StegaStamp
+ (100bits)
+ TrustMark-P
+ (100bits)
+ TrustMark-Q
+ (100bits)
+ VideoSeal-0.0
+ (96bits)
+ VideoSeal-1.0
+ (256bits)
+ WAM
+ (32bits)
+ Identity(excl.resizing) 100.00% 95.04% 99.84% 99.23% 99.91% 96.94% 99.61% 99.96%
+ Aggregated 99.59% 79.28% 85.03% 79.46% 87.27% 82.67% 89.60% 90.62%
+ Color 99.97% 82.47% 99.14% 84.53% 98.16% 83.24% 97.60% 88.42%
+ Combination 99.12% 56.57% 70.45% 58.64% 74.10% 74.75% 79.31% 93.04%
+ Noise 98.57% 85.21% 99.61% 89.26% 98.85% 87.98% 90.13% 99.94%
+ Overlay 100.00% 94.62% 99.66% 97.55% 98.93% 96.24% 99.27% 99.96%
+ Quality 99.73% 88.56% 99.75% 95.30% 99.62% 93.13% 98.75% 99.65%
+ Spatial 99.82% 76.40% 61.68% 68.09% 69.43% 74.85% 80.47% 79.83%
+ AggregatedWorst 98.07% 75.26% 82.58% 73.29% 82.47% 76.03% 83.53% 85.03%
+ ColorWorst 99.93% 78.31% 98.19% 76.86% 96.03% 78.16% 95.10% 84.29%
+ CombinationWorst 89.46% 52.60% 62.62% 51.69% 58.16% 59.06% 60.49% 71.86%
+ NoiseWorst 97.63% 80.61% 99.44% 84.64% 98.07% 84.34% 86.10% 99.91%
+ OverlayWorst 99.99% 93.91% 99.04% 93.69% 94.80% 95.55% 98.52% 99.96%
+ QualityWorst 99.49% 84.17% 99.57% 89.02% 99.05% 87.00% 97.34% 97.30%
+ SpatialWorst 99.77% 72.13% 57.87% 62.33% 63.04% 68.14% 73.00% 74.97%
+ Table3|Payloadbitaccuracyaggregatedacrosseachtransformationcategorywhenimagesareresizedto
+ 512×512.Notethatnumbersarenotdirectlycomparableasthepayloadsizeisdifferentfordifferentmethods.
+ 9. Relatedwork
+ Whilethispaperisnotmeanttobeacomprehensivesurveyonwatermarking–werefertoWan
+ etal.(2022)forrelativelyarecentoverview–wewanttoprovideashortoverviewofwatermarking
+ ingeneralandrecentdevelopmentsindeployingwatermarkingalongsidegenerativeAI.Besides
+ presentingresultsforSynthID-Image,thispaperalsotouchesonrobustness,threatmodelsand
+ practicalconcerns.Inthisspirit,ourpaperissimilartothisrecentState-of-Knowledgeonwatermarking
+ (Zhaoetal.,2025).
+ Tothebestofourknowledge,Braudaway(1997);VanSchyndeletal.(1994)presentedthefirst
+ invisiblewatermarks.Asvisiblewatermarkswerenotyetautomaticallyremovableaseasilyastoday
+ (Dekeletal.,2017),earlyworkininvisiblewatermarkingwascloselyentangledwithsteganography
+ (Cox,2007). Irrespectiveoftheuse,earlymethodseitherusedthespatialorfrequencydomaintohide
+ information.Forexample,Wangetal.(2001)hideinformationinlessimportantbitsacrosspixels.
+ Thisisnotveryrobusttocommonimagetransformations(FazliandKhodaverdi,2009). Instead,a
+ longlineofworkusesDCT(Ahmedetal.,1974)orDWT(Shensa,1992)transforms.Well-received
+ examples includeBarnietal. (1998);ChenandWornell (1998,2001);Parahetal. (2016)and
+ Barnietal.(2001);KashyapandSinha(2012),respectively.Approachesworkinginthespatialand
+ frequencydomainshavealsobeencombined,e.g.,usingDCT-SVDapproaches(SinghandSingh,
+ 2017;SuandChen,2018).Recently,DCTandDWTbasedapproacheshavebeenre-popularizeddue
+ totheirusagebyStabilityAI18despitetheirflawscomparedtorecentdeeplearningbasedmethods.
+ Whilethereareearlyexperimentsusingneuralnetworksforwatermarkdetectionin(Yuetal.,
+ 2001),properdeeplearningbasedapproachesgainedtractionaround2017(Munetal.,2017;Zhu
+ etal.,2018).Usually,encoder-decoderarchitectures(i.e.,content-based,post-hocmethods)tried
+ toimproveonqualityandrobustness(Buietal.,2023,2025;HayesandDanezis,2017;Hayes
+ etal.,2020;Luoetal.,2020;Panetal.,2023,2024;Tanciketal.,2020;WenandAydöre,2019;
+ Xuetal.,2025).Recently,theseapproacheshavebeenextendedtoallowlocalizationof(multiple)
+ watermarks(Sanderetal.,2025).Onlymorerecently,withtheriseofdiffusionmodels(Hoetal.,
+ 2020;Sohl-Dicksteinetal.,2015)suchasstablediffusion(Rombachetal.,2022),watermarkinghas
+ beenintegratedintothegenerationprocess;seeFernandezetal.(2023);Wenetal.(2023);Yang
+ etal.(2024).TheprosandconshavebeendiscussedatlengthinSection2.Theseworksusually
+ 18https://github.com/Stability-AI/invisible-watermark-gpu
+ 23
+SynthID-Image: Image watermarking at internet scale
+ exclusively focus on image watermarking; literature on video (Fernandez et al., 2024; Zhang et al.,
+ 2020a) or audio watermarking (Hua et al., 2016; Roman et al., 2024) tends to be sparse, possibly
+ because methods are usually general enough across these modalities.
+ The importance of appropriate benchmarks for watermarking has been highlighted as early as
+ 2000 (Petitcolas, 2000) with a thorough account of possible attacks some years later by Cox (2007).
+ More recently, An et al. (2024) introduced an up-to-date and relatively comprehensive benchmark
+ of deep learning based watermarking techniques. Proper benchmarking also includes considering
+ a variety of (adaptive) attacks (Lukas et al., 2024; Saberi et al., 2024a; Zhao et al., 2024), many
+ of which have been discussed at length in Section 6. Meta also maintains a benchmark for image
+ watermarking, called Omni Seal Bench.19
+ In terms of deployed systems at the time of writing, the solution used by Stability AI20 has received
+ considerable attention, but usage is difficult to track. Imatag released several models on Hugging Face,
+ including a StableSignature (Fernandez et al., 2023) based one.21 However, the corresponding
+ proprietary service seems to focus on content tracking and information leak identification.22 For
+ DALL-E 223, OpenAI experimented with a visible watermark referred to as “coloured squares” by users.
+ While there was no official communication on this, and OpenAI’s FAQs state that users are allowed to
+ remove it,24 this can be understood as an early approach to watermarking. More recently, for DALL-E
+ 3,25 OpenAI announced both C2PA metadata as well as proper invisible watermarking (for image
+ and audio). To date, however, this has not been released. Instead, OpenAI showcased early results
+ for AI-generated image detection,26 which seems rather fragile under certain transformations. Meta
+ recently announced to follow C2PA specifications and reveal this information to users on Facebook,
+ Instragram and Threads.27 Meta seems to pursue invisible watermarking across modalities, as well,
+ with some open-source models (Fernandez et al., 2024; Roman et al., 2024; Sander et al., 2025) but
+ no concrete public-facing verification system yet. Similarly, Microsoft published and open-sourced
+ an image watermarking model (Xu et al., 2025).28 Overall, this makes SynthID-Image the first
+ system deployed at large-scale that consistently watermarks large amounts of generated content and
+ discloses this information to end users.
+ 10. Limitations and future work
+ Despite its success, SynthID-Image alone will not solve many of the problems we set out to alleviate,
+ including misinformation, impersonation or copyright tracking. This is because watermarking in
+ itself does not solve the provenance problem. Instead, SynthID-Image needs to become part
+ of an ecosystem of tools, including C2PA, that are adopted by all major players across industry
+ and governments to watermark AI-generated content and surface this information to the public.
+ This requires both technological advancements as well as work on policy and cooperation across
+ companies and governments. Besides, there are various technical challenges that we believe will
+ become important with advancements in generative AI. For example, SynthID operates on text,
+ images, audio or video. Thus, work on detection and handling fractional watermarks becomes
+ important. Similarly, we likely need larger payloads as use cases of generative AI grow and we want
+ 19https://github.com/facebookresearch/omnisealbench
+ 20https://github.com/ShieldMnt/invisible-watermark
+ 21https://huggingface.co/imatag/stable-signature-bzh-sdxl-vae-weak
+ 22https://www.imatag.com/
+ 23https://openai.com/index/dall-e-2/
+ 24https://web.archive.org/web/*/https://help.openai.com/en/articles/6468065-dall-e-2-faq
+ 25https://openai.com/index/dall-e-3/
+ 26https://openai.com/index/understanding-the-source-of-what-we-see-and-hear-online/
+ 27https://about.fb.com/news/2024/02/labeling-ai-generated-images-on-facebook-instagram-and-threads/
+ 28https://github.com/microsoft/InvisMark
+ 24
+SynthID-Image: Image watermarking at internet scale
+ to enable public detectability using cryptographic signatures (Fairoze et al., 2025). For open models,
+ we need to work on improving security, particularly considering white-box threat models and we
+ generally need to figure out proper versioning of watermarks, assuming that multiple watermarking
+ solutions will be available soon.
+ Acknowledgments
+ We would like to thank Demis Hassabis for starting, sponsoring and advising throughout this project.
+ We thank Clement Wolf, Ian Goodfellow, Chris Bregler and Oriol Vinyals for their advice. We also
+ thank many others who contributed across Google DeepMind and Google, including our partners at
+ Google Research, Google Cloud, Google Global Business & Operations and YouTube.
