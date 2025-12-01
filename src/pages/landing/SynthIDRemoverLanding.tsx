@@ -36,7 +36,7 @@ const SynthIDRemoverLanding: React.FC = () => {
               <p className="text-xl text-gray-400 max-w-2xl mx-auto mb-10 leading-relaxed font-light">
                 Advanced signal processing utility for analyzing and neutralizing robust invisible watermarks.
                 <br className="hidden md:block" />
-                <span className="text-indigo-400">Local Processing</span> • <span className="text-indigo-400">Geometric Attacks</span> • <span className="text-indigo-400">Chroma Washing</span>
+                <span className="text-indigo-400">Local Processing</span> • <span className="text-indigo-400">Chroma Washing</span> • <span className="text-indigo-400">Geometric Jitter</span>
               </p>
               
               <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
@@ -45,7 +45,7 @@ const SynthIDRemoverLanding: React.FC = () => {
                     Launch Utility
                   </button>
                 </Link>
-                <a href="https://deepmind.google/technologies/synthid/" target="_blank" rel="noreferrer" className="px-8 py-4 text-gray-400 hover:text-white transition-colors">
+                <a href="https://arxiv.org/abs/2510.09263" target="_blank" rel="noreferrer" className="px-8 py-4 text-gray-400 hover:text-white transition-colors">
                   View Research
                 </a>
               </div>
@@ -59,18 +59,18 @@ const SynthIDRemoverLanding: React.FC = () => {
             <div className="grid md:grid-cols-3 gap-8">
               {[
                 {
-                  title: "Signal Disruption",
-                  desc: "Targeted 4:2:0 chroma subsampling attacks high-frequency watermark signals hidden in color channels.",
-                  icon: "blur_on"
+                  title: "Chroma Washing",
+                  desc: "Attacks the YCbCr color space where SynthID hides its payload. Adds noise and quantizes the Cb/Cr channels that humans are less sensitive to.",
+                  icon: "palette"
                 },
                 {
                   title: "Geometric Jitter",
-                  desc: "Micro-rotations and elastic scaling break the rigid pixel grid alignment required for deep learning detectors.",
+                  desc: "Micro-rotations (0.5-1.5°) and elastic scaling break the rigid pixel grid alignment required by the decoder's learned patterns.",
                   icon: "transform"
                 },
                 {
-                  title: "Imprint & Reverse",
-                  desc: "Inject simulated watermark patterns into clean images to test detection robustness and attribution logic.",
+                  title: "Imprint Mode",
+                  desc: "Reverse the process: inject a simulated watermark pattern into clean images to test detection robustness or add provenance to your own work.",
                   icon: "fingerprint"
                 }
               ].map((feature, i) => (
@@ -100,15 +100,15 @@ const SynthIDRemoverLanding: React.FC = () => {
               <div className="flex-1">
                 <h3 className="text-2xl font-bold mb-4 text-white">Based on First Principles</h3>
                 <p className="text-gray-400 leading-relaxed mb-6">
-                  SynthID and similar technologies rely on preserving high-frequency correlations across the image spectrum. 
+                  SynthID and similar technologies rely on preserving high-frequency correlations in the chroma channels. 
                   Project Silencer introduces controlled entropy to these specific bands, raising the noise floor just enough to decouple the watermark without destroying semantic content.
                 </p>
                 <div className="flex gap-4 text-sm text-gray-500 font-mono">
-                  <span>v1.0.4</span>
+                  <span>v2.0</span>
                   <span>•</span>
                   <span>CANVAS_API</span>
                   <span>•</span>
-                  <span>WEBGL_ACCEL</span>
+                  <span>YCbCr_ATTACK</span>
                 </div>
               </div>
               <div className="w-full md:w-64 h-64 bg-black rounded-2xl border border-white/5 relative overflow-hidden flex items-center justify-center">
