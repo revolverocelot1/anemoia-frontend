@@ -1,11 +1,12 @@
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useRef, useEffect, Suspense } from 'react';
 import { Play, Pause, Upload, Download, Settings, Grid3X3, Maximize2, Info, Zap, Ruler, Camera, Eye, Palette, Sliders, Database, FileText } from 'lucide-react';
-import TriangleSplattingViewer from '../components/TriangleSplattingViewer';
 import CardGlass from '../components/CardGlass';
 import AnimatedPage from '../components/AnimatedPage';
 import HolographicStats from '../components/HolographicStats';
 import { OFFStats } from '../viewers/triangle/offLoader';
 import * as THREE from 'three';
+
+const TriangleSplattingViewer = React.lazy(() => import('../components/TriangleSplattingViewer'));
 
 // Modern Toggle Switch Component
 const ToggleSwitch: React.FC<{
@@ -62,6 +63,7 @@ const TriangleSplattingPage: React.FC = () => {
   const [measurements, setMeasurements] = useState<number[]>([]);
   const [cameraPosition, setCameraPosition] = useState<[number, number, number]>([5, 5, 5]);
   const [showControlsOverlay, setShowControlsOverlay] = useState(true);
+  const [viewerActivated, setViewerActivated] = useState(false);
   const [settings, setSettings] = useState({
     // Basic settings
     wireframe: false,
@@ -173,6 +175,7 @@ const TriangleSplattingPage: React.FC = () => {
       const url = URL.createObjectURL(file);
       setFileUrl(url);
       setFileName(file.name);
+      setViewerActivated(true);
     }
   }, [fileUrl]);
 
@@ -186,6 +189,7 @@ const TriangleSplattingPage: React.FC = () => {
       const url = URL.createObjectURL(file);
       setFileUrl(url);
       setFileName(file.name);
+      setViewerActivated(true);
     }
   }, [fileUrl]);
 
@@ -204,15 +208,13 @@ const TriangleSplattingPage: React.FC = () => {
 
 
   const exportScreenshot = useCallback(() => {
-    if (viewerRef.current) {
-      const canvas = viewerRef.current.querySelector('canvas');
-      if (canvas) {
-        const link = document.createElement('a');
-        link.download = `triangle-splatting-${Date.now()}.png`;
-        link.href = canvas.toDataURL();
-        link.click();
-      }
-    }
+    if (!viewerActivated) return;
+    const canvas = viewerRef.current?.querySelector('canvas');
+    if (!canvas) return;
+    const link = document.createElement('a');
+    link.download = `triangle-splatting-${Date.now()}.png`;
+    link.href = canvas.toDataURL();
+    link.click();
   }, []);
 
   const exportMeasurements = useCallback(() => {
@@ -363,19 +365,52 @@ const TriangleSplattingPage: React.FC = () => {
                 onDrop={handleDrop}
                 onDragOver={handleDragOver}
               >
-                <TriangleSplattingViewer
-                  url={fileUrl || undefined}
-                  fileName={fileName}
-                  onStatsUpdate={handleStatsUpdate}
-                  settings={settings}
-                  onMeasure={handleMeasurement}
-                  cameraPosition={cameraPosition}
-                  className="w-full h-full"
-                />
+                {viewerActivated ? (
+                  <Suspense
+                    fallback={
+                      <div className="flex h-full w-full items-center justify-center bg-black/60">
+                        <div className="text-center">
+                          <div className="text-xl text-cyan-300 mb-2">Loading 3D viewer…</div>
+                          <div className="text-sm text-gray-400">Fetching GPU components</div>
+                        </div>
+                      </div>
+                    }
+                  >
+                    <TriangleSplattingViewer
+                      url={fileUrl || undefined}
+                      fileName={fileName}
+                      onStatsUpdate={handleStatsUpdate}
+                      settings={settings}
+                      onMeasure={handleMeasurement}
+                      cameraPosition={cameraPosition}
+                      className="w-full h-full"
+                    />
+                  </Suspense>
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center bg-black/60 px-6 text-center">
+                    <div className="space-y-4">
+                      <div className="text-5xl">🔺</div>
+                      <p className="text-lg text-gray-300">
+                        Initialize the 3D viewer to keep the page fast until you need it.
+                      </p>
+                      <div className="space-y-2 text-gray-400 text-sm">
+                        <p>Upload or drop a .off/.ply file and we will load the renderer.</p>
+                        <p>Or click the button below to preload the viewer now.</p>
+                      </div>
+                      <button
+                        onClick={() => setViewerActivated(true)}
+                        className="inline-flex items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-cyan-600 to-blue-700 px-4 py-2 text-white shadow-lg hover:from-cyan-500 hover:to-blue-600 transition-all"
+                      >
+                        <Play size={16} />
+                        Initialize 3D Viewer
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Drag & Drop Overlay */}
-              {!fileUrl && (
+              {!fileUrl && viewerActivated && (
                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                   <div className="text-center">
                     <div className="text-8xl mb-4 animate-pulse">🔺</div>
@@ -386,7 +421,7 @@ const TriangleSplattingPage: React.FC = () => {
               )}
 
               {/* Measurements Display */}
-              {measurements.length > 0 && (
+              {viewerActivated && measurements.length > 0 && (
                 <div className="absolute top-4 left-4 bg-black/80 backdrop-blur-md text-cyan-400 px-4 py-3 rounded-lg text-sm border border-cyan-900/50 max-w-xs">
                   <div className="font-bold mb-2 flex items-center gap-2">
                     <Ruler size={16} />

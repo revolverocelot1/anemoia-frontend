@@ -1,22 +1,15 @@
 // src/workers/depth.worker.ts -> MINIMAL WASM-ONLY VERSION
-import { pipeline, env } from '@huggingface/transformers';
+import { env, pipeline } from '@xenova/transformers';
 
-// Configure transformers.js to use WASM backend only
+// Configure transformers.js for browser WASM in a worker
 env.allowLocalModels = false;
-env.allowRemoteModels = true;
-
-// Force WASM backend configuration
-env.backends = {
-    onnx: {
-        wasm: {
-            numThreads: 1,
-            simd: true
-        }
-    }
+env.backends.onnx.wasm = {
+    // Keep the worker light so it does not saturate the CPU
+    numThreads: 1,
+    simd: true,
 };
 
 let depthEstimator: any = null;
-let isInitialized = false;
 
 // Simple message handler
 self.onmessage = async (event) => {
@@ -26,128 +19,98 @@ self.onmessage = async (event) => {
         return;
     }
 
-    if (!imageData) {
+    if (!imageData || typeof imageData.width !== 'number' || typeof imageData.height !== 'number') {
         self.postMessage({
             status: 'error',
-            error: 'No image data provided'
+            error: 'No image data provided',
         });
         return;
     }
 
     try {
-        // Initialize model only once
-        if (!isInitialized) {
+        if (!depthEstimator) {
             self.postMessage({ status: 'loading_model', message: 'Loading AI engine...' });
-            
-            // Simple pipeline configuration with WASM backend
+
+            // Xenova pipeline works inside web workers without DOM APIs
             depthEstimator = await pipeline(
-                'depth-estimation', 
+                'depth-estimation',
                 'onnx-community/depth-anything-v2-small',
-                {
-                    dtype: 'q8',
-                    device: 'wasm'
-                }
             );
-            isInitialized = true;
-            
+
             self.postMessage({ status: 'model_ready', message: 'Engine Ready' });
         }
 
         self.postMessage({ status: 'processing', message: 'Analyzing image...' });
-        
-        // Convert ImageData to canvas and then to data URL
-        const canvas = new OffscreenCanvas(imageData.width, imageData.height);
-        const ctx = canvas.getContext('2d');
-        
-        if (!ctx) {
-            throw new Error('Failed to get 2D context');
+
+        // Run depth estimation directly on ImageData to avoid DOM dependencies
+        const result = await depthEstimator(imageData);
+        if (!result || !result.depth) {
+            throw new Error('Invalid result from depth estimation');
         }
-        
-        ctx.putImageData(imageData, 0, 0);
-        
-        // Convert to blob and create URL
-        const blob = await canvas.convertToBlob({ type: 'image/png' });
-        const imageUrl = URL.createObjectURL(blob);
-        
-        try {
-            // Run depth estimation
-            const result = await depthEstimator(imageUrl);
-            
-            if (!result || !result.depth) {
-                throw new Error('Invalid result from depth estimation');
-            }
-            
-            const { data: depthData, width, height } = result.depth;
-            
-            // Convert depth data to image
-            const depthArray = Array.from(depthData as Float32Array);
-            
-            // Compute min and max without using spread to avoid call-stack overflow on large arrays
-            let min = Number.POSITIVE_INFINITY;
-            let max = Number.NEGATIVE_INFINITY;
-            for (let i = 0; i < depthArray.length; i++) {
-                const v = depthArray[i];
-                if (v < min) min = v;
-                if (v > max) max = v;
-            }
-            
-            const range = max - min;
-            
-            const imageData2 = new Uint8ClampedArray(width * height * 4);
-            for (let i = 0; i < depthArray.length; i++) {
-                const value = range > 0 ? Math.round(255 * (depthArray[i] - min) / range) : 0;
-                const idx = i * 4;
-                imageData2[idx] = value;     // R
-                imageData2[idx + 1] = value; // G
-                imageData2[idx + 2] = value; // B
-                imageData2[idx + 3] = 255;   // A
-            }
-            
-            // Create output canvas
-            const outputCanvas = new OffscreenCanvas(width, height);
-            const outputCtx = outputCanvas.getContext('2d');
-            
-            if (!outputCtx) {
-                throw new Error('Failed to get output context');
-            }
-            
-            const outputImageData = new ImageData(imageData2, width, height);
-            outputCtx.putImageData(outputImageData, 0, 0);
-            
-            const outputBlob = await outputCanvas.convertToBlob({ type: 'image/png' });
-            const arrayBuffer = await outputBlob.arrayBuffer();
 
-            // Build a normalized depth Float32Array (0..1)
-            const normalizedDepth = new Float32Array(depthArray.length);
-            for (let i = 0; i < depthArray.length; i++) {
-                normalizedDepth[i] = range > 0 ? (depthArray[i] - min) / range : 0;
-            }
+        const { data: depthData, width, height } = result.depth;
 
-            // Also expose the grayscale RGBA buffer directly for consumers that want ImageData-like data
-            const grayRgba = imageData2; // Uint8ClampedArray length width*height*4
+        // Convert depth data to image
+        const depthArray = Array.from(depthData as Float32Array);
 
-            self.postMessage({
+        let min = Number.POSITIVE_INFINITY;
+        let max = Number.NEGATIVE_INFINITY;
+        for (let i = 0; i < depthArray.length; i++) {
+            const v = depthArray[i];
+            if (v < min) min = v;
+            if (v > max) max = v;
+        }
+
+        const range = max - min;
+
+        const imageData2 = new Uint8ClampedArray(width * height * 4);
+        for (let i = 0; i < depthArray.length; i++) {
+            const value = range > 0 ? Math.round(255 * (depthArray[i] - min) / range) : 0;
+            const idx = i * 4;
+            imageData2[idx] = value; // R
+            imageData2[idx + 1] = value; // G
+            imageData2[idx + 2] = value; // B
+            imageData2[idx + 3] = 255; // A
+        }
+
+        // Create output canvas for PNG serialization
+        const outputCanvas = new OffscreenCanvas(width, height);
+        const outputCtx = outputCanvas.getContext('2d');
+
+        if (!outputCtx) {
+            throw new Error('Failed to get output context');
+        }
+
+        const outputImageData = new ImageData(imageData2, width, height);
+        outputCtx.putImageData(outputImageData, 0, 0);
+
+        const outputBlob = await outputCanvas.convertToBlob({ type: 'image/png' });
+        const arrayBuffer = await outputBlob.arrayBuffer();
+
+        // Normalized depth (0..1)
+        const normalizedDepth = new Float32Array(depthArray.length);
+        for (let i = 0; i < depthArray.length; i++) {
+            normalizedDepth[i] = range > 0 ? (depthArray[i] - min) / range : 0;
+        }
+
+        const grayRgba = imageData2; // Uint8ClampedArray length width*height*4
+
+        self.postMessage(
+            {
                 status: 'complete',
                 output: arrayBuffer,
                 width,
                 height,
                 normalizedDepth,
-                grayRgba
-            }, [
-                arrayBuffer,
-                normalizedDepth.buffer,
-                grayRgba.buffer
-            ]);
-            
-        } finally {
-            URL.revokeObjectURL(imageUrl);
-        }
-        
+                grayRgba,
+            },
+            [arrayBuffer, normalizedDepth.buffer, grayRgba.buffer],
+        );
     } catch (error: any) {
-        console.error('[Worker] Error:', error);
+        console.error('[DepthWorker] Error:', error);
         self.postMessage({
             status: 'error',
-            error: error.message || 'Unknown error occurred'
+            error: error?.message || 'Unknown error occurred',
         });
     }
 };
