@@ -66,9 +66,12 @@ validateEnvironment();
 env.allowLocalModels = false;
 env.allowRemoteModels = true;
 
-// Configure WASM paths if available
+// Ensure the ONNX runtime WASM binaries resolve from our copied public assets
+const wasmBasePath = `${window.location.origin}/ort-wasm/`;
 if (env.backends?.onnx?.wasm) {
-    env.backends.onnx.wasm.wasmPaths = '/';
+    env.backends.onnx.wasm.wasmPaths = wasmBasePath;
+    env.backends.onnx.wasm.numThreads = 1;
+    env.backends.onnx.wasm.simd = true;
 }
 
 // Initialize GPU acceleration

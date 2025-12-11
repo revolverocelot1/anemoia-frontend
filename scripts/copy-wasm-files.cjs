@@ -19,6 +19,7 @@ const filesToCopy = [
   'ort-wasm-simd.wasm',
   'ort-wasm-threaded.wasm',
   'ort-wasm-simd-threaded.wasm',
+  'ort-wasm-simd-threaded.mjs',
   'ort-wasm-simd.jsep.wasm',
   'ort-wasm-simd-threaded.jsep.wasm',
   

@@ -2,8 +2,12 @@
 import { env, pipeline } from '@xenova/transformers';
 
 // Configure transformers.js for browser WASM in a worker
+const wasmBasePath = `${self.location.origin}/ort-wasm/`;
 env.allowLocalModels = false;
+env.allowRemoteModels = true;
 env.backends.onnx.wasm = {
+    ...(env.backends.onnx.wasm || {}),
+    wasmPaths: wasmBasePath,
     // Keep the worker light so it does not saturate the CPU
     numThreads: 1,
     simd: true,
@@ -42,8 +46,34 @@ self.onmessage = async (event) => {
 
         self.postMessage({ status: 'processing', message: 'Analyzing image...' });
 
+        // Ensure the payload is a real ImageData instance (structured clone can strip prototype)
+        const width = (imageData as any)?.width;
+        const height = (imageData as any)?.height;
+        const dataArray = (imageData as any)?.data;
+        const preparedImageData =
+            imageData instanceof ImageData && dataArray instanceof Uint8ClampedArray
+                ? imageData
+                : new ImageData(
+                    dataArray instanceof Uint8ClampedArray
+                        ? dataArray
+                        : new Uint8ClampedArray(dataArray || []),
+                    width,
+                    height,
+                );
+
+        // #region agent log
+        emitDebugLog('H1', 'depth.worker.ts:input_check', 'Prepared image data', {
+            width: preparedImageData.width,
+            height: preparedImageData.height,
+            hasData: !!preparedImageData.data,
+            dataLength: preparedImageData.data?.length,
+            instance: preparedImageData instanceof ImageData,
+            ctor: (preparedImageData as any)?.constructor?.name,
+        });
+        // #endregion
+
         // Run depth estimation directly on ImageData to avoid DOM dependencies
-        const result = await depthEstimator(imageData);
+        const result = await depthEstimator(preparedImageData);
         if (!result || !result.depth) {
             throw new Error('Invalid result from depth estimation');
         }
