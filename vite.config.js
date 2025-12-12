@@ -126,6 +126,7 @@ export default defineConfig({
         }
     },
     resolve: {
+        dedupe: ['onnxruntime-web', 'onnxruntime-common'],
         alias: {
             '@': resolve(__dirname, 'src'),
             'three': 'three',
