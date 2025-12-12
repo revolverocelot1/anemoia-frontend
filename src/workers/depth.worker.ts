@@ -1,5 +1,5 @@
 // src/workers/depth.worker.ts -> MINIMAL WASM-ONLY VERSION
-import { env, pipeline } from '@xenova/transformers';
+import { env, pipeline, RawImage } from '@xenova/transformers';
 
 // Configure transformers.js for browser WASM in a worker
 const wasmBasePath = `${self.location.origin}/ort-wasm/`;
@@ -13,21 +13,23 @@ env.backends.onnx.wasm = {
     simd: true,
 };
 
+// Lightweight logger to avoid reference errors during worker execution
+const emitDebugLog = (...args: any[]) => {
+    try {
+        // Use debug to keep logs unobtrusive in production consoles
+        console.debug('[DepthWorker]', ...args);
+    } catch (_err) {
+        // No-op if console is unavailable
+    }
+};
+
 let depthEstimator: any = null;
 
 // Simple message handler
 self.onmessage = async (event) => {
-    const { command, imageData } = event.data;
+    const { command, imageData, imageUrl } = event.data;
 
     if (command !== 'generate') {
-        return;
-    }
-
-    if (!imageData || typeof imageData.width !== 'number' || typeof imageData.height !== 'number') {
-        self.postMessage({
-            status: 'error',
-            error: 'No image data provided',
-        });
         return;
     }
 
@@ -46,39 +48,55 @@ self.onmessage = async (event) => {
 
         self.postMessage({ status: 'processing', message: 'Analyzing image...' });
 
-        // Ensure the payload is a real ImageData instance (structured clone can strip prototype)
-        const width = (imageData as any)?.width;
-        const height = (imageData as any)?.height;
-        const dataArray = (imageData as any)?.data;
-        const preparedImageData =
-            imageData instanceof ImageData && dataArray instanceof Uint8ClampedArray
-                ? imageData
-                : new ImageData(
-                    dataArray instanceof Uint8ClampedArray
-                        ? dataArray
-                        : new Uint8ClampedArray(dataArray || []),
-                    width,
-                    height,
-                );
+        let rawImage: any = null;
 
-        // #region agent log
-        emitDebugLog('H1', 'depth.worker.ts:input_check', 'Prepared image data', {
-            width: preparedImageData.width,
-            height: preparedImageData.height,
-            hasData: !!preparedImageData.data,
-            dataLength: preparedImageData.data?.length,
-            instance: preparedImageData instanceof ImageData,
-            ctor: (preparedImageData as any)?.constructor?.name,
-        });
-        // #endregion
+        if (imageUrl && typeof imageUrl === 'string') {
+            rawImage = await RawImage.fromURL(imageUrl);
+        } else if (imageData && typeof imageData.width === 'number' && typeof imageData.height === 'number') {
+            // Ensure the payload is a real ImageData instance (structured clone can strip prototype)
+            const inputWidth = (imageData as any)?.width;
+            const inputHeight = (imageData as any)?.height;
+            const dataArray = (imageData as any)?.data;
+            const preparedImageData =
+                imageData instanceof ImageData && dataArray instanceof Uint8ClampedArray
+                    ? imageData
+                    : new ImageData(
+                        dataArray instanceof Uint8ClampedArray
+                            ? dataArray
+                            : new Uint8ClampedArray(dataArray || []),
+                        inputWidth,
+                        inputHeight,
+                    );
 
-        // Run depth estimation directly on ImageData to avoid DOM dependencies
-        const result = await depthEstimator(preparedImageData);
+            // #region agent log
+            emitDebugLog('H1', 'depth.worker.ts:input_check', 'Prepared image data', {
+                width: preparedImageData.width,
+                height: preparedImageData.height,
+                hasData: !!preparedImageData.data,
+                dataLength: preparedImageData.data?.length,
+                instance: preparedImageData instanceof ImageData,
+                ctor: (preparedImageData as any)?.constructor?.name,
+            });
+            // #endregion
+
+            rawImage = new RawImage(preparedImageData.data, preparedImageData.width, preparedImageData.height, 4);
+        } else {
+            self.postMessage({
+                status: 'error',
+                error: 'No image data provided',
+            });
+            return;
+        }
+
+        rawImage.convert(3); // Drop alpha channel
+
+        // Run depth estimation
+        const result = await depthEstimator(rawImage);
         if (!result || !result.depth) {
             throw new Error('Invalid result from depth estimation');
         }
 
-        const { data: depthData, width, height } = result.depth;
+        const { data: depthData, width: depthWidth, height: depthHeight } = result.depth;
 
         // Convert depth data to image
         const depthArray = Array.from(depthData as Float32Array);
@@ -93,7 +111,7 @@ self.onmessage = async (event) => {
 
         const range = max - min;
 
-        const imageData2 = new Uint8ClampedArray(width * height * 4);
+        const imageData2 = new Uint8ClampedArray(depthWidth * depthHeight * 4);
         for (let i = 0; i < depthArray.length; i++) {
             const value = range > 0 ? Math.round(255 * (depthArray[i] - min) / range) : 0;
             const idx = i * 4;
@@ -104,14 +122,14 @@ self.onmessage = async (event) => {
         }
 
         // Create output canvas for PNG serialization
-        const outputCanvas = new OffscreenCanvas(width, height);
+        const outputCanvas = new OffscreenCanvas(depthWidth, depthHeight);
         const outputCtx = outputCanvas.getContext('2d');
 
         if (!outputCtx) {
             throw new Error('Failed to get output context');
         }
 
-        const outputImageData = new ImageData(imageData2, width, height);
+        const outputImageData = new ImageData(imageData2, depthWidth, depthHeight);
         outputCtx.putImageData(outputImageData, 0, 0);
 
         const outputBlob = await outputCanvas.convertToBlob({ type: 'image/png' });
@@ -129,8 +147,8 @@ self.onmessage = async (event) => {
             {
                 status: 'complete',
                 output: arrayBuffer,
-                width,
-                height,
+                width: depthWidth,
+                height: depthHeight,
                 normalizedDepth,
                 grayRgba,
             },

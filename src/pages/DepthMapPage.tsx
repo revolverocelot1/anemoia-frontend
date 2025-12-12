@@ -1,5 +1,5 @@
 // src/pages/DepthMapPage.tsx -> THE FINAL, CORRECT VERSION
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
@@ -341,15 +341,19 @@ const DepthMapPage = () => {
     // Refs
     const worker = useRef<Worker | null>(null);
 
-    // Initialize worker
-    useEffect(() => {
+    // Create or reuse the depth worker and wire up listeners
+    const setupWorker = useCallback(() => {
+        if (worker.current) {
+            return worker.current;
+        }
+
         try {
-            worker.current = new Worker(new URL('../workers/depth.worker.ts', import.meta.url), { type: 'module' });
-            
-            worker.current.onmessage = (e: MessageEvent) => {
+            const depthWorker = new Worker(new URL('../workers/depth.worker.ts', import.meta.url), { type: 'module' });
+
+            depthWorker.onmessage = (e: MessageEvent) => {
                 const { status, message, output, error, width, height } = e.data;
                 console.log('Worker message:', status, message);
-                
+
                 switch (status) {
                     case 'loading_model':
                         setUiState('loading_model');
@@ -381,18 +385,26 @@ const DepthMapPage = () => {
                 }
             };
 
-            worker.current.onerror = (error) => {
+            depthWorker.onerror = (error) => {
                 console.error('Worker error:', error);
-                setErrorMessage('Worker error: ' + error.message);
+                setErrorMessage('Worker error: ' + (error as ErrorEvent)?.message);
                 setUiState('error');
             };
 
+            worker.current = depthWorker;
             setUiState('idle');
+            return depthWorker;
         } catch (error) {
             console.error('Failed to initialize worker:', error);
             setErrorMessage('Failed to initialize worker');
             setUiState('error');
+            return null;
         }
+    }, []);
+
+    // Initialize worker on mount
+    useEffect(() => {
+        setupWorker();
 
         return () => {
             if (worker.current) {
@@ -400,7 +412,7 @@ const DepthMapPage = () => {
                 worker.current = null;
             }
         };
-    }, []);
+    }, [setupWorker]);
 
     const handleFileChange = (input: React.ChangeEvent<HTMLInputElement> | File) => {
         let file: File | null = null;
@@ -434,8 +446,10 @@ const DepthMapPage = () => {
     };
 
     const handleGenerate = () => {
-        if (!processedImageData || !worker.current) {
-            setErrorMessage('No image selected or worker not initialized');
+        const activeWorker = worker.current ?? setupWorker();
+
+        if ((!processedImageData && !imagePreview) || !activeWorker) {
+            setErrorMessage(!imagePreview ? 'No image selected' : 'Worker not initialized');
             setUiState('error');
             return;
         }
@@ -444,19 +458,20 @@ const DepthMapPage = () => {
         setUiState('processing');
         
         try {
-            worker.current.postMessage({
+            activeWorker.postMessage({
                 command: 'generate',
-                imageData: processedImageData,
+                    imageData: processedImageData,
+                    imageUrl: imagePreview,
             });
 
             const tempListener = (e: MessageEvent) => {
                 if (e.data.status === 'complete') {
                     const endTime = performance.now();
                     setProcessingTime(parseFloat(((endTime - startTime) / 1000).toFixed(2)));
-                    worker.current?.removeEventListener('message', tempListener);
+                    activeWorker?.removeEventListener('message', tempListener);
                 }
             };
-            worker.current.addEventListener('message', tempListener);
+            activeWorker.addEventListener('message', tempListener);
         } catch (error) {
             console.error('Error sending message to worker:', error);
             setErrorMessage('Failed to process image');

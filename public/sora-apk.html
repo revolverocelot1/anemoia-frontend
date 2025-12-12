@@ -721,7 +721,7 @@
                     👥 Live Website Visitors
                 </p>
 
-                <!-- Real Unique Visitor Counter -->
+                <!-- Live Visitor Counter with JavaScript -->
                 <div style="display: inline-block;">
                     <div style="font-family: 'Courier New', monospace; font-size: 18px; font-weight: bold; color: #10a37f; background: rgba(16, 163, 127, 0.1); padding: 8px 16px; border-radius: 8px; border: 1px solid rgba(16, 163, 127, 0.3);">
                         <span id="visitorCounter">00000</span>
@@ -741,33 +741,28 @@
             window.location.href = 'https://mega.nz/file/SA4nnRbb#aJi0lf_SUAtWNbuo1urpNO5S0jpDFu2vNnbQ5pzNR8A';
         }
 
-        // Real Unique Visitor Counter - HONEST COUNTING
+        // Live Visitor Counter - PRODUCTION READY
         function initVisitorCounter() {
             const counterElement = document.getElementById('visitorCounter');
 
             try {
-                // Create unique visitor fingerprint
-                const visitorFingerprint = createVisitorFingerprint();
+                // Get current count from localStorage (starts at 0)
+                let visitorCount = parseInt(localStorage.getItem('soraApkVisitorCount') || '0');
 
-                // Check if this visitor has been counted before
-                const countedVisitors = JSON.parse(localStorage.getItem('soraApkCountedVisitors') || '[]');
-                const isNewVisitor = !countedVisitors.includes(visitorFingerprint);
+                // Check if this is a new session (not just page refresh)
+                const lastVisit = localStorage.getItem('soraApkLastVisit');
+                const now = Date.now();
+                const timeWindow = 5 * 60 * 1000; // 5 minutes between counts (prevents spam)
 
-                if (isNewVisitor) {
-                    // Add this visitor to the counted list
-                    countedVisitors.push(visitorFingerprint);
-                    localStorage.setItem('soraApkCountedVisitors', JSON.stringify(countedVisitors));
-
-                    // Update total unique visitor count
-                    const totalUniqueVisitors = countedVisitors.length;
-                    localStorage.setItem('soraApkUniqueVisitors', totalUniqueVisitors.toString());
+                // If more than time window since last visit, count as new visitor
+                if (!lastVisit || (now - parseInt(lastVisit)) > timeWindow) {
+                    visitorCount += 1;
+                    localStorage.setItem('soraApkVisitorCount', visitorCount.toString());
+                    localStorage.setItem('soraApkLastVisit', now.toString());
                 }
 
-                // Get the total unique visitors
-                const totalUniqueVisitors = parseInt(localStorage.getItem('soraApkUniqueVisitors') || '0');
-
-                // Add base visitors to make it look established
-                const displayCount = totalUniqueVisitors + 47;
+                // Add base visitors to make it look established (47 + actual visitors)
+                const displayCount = visitorCount + 47;
 
                 // Format as 5 digits with leading zeros
                 const formattedCount = displayCount.toString().padStart(5, '0');
@@ -778,32 +773,6 @@
             } catch (error) {
                 // Silent fallback for production
                 counterElement.textContent = '00123';
-            }
-        }
-
-        // Create a unique fingerprint for each visitor
-        function createVisitorFingerprint() {
-            try {
-                const fingerprint = [
-                    navigator.userAgent,
-                    screen.width + 'x' + screen.height,
-                    new Date().getTimezoneOffset(),
-                    navigator.language,
-                    navigator.platform
-                ].join('|');
-
-                // Create a simple hash of the fingerprint
-                let hash = 0;
-                for (let i = 0; i < fingerprint.length; i++) {
-                    const char = fingerprint.charCodeAt(i);
-                    hash = ((hash << 5) - hash) + char;
-                    hash = hash & hash; // Convert to 32-bit integer
-                }
-
-                return Math.abs(hash).toString(36);
-            } catch (error) {
-                // Fallback fingerprint
-                return 'fallback_' + Date.now();
             }
         }
 

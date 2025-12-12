@@ -138,8 +138,6 @@ export default defineConfig({
       '@react-three/drei': '@react-three/drei',
       '@mediapipe/pose': resolve(__dirname, 'node_modules/@mediapipe/pose/pose.js'),
       // Force all ONNX Runtime imports to use the same version
-      'onnxruntime-web': resolve(__dirname, 'node_modules/onnxruntime-web/dist/ort.min.js'),
-      'onnxruntime-web/webgpu': resolve(__dirname, 'node_modules/onnxruntime-web/dist/ort.webgpu.min.js')
     },
   },
 })

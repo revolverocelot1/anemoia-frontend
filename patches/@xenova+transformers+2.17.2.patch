@@ -1,0 +1,41 @@
+diff --git a/node_modules/@xenova/transformers/src/utils/tensor.js b/node_modules/@xenova/transformers/src/utils/tensor.js
+index 469054c..79bb487 100644
+--- a/node_modules/@xenova/transformers/src/utils/tensor.js
++++ b/node_modules/@xenova/transformers/src/utils/tensor.js
+@@ -55,20 +55,29 @@ export class Tensor {
+      * @param {[DataType, DataArray, number[]]|[import('onnxruntime-common').Tensor]} args
+      */
+     constructor(...args) {
+-        if (args[0] instanceof ONNXTensor) {
+-            // Create shallow copy
+-            Object.assign(this, args[0]);
++        /** @type {any} */
++        let base;
+ 
++        if (args[0] instanceof ONNXTensor) {
++            base = args[0];
+         } else {
+-            // Create new tensor
+-            Object.assign(this, new ONNXTensor(
++            base = new ONNXTensor(
+                 /** @type {DataType} */(args[0]),
+                 /** @type {Exclude<import('./maths.js').AnyTypedArray, Uint8ClampedArray>} */(args[1]),
+                 args[2]
+-            ));
++            );
+         }
+ 
+-        return new Proxy(this, {
++        // Ensure our Tensor prototype inherits the ONNX Tensor prototype, so we don't lose
++        // non-enumerable accessors (e.g., `data`, `dataLocation`, etc.) when re-prototyping.
++        if (Object.getPrototypeOf(Tensor.prototype) !== ONNXTensor.prototype) {
++            Object.setPrototypeOf(Tensor.prototype, ONNXTensor.prototype);
++        }
++
++        // Make ONNX tensor instances also behave like our Tensor class
++        Object.setPrototypeOf(base, Tensor.prototype);
++
++        return new Proxy(base, {
+             get: (obj, key) => {
+                 if (typeof key === 'string') {
+                     let index = Number(key);
