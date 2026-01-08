@@ -192,10 +192,18 @@ const HomePage = () => {
                 
                 <ToolCard
                   variants={itemVariants}
+                  title="SHARP 3D Generator"
+                  description="Transform any image into 3D Gaussian Splats using Apple's neural network. Single-image to photorealistic 3D in seconds."
+                  icon="auto_awesome"
+                  accent="5"
+                  path="/sharp"
+                />
+                <ToolCard
+                  variants={itemVariants}
                   title="3D Splat Viewer"
                   description="WebGL renderer for Gaussian Splats, Triangle Splats, and PLY meshes. Experience cutting-edge 3D reconstruction with GPU-optimized rendering."
                   icon="camera_invert"
-                  accent="5"
+                  accent="6"
                   path="/splat-viewer"
                 />
                 <ToolCard

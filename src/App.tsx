@@ -62,6 +62,10 @@ import AnimeGalleryLanding from './pages/landing/AnimeGalleryLanding';
 import TPoseLanding from './pages/landing/TPoseLanding';
 import ImageChatLanding from './pages/landing/ImageChatLanding';
 import ASCIIVideoLanding from './pages/landing/ASCIIVideoLanding';
+import SharpLanding from './pages/landing/SharpLanding';
+
+// Lazy load SharpPage to avoid heavy dependencies on startup
+const SharpPage = lazy(() => import('./pages/SharpPage'));
 
 // Lazy load R3FCanvas to ensure proper module loading
 const R3FCanvas = lazy(() => import('./three/R3FCanvas'));
@@ -364,6 +368,14 @@ function App() {
                 </AnimatedPage>
               }
             />
+            <Route
+              path="/sharp/landing"
+              element={
+                <AnimatedPage>
+                  <SharpLanding />
+                </AnimatedPage>
+              }
+            />
 
             {/* Redirects for SEO */}
             <Route path="/ocr" element={<Navigate to="/compare" replace />} />
@@ -519,6 +531,16 @@ function App() {
               element={
                 <AnimatedPage>
                   <SplatViewerPage />
+                </AnimatedPage>
+              }
+            />
+            <Route
+              path="/sharp"
+              element={
+                <AnimatedPage>
+                  <Suspense fallback={<LoadingFallback />}>
+                    <SharpPage />
+                  </Suspense>
                 </AnimatedPage>
               }
             />

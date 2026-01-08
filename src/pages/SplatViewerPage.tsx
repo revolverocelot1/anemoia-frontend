@@ -18,7 +18,8 @@ import Footer from '../components/Footer';
 import HolographicStats from '../components/HolographicStats';
 import EnhancedButton from '../components/EnhancedButton';
 import NavigationBreadcrumb from '../components/NavigationBreadcrumb';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { sharpFileStore } from '../utils/sharpFileStore';
 import { Upload, Box, Play, Pause, Settings, Grid3X3, Maximize2, Info, Zap, Eye, ArrowRight } from 'lucide-react';
 
 // Add viewer type
@@ -575,10 +576,17 @@ const Loader = () => {
 
 // --- Enhanced Renderer Components ---
 
-const GaussianSplatRenderer = ({ url }: { url: string}) => {
+const GaussianSplatRenderer = ({ url, format }: { url: string; format?: string }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const rendererRef = useRef<SPLAT.WebGLRenderer | null>(null);
   const [error, setError] = useState<string | null>(null);
   const { settings } = useViewerSettings();
+
+  // Store current settings in refs for the animation loop
+  const settingsRef = useRef(settings);
+  useEffect(() => {
+    settingsRef.current = settings;
+  }, [settings]);
 
   useEffect(() => {
     if (!canvasRef.current) return;
@@ -587,7 +595,7 @@ const GaussianSplatRenderer = ({ url }: { url: string}) => {
     const resizeCanvas = () => {
       const parent = canvas.parentElement;
       if (parent) {
-        const { width, height } = qualityToResolution(settings.quality, parent);
+        const { width, height } = qualityToResolution(settingsRef.current.quality, parent);
         canvas.width = width;
         canvas.height = height;
         canvas.style.width = '100%';
@@ -600,7 +608,26 @@ const GaussianSplatRenderer = ({ url }: { url: string}) => {
     const scene = new SPLAT.Scene();
     const camera = new SPLAT.Camera();
     const renderer = new SPLAT.WebGLRenderer(canvas);
-    const controls = new SPLAT.OrbitControls(camera, canvas);
+    rendererRef.current = renderer;
+    
+    // Configure OrbitControls for frontal viewing of the scene
+    const controls = new SPLAT.OrbitControls(
+      camera, 
+      canvas,
+      -Math.PI / 2,   // alpha: -90° - looking from negative Z toward origin (front view)
+      Math.PI / 2,    // beta: at horizon level
+      3,              // radius: viewing distance
+      true,           // enable keyboard controls
+      new SPLAT.Vector3(0, 0, 0) // target: scene center
+    );
+    
+    // Configure controls for smooth interaction
+    controls.orbitSpeed = 1.5;
+    controls.panSpeed = 1.0;
+    controls.zoomSpeed = 2.0;
+    controls.dampening = 0.1;
+    controls.minZoom = 0.5;
+    controls.maxZoom = 20;
 
     let animationFrameId: number;
     const animate = () => {
@@ -611,13 +638,26 @@ const GaussianSplatRenderer = ({ url }: { url: string}) => {
 
     (async () => {
       try {
-      await SPLAT.Loader.LoadAsync(url, scene, () => {});
-      animate();
+        // Determine which loader to use based on format or file extension
+        const isPly = format === '.ply' || url.includes('.ply') || !url.includes('.splat');
+        console.log('[GaussianSplatRenderer] Loading with PLYLoader:', isPly, 'URL:', url.substring(0, 50));
+        
+        // Use PLYLoader directly for PLY files to ensure proper parsing
+        if (isPly) {
+          await SPLAT.PLYLoader.LoadAsync(url, scene, () => {});
+        } else {
+          await SPLAT.Loader.LoadAsync(url, scene, () => {});
+        }
+        
+        console.log('[GaussianSplatRenderer] Scene loaded, starting animation');
+        animate();
       } catch (e) {
         console.error('Failed to load PLY:', e);
         const errorMessage = (e as Error).message;
-        if (errorMessage.includes('Float32Array')) {
-          setError('Invalid PLY format: This file is not a valid Gaussian Splat.');
+        if (errorMessage.includes('Float32Array') || errorMessage.includes('Invalid vertex count')) {
+          setError('Invalid PLY format: This file is not a valid Gaussian Splat. The PLY file may be missing required properties.');
+        } else if (errorMessage.includes('Invalid PLY header')) {
+          setError('Invalid PLY header: The file does not have a valid PLY format header.');
         } else {
           setError(`Failed to load PLY file: ${errorMessage}`);
         }
@@ -627,15 +667,33 @@ const GaussianSplatRenderer = ({ url }: { url: string}) => {
     return () => {
       cancelAnimationFrame(animationFrameId);
       controls.dispose();
+      rendererRef.current = null;
       window.removeEventListener('resize', resizeCanvas);
     };
-  }, [url, settings.quality]);
+  }, [url, format]); // Removed settings.quality to prevent unnecessary reloads
+
+  // Apply background color changes without reloading the scene
+  useEffect(() => {
+    if (canvasRef.current) {
+      canvasRef.current.style.backgroundColor = settings.backgroundColor;
+    }
+  }, [settings.backgroundColor]);
 
   if (error) {
     return <div className="text-red-400 p-4 text-center">{error}</div>;
   }
 
-  return <canvas ref={canvasRef} style={{ width: '100%', height: '100%', display: 'block' }} />;
+  return (
+    <canvas 
+      ref={canvasRef} 
+      style={{ 
+        width: '100%', 
+        height: '100%', 
+        display: 'block',
+        backgroundColor: settings.backgroundColor 
+      }} 
+    />
+  );
 };
 
 const TriangleSplatRenderer = ({ url, onStatsUpdate }: { url: string; onStatsUpdate: (stats: any) => void }) => {
@@ -820,7 +878,7 @@ const UnifiedRenderer = ({ fileType, fileUrl, onStatsUpdate }: {
   if (fileType === 'gaussian') {
     return (
       <>
-        <GaussianSplatRenderer url={fileUrl} />
+        <GaussianSplatRenderer url={fileUrl} format=".ply" />
         <HolographicStats />
         {/* Enhanced UI overlay */}
         <div className="absolute top-4 right-4 flex flex-col gap-2">
@@ -1278,6 +1336,7 @@ const ViewerToggle = ({ viewerType, onChange }: { viewerType: ViewerType; onChan
 // Main Component
 const SplatViewerPage: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [splatUrl, setSplatUrl] = useState<string | null>(null);
   const [fileName, setFileName] = useState<string>('');
   const [isDebugMode, setIsDebugMode] = useState(false);
@@ -1291,6 +1350,41 @@ const SplatViewerPage: React.FC = () => {
   const [stats, setStats] = useState<any>({});
   const [error, setError] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [loadingFromStore, setLoadingFromStore] = useState(false);
+
+  // Load file from IndexedDB if loadId is present (from SHARP generator)
+  useEffect(() => {
+    const loadId = searchParams.get('loadId');
+    if (loadId) {
+      setLoadingFromStore(true);
+      sharpFileStore.get(loadId)
+        .then((storedFile) => {
+          if (storedFile) {
+            console.log('[SplatViewerPage] Loading file from IndexedDB:', storedFile.filename);
+            const url = URL.createObjectURL(storedFile.blob);
+            setFileUrl(url);
+            setFileType('gaussian');
+            setFile(new File([storedFile.blob], storedFile.filename, { type: 'application/octet-stream' }));
+            if (storedFile.metadata) {
+              setStats({
+                splatCount: storedFile.metadata.gaussianCount,
+                focalLength: storedFile.metadata.focalLength
+              });
+            }
+          } else {
+            console.warn('[SplatViewerPage] No file found for loadId:', loadId);
+            setError('The requested file was not found. It may have expired.');
+          }
+        })
+        .catch((err) => {
+          console.error('[SplatViewerPage] Failed to load from IndexedDB:', err);
+          setError('Failed to load the generated file.');
+        })
+        .finally(() => {
+          setLoadingFromStore(false);
+        });
+    }
+  }, [searchParams]);
 
   // Unified file handler
   const handleFiles = useCallback(async (files: FileList | File[]) => {

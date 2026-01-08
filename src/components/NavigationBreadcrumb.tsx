@@ -14,6 +14,7 @@ const NavigationBreadcrumb: React.FC = () => {
 
   const routeLabels: Record<string, string> = {
     'splat-viewer': '3D Splat Viewer',
+    'sharp': 'SHARP 3D Generator',
     'landing': 'Overview',
     'upscaler': 'AI Upscaler',
     'ascii-video': 'ASCII Video Converter',
