@@ -21,17 +21,13 @@ env.allowLocalModels = false;
 env.allowRemoteModels = true;
 
 // Safely configure the ONNX WASM backend
-// CRITICAL: Must use numThreads: 1 when SharedArrayBuffer is unavailable
+// CRITICAL: Use single-threaded mode for stability across environments
+// Multi-threading can cause stalls even when SharedArrayBuffer is available
 try {
-    // Only use multiple threads if both SharedArrayBuffer and crossOriginIsolated are available
-    const canUseThreads = hasSharedArrayBuffer && isCrossOriginIsolated;
-    const numThreads = canUseThreads 
-        ? Math.min(navigator.hardwareConcurrency || 2, 4) 
-        : 1;
-
     env.backends.onnx.wasm = {
         wasmPaths: wasmBasePath,
-        numThreads,
+        // Use single-threaded mode for maximum compatibility and stability
+        numThreads: 1,
         // SIMD should work without SharedArrayBuffer
         simd: true,
         // Disable proxy to simplify execution
@@ -40,11 +36,9 @@ try {
 
     console.debug('[SharpDepthWorker] WASM config:', {
         wasmPaths: wasmBasePath,
-        numThreads,
+        numThreads: 1,
         hasSharedArrayBuffer,
         isCrossOriginIsolated,
-        canUseThreads,
-        hardwareConcurrency: navigator.hardwareConcurrency,
     });
 } catch (e) {
     console.warn('[SharpDepthWorker] Failed to configure ONNX backend:', e);
