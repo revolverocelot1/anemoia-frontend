@@ -440,3 +440,6 @@ self.onmessage = async (event: MessageEvent<SharpWorkerMessage>) => {
         });
     }
 };
+
+
+
