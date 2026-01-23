@@ -8,16 +8,47 @@
  */
 import { env, pipeline, RawImage } from '@xenova/transformers';
 
+// Check if SharedArrayBuffer is available (required for multi-threading)
+// Also check crossOriginIsolated which is the proper way to detect COOP/COEP
+const hasSharedArrayBuffer = typeof SharedArrayBuffer !== 'undefined';
+const isCrossOriginIsolated = typeof self !== 'undefined' && (self as any).crossOriginIsolated === true;
+
 // Configure transformers.js for browser WASM in a worker
 const wasmBasePath = `${self.location.origin}/ort-wasm/`;
+
+// Must configure BEFORE any pipeline creation
 env.allowLocalModels = false;
 env.allowRemoteModels = true;
-env.backends.onnx.wasm = {
-    ...(env.backends.onnx.wasm || {}),
-    wasmPaths: wasmBasePath,
-    numThreads: navigator.hardwareConcurrency > 4 ? 4 : 2, // Use more threads for better performance
-    simd: true,
-};
+
+// Safely configure the ONNX WASM backend
+// CRITICAL: Must use numThreads: 1 when SharedArrayBuffer is unavailable
+try {
+    // Only use multiple threads if both SharedArrayBuffer and crossOriginIsolated are available
+    const canUseThreads = hasSharedArrayBuffer && isCrossOriginIsolated;
+    const numThreads = canUseThreads 
+        ? Math.min(navigator.hardwareConcurrency || 2, 4) 
+        : 1;
+
+    env.backends.onnx.wasm = {
+        wasmPaths: wasmBasePath,
+        numThreads,
+        // SIMD should work without SharedArrayBuffer
+        simd: true,
+        // Disable proxy to simplify execution
+        proxy: false,
+    };
+
+    console.debug('[SharpDepthWorker] WASM config:', {
+        wasmPaths: wasmBasePath,
+        numThreads,
+        hasSharedArrayBuffer,
+        isCrossOriginIsolated,
+        canUseThreads,
+        hardwareConcurrency: navigator.hardwareConcurrency,
+    });
+} catch (e) {
+    console.warn('[SharpDepthWorker] Failed to configure ONNX backend:', e);
+}
 
 const log = (...args: any[]) => {
     try {
@@ -62,9 +93,18 @@ async function loadModel(): Promise<any> {
     modelLoadPromise = (async () => {
         self.postMessage({ status: 'loading_model', progress: 0, message: 'Loading Depth Anything V2 neural network...' });
         
+        // Device is configured via env.backends.onnx.wasm settings above
         depthEstimator = await pipeline(
             'depth-estimation',
             'onnx-community/depth-anything-v2-small',
+            {
+                progress_callback: (progress: any) => {
+                    if (progress.status === 'downloading' || progress.status === 'progress') {
+                        const pct = progress.progress ? Math.round(progress.progress) : 0;
+                        self.postMessage({ status: 'loading_model', progress: pct / 10, message: `Loading model: ${pct}%` });
+                    }
+                }
+            }
         );
         
         self.postMessage({ status: 'model_ready', progress: 10, message: 'Neural depth model loaded' });

@@ -5,36 +5,46 @@ services:
     buildCommand: npm install && npm run build
     staticPublishPath: ./dist
     headers:
-      - path: /*
+      # Cross-Origin Isolation headers for SharedArrayBuffer support
+      - path: "/*"
         name: Cross-Origin-Embedder-Policy
         value: require-corp
-      - path: /*
+      - path: "/*"
         name: Cross-Origin-Opener-Policy
         value: same-origin
-      - path: /*
+      - path: "/*"
         name: Cross-Origin-Resource-Policy
         value: cross-origin
-      - path: /*
+      # CORS headers
+      - path: "/*"
         name: Access-Control-Allow-Origin
         value: "*"
-      - path: /*
+      - path: "/*"
         name: Access-Control-Allow-Methods
-        value: GET, POST, PUT, DELETE, OPTIONS
-      - path: /*
+        value: "GET, POST, PUT, DELETE, OPTIONS"
+      - path: "/*"
         name: Access-Control-Allow-Headers
-        value: Content-Type, Authorization
-      - path: /ffmpeg/*
-        name: Content-Type
-        value: application/javascript
-      - path: /ffmpeg/*.wasm
+        value: "Content-Type, Authorization"
+      # WASM file headers
+      - path: "/ort-wasm/*.wasm"
         name: Content-Type
         value: application/wasm
-      - path: /*.wasm
+      - path: "/ffmpeg/*.wasm"
         name: Content-Type
         value: application/wasm
+      - path: "/*.wasm"
+        name: Content-Type
+        value: application/wasm
+      # Cache headers for static assets
+      - path: "/ort-wasm/*"
+        name: Cache-Control
+        value: "public, max-age=31536000, immutable"
+      - path: "/ffmpeg/*"
+        name: Cache-Control
+        value: "public, max-age=31536000, immutable"
     routes:
       - type: rewrite
-        source: /*
+        source: "/*"
         destination: /index.html
     envVars:
       - key: NODE_VERSION

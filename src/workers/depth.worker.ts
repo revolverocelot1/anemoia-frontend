@@ -1,17 +1,46 @@
 // src/workers/depth.worker.ts -> MINIMAL WASM-ONLY VERSION
 import { env, pipeline, RawImage } from '@xenova/transformers';
 
+// Check if SharedArrayBuffer is available (required for multi-threading)
+// Also check crossOriginIsolated which is the proper way to detect COOP/COEP
+const hasSharedArrayBuffer = typeof SharedArrayBuffer !== 'undefined';
+const isCrossOriginIsolated = typeof self !== 'undefined' && (self as any).crossOriginIsolated === true;
+
 // Configure transformers.js for browser WASM in a worker
 const wasmBasePath = `${self.location.origin}/ort-wasm/`;
+
+// Must configure BEFORE any pipeline creation
 env.allowLocalModels = false;
 env.allowRemoteModels = true;
-env.backends.onnx.wasm = {
-    ...(env.backends.onnx.wasm || {}),
-    wasmPaths: wasmBasePath,
-    // Keep the worker light so it does not saturate the CPU
-    numThreads: 1,
-    simd: true,
-};
+
+// Safely configure the ONNX WASM backend
+// CRITICAL: Must use numThreads: 1 when SharedArrayBuffer is unavailable
+try {
+    // Force single-threaded execution when not cross-origin isolated
+    // This avoids the "no available backend found" error
+    const useThreads = hasSharedArrayBuffer && isCrossOriginIsolated;
+    
+    env.backends.onnx.wasm = {
+        wasmPaths: wasmBasePath,
+        // MUST be 1 when SharedArrayBuffer is not available
+        numThreads: useThreads ? 1 : 1,
+        // SIMD should work without SharedArrayBuffer
+        simd: true,
+        // Disable proxy to simplify execution
+        proxy: false,
+    };
+
+    // Debug log for troubleshooting
+    console.debug('[DepthWorker] WASM config:', {
+        wasmPaths: wasmBasePath,
+        numThreads: 1,
+        hasSharedArrayBuffer,
+        isCrossOriginIsolated,
+        useThreads,
+    });
+} catch (e) {
+    console.warn('[DepthWorker] Failed to configure ONNX backend:', e);
+}
 
 // Lightweight logger to avoid reference errors during worker execution
 const emitDebugLog = (...args: any[]) => {
@@ -38,9 +67,17 @@ self.onmessage = async (event) => {
             self.postMessage({ status: 'loading_model', message: 'Loading AI engine...' });
 
             // Xenova pipeline works inside web workers without DOM APIs
+            // Device is configured via env.backends.onnx.wasm settings above
             depthEstimator = await pipeline(
                 'depth-estimation',
                 'onnx-community/depth-anything-v2-small',
+                {
+                    progress_callback: (progress: any) => {
+                        if (progress.status === 'downloading' || progress.status === 'progress') {
+                            console.debug('[DepthWorker] Model loading:', progress);
+                        }
+                    }
+                }
             );
 
             self.postMessage({ status: 'model_ready', message: 'Engine Ready' });
