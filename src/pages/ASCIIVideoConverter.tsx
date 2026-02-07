@@ -20,7 +20,7 @@ interface ProcessingConfig {
   charDensity: number;
   frameRate: 5 | 10 | 15 | 20 | 24 | 30;
   quality: 'low' | 'medium' | 'high' | 'ultra';
-  outputMode: 'normal' | 'colored' | 'negative' | 'edge';
+  outputMode: 'normal' | 'colored' | 'negative' | 'depth';
   edgeThreshold: number;
   workerCount: number;
   batchSize: number;
@@ -156,7 +156,7 @@ const ASCIIVideoConverter: React.FC = () => {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [selectedPreset, setSelectedPreset] = useState('classic');
   const [selectedTheme, setSelectedTheme] = useState<keyof typeof COLOR_THEMES>('matrix');
-  const [exportFormat, setExportFormat] = useState<'video' | 'gif' | 'text'>('video');
+  const [exportFormat, setExportFormat] = useState<'video' | 'gif' | 'image' | 'text'>('video');
   
   // Improved frame buffer management
   const [frameBuffer, setFrameBuffer] = useState<Map<number, FrameData>>(new Map());
@@ -445,12 +445,10 @@ const ASCIIVideoConverter: React.FC = () => {
     ctx.font = `${config.fontSize}px Consolas, Monaco, monospace`;
     ctx.textBaseline = 'top';
     
-    if (config.outputMode === 'colored' && colors) {
-      // Render colored ASCII
+    if (colors && colors.length > 0) {
+      // Render with per-character colors (works for both Full Color and themed modes)
       let colorIndex = 0;
-      
-      // Enable shadows for colored mode for better visibility
-      ctx.shadowBlur = 1;
+      ctx.shadowBlur = config.outputMode === 'colored' ? 1 : 2;
       
       lines.forEach((line, lineIndex) => {
         const y = lineIndex * charHeight;
@@ -459,33 +457,28 @@ const ASCIIVideoConverter: React.FC = () => {
           const char = line[charIndex];
           const x = charIndex * charWidth;
           
-          if (colorIndex < colors.length - 2) {
+          if (colorIndex + 2 < colors.length) {
             const r = colors[colorIndex];
             const g = colors[colorIndex + 1];
             const b = colors[colorIndex + 2];
             colorIndex += 3;
             
             ctx.fillStyle = `rgb(${r},${g},${b})`;
-            ctx.shadowColor = `rgba(${r},${g},${b},0.5)`;
+            ctx.shadowColor = `rgba(${r},${g},${b},0.4)`;
           } else {
-            // Fallback color
             ctx.fillStyle = theme.text;
             ctx.shadowColor = theme.glow;
           }
           
-          // Draw character
           if (char !== ' ') {
             ctx.fillText(char, x, y);
-          } else {
-            // For spaces in colored mode, draw a faint colored block
-            ctx.globalAlpha = 0.1;
-            ctx.fillRect(x, y, charWidth, charHeight);
-            ctx.globalAlpha = 1.0;
           }
         }
       });
+      
+      ctx.shadowBlur = 0;
     } else {
-      // Render monochrome ASCII with theme color
+      // Render monochrome ASCII with theme color (mono mode)
       ctx.fillStyle = theme.text;
       ctx.shadowColor = theme.glow;
       ctx.shadowBlur = 2;
@@ -502,7 +495,6 @@ const ASCIIVideoConverter: React.FC = () => {
         }
       });
       
-      // Reset shadow
       ctx.shadowBlur = 0;
     }
   };
@@ -579,9 +571,9 @@ const ASCIIVideoConverter: React.FC = () => {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     
-    // Calculate dimensions maintaining aspect ratio with better scaling
-    const maxWidth = 800; // Fixed processing width for consistency
-    const maxHeight = 600; // Fixed processing height for consistency
+    // Reduced resolution for speed - ASCII only needs ~240px wide input
+    const maxWidth = 300;
+    const maxHeight = 225;
     
     const imageAspectRatio = img.width / img.height;
     let processWidth, processHeight;
@@ -620,12 +612,13 @@ const ASCIIVideoConverter: React.FC = () => {
             colorMode: config.colorMode,
             brightness: config.brightness,
             contrast: config.contrast,
-            edgeDetection: config.outputMode === 'edge',
+            edgeDetection: false,
             edgeThreshold: config.edgeThreshold,
             negative: config.outputMode === 'negative',
             fontSize: config.fontSize,
-          charDensity: config.charDensity,
-          colored: config.outputMode === 'colored'
+            charDensity: config.charDensity,
+            colored: config.outputMode === 'colored',
+            depthMode: config.outputMode === 'depth'
           }
         }
       });
@@ -656,9 +649,9 @@ const ASCIIVideoConverter: React.FC = () => {
     
     return new Promise<void>((resolve) => {
       video.onseeked = () => {
-        // Calculate dimensions maintaining aspect ratio with better scaling
-        const maxWidth = 800; // Fixed processing width for consistency
-        const maxHeight = 600; // Fixed processing height for consistency
+        // Reduced resolution for speed - ASCII only needs ~240px wide input
+        const maxWidth = 300;
+        const maxHeight = 225;
         
         const videoAspectRatio = video.videoWidth / video.videoHeight;
         let processWidth, processHeight;
@@ -713,12 +706,13 @@ const ASCIIVideoConverter: React.FC = () => {
                 colorMode: config.colorMode,
                 brightness: config.brightness,
                 contrast: config.contrast,
-                edgeDetection: config.outputMode === 'edge',
+                edgeDetection: false,
                 edgeThreshold: config.edgeThreshold,
                 negative: config.outputMode === 'negative',
                 fontSize: config.fontSize,
-              charDensity: config.charDensity,
-              colored: config.outputMode === 'colored'
+                charDensity: config.charDensity,
+                colored: config.outputMode === 'colored',
+                depthMode: config.outputMode === 'depth'
               }
             }
           });
@@ -901,6 +895,7 @@ const ASCIIVideoConverter: React.FC = () => {
     try {
       setIsProcessing(true);
       setMetrics(prev => ({ ...prev, progress: 0 }));
+      setError('Loading FFmpeg encoder... (first time may take a moment)');
       
       const firstFrame = orderedFrames[0];
       const lines = firstFrame.ascii.split('\n');
@@ -911,16 +906,16 @@ const ASCIIVideoConverter: React.FC = () => {
       const charHeight = config.fontSize * 1.2;
       
       const exportCanvas = document.createElement('canvas');
-      exportCanvas.width = maxLineLength * charWidth;
-      exportCanvas.height = lineCount * charHeight;
-      const ctx = exportCanvas.getContext('2d', { 
-        willReadFrequently: false,
-        alpha: false
-      });
+      // Ensure even dimensions for H.264 encoding
+      exportCanvas.width = Math.ceil(maxLineLength * charWidth / 2) * 2;
+      exportCanvas.height = Math.ceil(lineCount * charHeight / 2) * 2;
+      const ctx = exportCanvas.getContext('2d', { alpha: false });
       
       if (!ctx) return;
       
-      // Use FFmpeg export service
+      setError(null);
+      
+      // Use FFmpeg WASM for proper MP4 export with correct duration + audio
       const outputBlob = await asciiVideoExportService.exportVideo(
         orderedFrames,
         exportCanvas,
@@ -935,29 +930,28 @@ const ASCIIVideoConverter: React.FC = () => {
         renderFrameToCanvas,
         (progress) => {
           setMetrics(prev => ({ ...prev, progress }));
-        }
+        },
+        file // Pass original file for audio extraction
       );
       
-      // Download the video
+      // Download the MP4
       const url = URL.createObjectURL(outputBlob);
       const a = document.createElement('a');
       a.href = url;
       a.download = `ascii-video-${config.outputMode}-${Date.now()}.mp4`;
+      document.body.appendChild(a);
       a.click();
+      document.body.removeChild(a);
       URL.revokeObjectURL(url);
       
     } catch (error) {
       console.error('Export failed:', error);
-      setError('Failed to export video. Please try again.');
+      setError('Failed to export MP4. Please try again.');
       setTimeout(() => setError(null), 5000);
     } finally {
       setIsProcessing(false);
       setMetrics(prev => ({ ...prev, progress: 100 }));
     }
-  };
-  
-  const exportUsingVideoEncoder = async (canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D, frameRate: number) => {
-    // Removed - using FFmpeg instead
   };
 
   const playAnimation = useCallback(() => {
@@ -1012,62 +1006,118 @@ const ASCIIVideoConverter: React.FC = () => {
   const handleExportGIF = () => {
     if (orderedFrames.length === 0) return;
     
-    const firstFrame = orderedFrames[0];
-    const lines = firstFrame.ascii.split('\n');
-    const maxLineLength = Math.max(...lines.map(line => line.length));
+    try {
+      setIsProcessing(true);
+      setMetrics(prev => ({ ...prev, progress: 0 }));
+      
+      const firstFrame = orderedFrames[0];
+      const lines = firstFrame.ascii.split('\n');
+      const maxLineLength = Math.max(...lines.map(line => line.length));
+      const lineCount = lines.length;
+      
+      const charWidth = config.fontSize * 0.6;
+      const charHeight = config.fontSize * 1.2;
+      
+      const gifWidth = Math.round(maxLineLength * charWidth);
+      const gifHeight = Math.round(lineCount * charHeight);
+      
+      // Initialize GIF with correct settings
+      const gif = new GIF({
+        workers: 2,
+        quality: 10,
+        width: gifWidth,
+        height: gifHeight,
+        workerScript: '/gif.worker.js'
+      });
+      
+      gif.on('finished', (blob: Blob) => {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `ascii-animation-${Date.now()}.gif`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        setIsProcessing(false);
+        setMetrics(prev => ({ ...prev, progress: 100 }));
+      });
+      
+      gif.on('progress', (p: number) => {
+        setMetrics(prev => ({ ...prev, progress: 50 + p * 50 })); // Second half for GIF encoding
+      });
+      
+      // Create canvas for rendering frames
+      const gifCanvas = document.createElement('canvas');
+      gifCanvas.width = gifWidth;
+      gifCanvas.height = gifHeight;
+      const ctx = gifCanvas.getContext('2d', { alpha: false });
+      
+      if (ctx) {
+        // Add frames to GIF with proper delay
+        const frameDelay = Math.round(1000 / config.frameRate);
+        
+        orderedFrames.forEach((frame, index) => {
+          // Clear and render
+          ctx.fillStyle = theme.background;
+          ctx.fillRect(0, 0, gifCanvas.width, gifCanvas.height);
+          renderFrameToCanvas(gifCanvas, ctx, frame.ascii, frame.colors);
+          
+          // Clone canvas for each frame (gif.js needs separate canvas per frame)
+          const frameCanvas = document.createElement('canvas');
+          frameCanvas.width = gifCanvas.width;
+          frameCanvas.height = gifCanvas.height;
+          const frameCtx = frameCanvas.getContext('2d');
+          if (frameCtx) {
+            frameCtx.drawImage(gifCanvas, 0, 0);
+            gif.addFrame(frameCanvas, { delay: frameDelay, copy: true });
+          }
+          
+          setMetrics(prev => ({ ...prev, progress: ((index + 1) / orderedFrames.length) * 50 })); // First half for adding frames
+        });
+        
+        gif.render();
+      }
+    } catch (error) {
+      console.error('GIF export failed:', error);
+      setError('Failed to export GIF. Please try again.');
+      setTimeout(() => setError(null), 5000);
+      setIsProcessing(false);
+    }
+  };
+
+  const handleExportImage = () => {
+    // Export current preview frame as PNG image
+    if (orderedFrames.length === 0) return;
+    
+    const frame = orderedFrames[orderedFrames.length > 1 ? currentFrame : 0];
+    if (!frame) return;
+    
+    const lines = frame.ascii.split('\n');
+    const maxLen = Math.max(...lines.map(l => l.length));
     const lineCount = lines.length;
+    const charW = config.fontSize * 0.6;
+    const charH = config.fontSize * 1.2;
     
-    const charWidth = config.fontSize * 0.6;
-    const charHeight = config.fontSize;
+    const imgCanvas = document.createElement('canvas');
+    imgCanvas.width = Math.round(maxLen * charW);
+    imgCanvas.height = Math.round(lineCount * charH);
+    const imgCtx = imgCanvas.getContext('2d', { alpha: false });
+    if (!imgCtx) return;
     
-    // Initialize GIF with correct settings
-    const gif = new GIF({
-      workers: 2, // Reduced worker count
-      quality: 10,
-      width: maxLineLength * charWidth,
-      height: lineCount * charHeight,
-      workerScript: '/gif.worker.js'
-    });
+    renderFrameToCanvas(imgCanvas, imgCtx, frame.ascii, frame.colors);
     
-    gif.on('finished', (blob: Blob) => {
+    imgCanvas.toBlob((blob) => {
+      if (!blob) return;
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `ascii-animation-${Date.now()}.gif`;
+      a.download = `ascii-art-${Date.now()}.png`;
+      document.body.appendChild(a);
       a.click();
+      document.body.removeChild(a);
       URL.revokeObjectURL(url);
-    });
-    
-    // Create canvas for rendering frames
-    const gifCanvas = document.createElement('canvas');
-    gifCanvas.width = maxLineLength * charWidth;
-    gifCanvas.height = lineCount * charHeight;
-    const ctx = gifCanvas.getContext('2d', { alpha: false });
-    
-    if (ctx) {
-      // Set background color
-      ctx.fillStyle = theme.background;
-      ctx.fillRect(0, 0, gifCanvas.width, gifCanvas.height);
-      
-      // Add frames to GIF with proper delay
-      const frameDelay = Math.round(1000 / config.frameRate);
-      
-      orderedFrames.forEach((frame, index) => {
-        renderFrameToCanvas(gifCanvas, ctx, frame.ascii, frame.colors);
-        
-        // Clone canvas for each frame
-        const frameCanvas = document.createElement('canvas');
-        frameCanvas.width = gifCanvas.width;
-        frameCanvas.height = gifCanvas.height;
-        const frameCtx = frameCanvas.getContext('2d');
-        if (frameCtx) {
-          frameCtx.drawImage(gifCanvas, 0, 0);
-          gif.addFrame(frameCanvas, { delay: frameDelay });
-        }
-      });
-      
-      gif.render();
-    }
+    }, 'image/png');
   };
 
   const handleExport = () => {
@@ -1080,18 +1130,21 @@ const ASCIIVideoConverter: React.FC = () => {
       case 'gif':
         handleExportGIF();
         break;
+      case 'image':
+        handleExportImage();
+        break;
       case 'text': {
         const frames = orderedFrames.length > 0 ? 
           orderedFrames.map(f => f.ascii) : 
           processedFrames;
         const text = frames.join('\n\n' + '='.repeat(80) + '\n\n');
-    const blob = new Blob([text], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
+        const blob = new Blob([text], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
         a.download = 'ascii-frames.txt';
-    a.click();
-    URL.revokeObjectURL(url);
+        a.click();
+        URL.revokeObjectURL(url);
         break;
       }
     }
@@ -1101,21 +1154,47 @@ const ASCIIVideoConverter: React.FC = () => {
     if (!file) return;
     
     setIsProcessing(true);
+    isProcessingRef.current = true;
+    processingStartTimeRef.current = performance.now();
     setMetrics(prev => ({ ...prev, progress: 0 }));
     setError('');
     
-    const startTime = Date.now();
+    // Clear previous data
+    setFrameBuffer(new Map());
+    setProcessedColorFrames(new Map());
+    setProcessedFrames([]);
+    setOrderedFrames([]);
+    processedFramesMapRef.current.clear();
+    
+    const startTime = performance.now();
     console.log('Starting video processing with config:', config);
     
     // Create video element to extract frames
     const video = document.createElement('video');
-    video.src = URL.createObjectURL(file);
+    const videoUrl = URL.createObjectURL(file);
+    video.src = videoUrl;
     video.muted = true;
+    video.preload = 'auto';
     
     // Wait for video metadata to load
-    await new Promise((resolve) => {
-      video.onloadedmetadata = resolve;
+    await new Promise<void>((resolve, reject) => {
+      video.onloadedmetadata = () => resolve();
+      video.onerror = () => reject(new Error('Failed to load video'));
+    }).catch(err => {
+      setError('Failed to load video. Try a different format.');
+      setIsProcessing(false);
+      isProcessingRef.current = false;
+      URL.revokeObjectURL(videoUrl);
+      return;
     });
+    
+    if (!video.duration || video.duration === Infinity) {
+      setError('Could not determine video duration.');
+      setIsProcessing(false);
+      isProcessingRef.current = false;
+      URL.revokeObjectURL(videoUrl);
+      return;
+    }
     
     const fps = config.frameRate;
     const duration = video.duration;
@@ -1123,213 +1202,209 @@ const ASCIIVideoConverter: React.FC = () => {
     console.log(`Video loaded: duration=${duration}s, fps=${fps}, totalFrames=${totalFrames}`);
     
     // Set the total frames for progress tracking
-    setMetrics(prev => ({ ...prev, totalFrames }));
+    setMetrics(prev => ({ ...prev, totalFrames, processedFrames: 0, progress: 0 }));
+    
+    // SPEED OPTIMIZATION: For ASCII art, we only need a small input canvas.
+    // ASCII output is max ~120 chars wide. Using 2x that = 240px gives good quality
+    // while being 10-15x faster than processing at 800px.
+    const maxDim = config.quality === 'ultra' ? 320 : 
+                   config.quality === 'high' ? 240 : 
+                   config.quality === 'medium' ? 180 : 120;
+    
+    const aspectRatio = video.videoWidth / video.videoHeight;
+    let canvasWidth: number, canvasHeight: number;
+    if (aspectRatio > 1) {
+      canvasWidth = Math.min(video.videoWidth, maxDim);
+      canvasHeight = Math.round(canvasWidth / aspectRatio);
+    } else {
+      canvasHeight = Math.min(video.videoHeight, maxDim);
+      canvasWidth = Math.round(canvasHeight * aspectRatio);
+    }
     
     // Create canvas for frame extraction
     const canvas = document.createElement('canvas');
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    canvas.width = canvasWidth;
+    canvas.height = canvasHeight;
+    const ctx = canvas.getContext('2d', { willReadFrequently: true, alpha: false });
     if (!ctx) {
       setError('Failed to create canvas context');
       setIsProcessing(false);
+      isProcessingRef.current = false;
+      URL.revokeObjectURL(videoUrl);
       return;
     }
     
-    const frames: FrameData[] = [];
+    const frames: (FrameData | null)[] = new Array(totalFrames).fill(null);
+    let completedCount = 0;
+    let workerIdx = 0;
     const frameInterval = 1 / fps;
     
-    // Extract frames
-    for (let i = 0; i < totalFrames; i++) {
-      const currentTime = i * frameInterval;
-      video.currentTime = currentTime;
-      
-      await new Promise((resolve) => {
-        video.onseeked = resolve;
-      });
-      
-      ctx.drawImage(video, 0, 0);
-      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      
-      // Process the frame immediately to test
-      const processedFrame = await processFrameWithWorker(imageData, config, i);
-      if (processedFrame) {
-        frames.push(processedFrame);
-        setMetrics(prev => ({ 
-          ...prev, 
-          progress: Math.floor(((i + 1) / totalFrames) * 100),
-          processedFrames: i + 1
-        }));
-      }
-    }
+    // Set up per-worker frame result handlers
+    const pendingResolvers = new Map<number, (data: any) => void>();
     
-    const processingTime = (Date.now() - startTime) / 1000;
-    console.log(`Processing completed in ${processingTime}s`);
+    const workerMessageHandlers = workerPoolRef.current.map(worker => {
+      const handler = (e: MessageEvent) => {
+        if (e.data.type === 'frameProcessed') {
+          const frameNum = e.data.data.frameNumber;
+          const resolver = pendingResolvers.get(frameNum);
+          if (resolver) {
+            pendingResolvers.delete(frameNum);
+            resolver(e.data.data);
+          }
+        }
+      };
+      worker.addEventListener('message', handler);
+      return { worker, handler };
+    });
     
-    setOrderedFrames(frames);
-    setIsProcessing(false);
-    
-    // Generate output based on format
-    if (exportFormat === 'video') {
-      await generateVideo(frames);
-    } else if (exportFormat === 'gif') {
-      await generateGIF(frames);
-    } else {
-      generateTextFile(frames);
-    }
-  };
-
-  // Process a single frame with worker
-  const processFrameWithWorker = async (
-    imageData: ImageData,
-    config: ProcessingConfig,
-    frameIndex: number
-  ): Promise<FrameData | null> => {
     try {
-      // Send frame to worker
-      const result = await new Promise<FrameData>((resolve, reject) => {
-        const worker = workerPoolRef.current[frameIndex % workerPoolRef.current.length];
+      // Sequential seeking, parallel worker processing
+      // We seek one frame at a time (video limitation) but fire off worker
+      // tasks without waiting for results — workers process in parallel
+      const workerPromises: Promise<void>[] = [];
+      
+      for (let i = 0; i < totalFrames; i++) {
+        if (!isProcessingRef.current) break;
         
-        const handleMessage = (e: MessageEvent) => {
-          if (e.data.frameIndex === frameIndex) {
-            worker.removeEventListener('message', handleMessage);
-            if (e.data.error) {
-              reject(new Error(e.data.error));
+        // Seek to frame
+        video.currentTime = i * frameInterval;
+        await new Promise<void>(resolve => {
+          video.onseeked = () => resolve();
+        });
+        
+        // Draw to canvas (scaled down)
+        ctx.drawImage(video, 0, 0, canvasWidth, canvasHeight);
+        const imageData = ctx.getImageData(0, 0, canvasWidth, canvasHeight);
+        
+        // Pick a worker round-robin
+        const worker = workerPoolRef.current[workerIdx];
+        workerIdx = (workerIdx + 1) % workerPoolRef.current.length;
+        
+        const frameNum = i;
+        
+        // Create a promise for this frame's worker result
+        const workerPromise = new Promise<void>((resolve) => {
+          pendingResolvers.set(frameNum, (data: any) => {
+            const { ascii, colors, width, height, timestamp } = data;
+            frames[frameNum] = {
+              frameNumber: frameNum,
+              ascii,
+              colors: colors ? new Uint8ClampedArray(colors) : null,
+              width,
+              height,
+              timestamp
+            };
+            completedCount++;
+            
+            // Update preview with the latest completed frame
+            if (config.outputMode === 'colored' && colors) {
+              const coloredHtml = createColoredAscii(ascii, new Uint8ClampedArray(colors), width);
+              setPreviewFrame(coloredHtml);
             } else {
-              resolve(e.data as FrameData);
+              setPreviewFrame(ascii);
+            }
+            
+            // Update progress
+            const elapsed = (performance.now() - startTime) / 1000;
+            const processingFps = elapsed > 0 ? completedCount / elapsed : 0;
+            setMetrics(prev => ({
+              ...prev,
+              processedFrames: completedCount,
+              progress: (completedCount / totalFrames) * 100,
+              fps: processingFps,
+              estimatedTime: processingFps > 0 ? (totalFrames - completedCount) / processingFps : 0
+            }));
+            
+            resolve();
+          });
+        });
+        
+        workerPromises.push(workerPromise);
+        
+        // Send frame to worker — correct message format matching worker's expectation
+        worker.postMessage({
+          type: 'processFrame',
+          data: {
+            frameData: {
+              frameNumber: frameNum,
+              timestamp: frameNum * frameInterval,
+              width: canvasWidth,
+              height: canvasHeight,
+              pixels: imageData.data
+            },
+            config: {
+              asciiChars: config.asciiChars,
+              colorMode: config.colorMode,
+              brightness: config.brightness,
+              contrast: config.contrast,
+              edgeDetection: false,
+              edgeThreshold: config.edgeThreshold,
+              negative: config.outputMode === 'negative',
+              fontSize: config.fontSize,
+              charDensity: config.charDensity,
+              colored: config.outputMode === 'colored',
+              depthMode: config.outputMode === 'depth'
             }
           }
-        };
-        
-        worker.addEventListener('message', handleMessage);
-        
-        // Send the processing request
-        worker.postMessage({
-          type: 'process',
-          frameData: {
-            width: imageData.width,
-            height: imageData.height,
-            pixels: Array.from(imageData.data)
-          },
-          config: {
-            ...config,
-            colored: config.outputMode === 'colored'
-          },
-          frameIndex
         });
+      }
+      
+      // Wait for all workers to finish processing
+      await Promise.all(workerPromises);
+      
+    } finally {
+      // Clean up worker message handlers (restore originals)
+      workerMessageHandlers.forEach(({ worker, handler }) => {
+        worker.removeEventListener('message', handler);
       });
       
-      return result;
-    } catch (error) {
-      console.error('Frame processing error:', error);
-      return null;
+      // Re-attach the default handleFrameProcessed handlers
+      workerPoolRef.current.forEach(worker => {
+        worker.onmessage = (e) => {
+          if (e.data.type === 'frameProcessed') {
+            handleFrameProcessed(e.data.data);
+          }
+        };
+      });
+      
+      URL.revokeObjectURL(videoUrl);
+      video.remove();
     }
+    
+    // Filter out null frames and set results
+    const validFrames = frames.filter((f): f is FrameData => f !== null);
+    
+    const processingTime = (performance.now() - startTime) / 1000;
+    console.log(`Processing completed: ${validFrames.length} frames in ${processingTime.toFixed(2)}s`);
+    
+    setOrderedFrames(validFrames);
+    setProcessedFrames(validFrames.map(f => f.ascii));
+    setIsProcessing(false);
+    isProcessingRef.current = false;
+    
+    setMetrics(prev => ({
+      ...prev,
+      processedFrames: validFrames.length,
+      progress: 100,
+      fps: validFrames.length / processingTime
+    }));
   };
 
   const generateVideo = async (frames: FrameData[]) => {
-    if (!canvasRef.current) return;
-
-    const firstFrame = frames[0];
-    const lines = firstFrame.ascii.split('\n');
-    const maxLineLength = Math.max(...lines.map(line => line.length));
-    const lineCount = lines.length;
-    
-    const charWidth = config.fontSize * 0.6;
-    const charHeight = config.fontSize * 1.2;
-    
-    const exportCanvas = document.createElement('canvas');
-    exportCanvas.width = maxLineLength * charWidth;
-    exportCanvas.height = lineCount * charHeight;
-    const ctx = exportCanvas.getContext('2d', { 
-      willReadFrequently: false,
-      alpha: false
-    });
-    
-    if (!ctx) return;
-
-    const outputBlob = await asciiVideoExportService.exportVideo(
-      frames,
-      exportCanvas,
-      ctx,
-      {
-        frameRate: config.frameRate,
-        fontSize: config.fontSize,
-        backgroundColor: theme.background,
-        format: 'mp4',
-        quality: config.quality
-      },
-      renderFrameToCanvas,
-      (progress) => {
-        setMetrics(prev => ({ ...prev, progress }));
-      }
-    );
-
-    const url = URL.createObjectURL(outputBlob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `ascii-video-${config.outputMode}-${Date.now()}.mp4`;
-    a.click();
-    URL.revokeObjectURL(url);
+    // Redirect to the fixed handleExportVideo which uses MediaRecorder
+    // This is called from the old code path but we redirect to the new export
+    if (frames.length > 0) {
+      // Ensure orderedFrames are set, then trigger export
+      setOrderedFrames(frames);
+      await handleExportVideo();
+    }
   };
 
   const generateGIF = async (frames: FrameData[]) => {
-    if (frames.length === 0) return;
-
-    const firstFrame = frames[0];
-    const lines = firstFrame.ascii.split('\n');
-    const maxLineLength = Math.max(...lines.map(line => line.length));
-    const lineCount = lines.length;
-    
-    const charWidth = config.fontSize * 0.6;
-    const charHeight = config.fontSize;
-    
-    // Initialize GIF with correct settings
-    const gif = new GIF({
-      workers: 2, // Reduced worker count
-      quality: 10,
-      width: maxLineLength * charWidth,
-      height: lineCount * charHeight,
-      workerScript: '/gif.worker.js'
-    });
-    
-    gif.on('finished', (blob: Blob) => {
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `ascii-animation-${Date.now()}.gif`;
-      a.click();
-      URL.revokeObjectURL(url);
-    });
-    
-    // Create canvas for rendering frames
-    const gifCanvas = document.createElement('canvas');
-    gifCanvas.width = maxLineLength * charWidth;
-    gifCanvas.height = lineCount * charHeight;
-    const ctx = gifCanvas.getContext('2d', { alpha: false });
-    
-    if (ctx) {
-      // Set background color
-      ctx.fillStyle = theme.background;
-      ctx.fillRect(0, 0, gifCanvas.width, gifCanvas.height);
-      
-      // Add frames to GIF with proper delay
-      const frameDelay = Math.round(1000 / config.frameRate);
-      
-      frames.forEach((frame, index) => {
-        renderFrameToCanvas(gifCanvas, ctx, frame.ascii, frame.colors);
-        
-        // Clone canvas for each frame
-        const frameCanvas = document.createElement('canvas');
-        frameCanvas.width = gifCanvas.width;
-        frameCanvas.height = gifCanvas.height;
-        const frameCtx = frameCanvas.getContext('2d');
-        if (frameCtx) {
-          frameCtx.drawImage(gifCanvas, 0, 0);
-          gif.addFrame(frameCanvas, { delay: frameDelay });
-        }
-      });
-      
-      gif.render();
+    // Redirect to handleExportGIF with the frames set
+    if (frames.length > 0) {
+      setOrderedFrames(frames);
+      handleExportGIF();
     }
   };
 
@@ -1544,7 +1619,7 @@ const ASCIIVideoConverter: React.FC = () => {
                   { key: 'normal', name: 'Normal', icon: Grid3x3 },
                   { key: 'colored', name: 'Full Color', icon: Palette },
                   { key: 'negative', name: 'Negative', icon: Contrast },
-                  { key: 'edge', name: 'Edge Detection', icon: Aperture }
+                  { key: 'depth', name: '⚡ Neural Depth', icon: Cpu }
                 ].map((mode) => (
                   <motion.button
                     key={mode.key}
@@ -1755,10 +1830,11 @@ const ASCIIVideoConverter: React.FC = () => {
                   {/* Export Format */}
                   <div>
                     <label className="block text-sm font-medium mb-2">Export Format</label>
-                    <div className="flex gap-2">
+                    <div className="flex flex-wrap gap-2">
                       {[
-                        { key: 'video', name: 'MP4/WebM', icon: Film },
+                        { key: 'video', name: 'MP4 Video', icon: Film },
                         { key: 'gif', name: 'GIF', icon: ImageIcon },
+                        { key: 'image', name: 'Image', icon: FileImage },
                         { key: 'text', name: 'Text', icon: FileVideo }
                       ].map((format) => (
                         <motion.button
@@ -1878,22 +1954,18 @@ const ASCIIVideoConverter: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Edge Threshold (for edge detection mode) */}
-                  {config.outputMode === 'edge' && (
-                    <div>
-                      <label className="block text-sm font-medium mb-2">
-                        Edge Threshold: {config.edgeThreshold.toFixed(2)}
-                      </label>
-                      <input
-                        type="range"
-                        min="0.1"
-                        max="0.9"
-                        step="0.1"
-                        value={config.edgeThreshold}
-                        onChange={(e) => setConfig(prev => ({ ...prev, edgeThreshold: parseFloat(e.target.value) }))}
-                        className="w-full"
-                        style={{ accentColor: theme.primary }}
-                      />
+                  {/* Neural Depth mode info */}
+                  {config.outputMode === 'depth' && (
+                    <div className="p-3 rounded-lg border border-yellow-500/30 bg-yellow-500/10">
+                      <div className="flex items-center gap-2 text-yellow-400 text-sm font-medium mb-1">
+                        <Cpu className="w-4 h-4" />
+                        ⚡ Neural Depth Mode — Experimental
+                      </div>
+                      <p className="text-xs opacity-70">
+                        Uses local contrast analysis + luminance gradient for depth-aware ASCII. 
+                        Foreground objects get denser characters, backgrounds fade out. 
+                        Leverages all CPU cores for maximum speed.
+                      </p>
                     </div>
                   )}
                   </motion.div>
@@ -1913,56 +1985,57 @@ const ASCIIVideoConverter: React.FC = () => {
                 Preview
               </h2>
               
-            {/* ASCII Preview */}
+            {/* ASCII Preview - responsive, auto-scaling */}
               <div 
               className="relative rounded-lg overflow-hidden bg-black border border-white/20"
                 style={{
-                  minHeight: '400px',
-                  maxHeight: '70vh',
-                  overflow: 'auto',
+                  minHeight: '300px',
+                  maxHeight: '75vh',
+                  overflow: 'hidden',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center'
                 }}
             >
-              {/* Aspect Ratio Indicator */}
+              {/* Frame info overlay */}
               {previewFrame && (
-                <div className="absolute top-2 right-2 bg-black/50 backdrop-blur-sm rounded px-2 py-1 text-xs opacity-70">
-                  {orderedFrames.length > 0 && (
-                    <span style={{ color: theme.primary }}>
-                      {orderedFrames.length} frames • {config.frameRate} FPS
-                    </span>
-                  )}
+                <div className="absolute top-2 right-2 z-10 bg-black/70 backdrop-blur-sm rounded px-2 py-1 text-xs" style={{ color: theme.primary }}>
+                  {orderedFrames.length > 0 && `${orderedFrames.length} frames • `}{config.frameRate} FPS
+                  {config.outputMode === 'depth' && ' • ⚡ Neural Depth'}
                 </div>
               )}
               {previewFrame ? (
-                <div className="w-full h-full flex items-center justify-center p-4">
+                <div className="w-full h-full flex items-center justify-center" style={{ padding: '8px' }}>
                   {config.outputMode === 'colored' ? (
                     <div
                       className="ascii-preview-colored"
                       style={{ 
-                        fontSize: `${config.fontSize}px`,
-                        lineHeight: 1.2,
-                        maxWidth: '100%',
-                        maxHeight: '100%',
-                        overflow: 'auto'
+                        fontSize: 'clamp(4px, 1.2vw, 12px)',
+                        lineHeight: 1.15,
+                        width: '100%',
+                        height: '100%',
+                        overflow: 'auto',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
                       }}
                       dangerouslySetInnerHTML={{ __html: previewFrame }}
                     />
                   ) : (
                   <pre
-                    className="leading-none text-center"
+                    className="leading-none"
                     style={{ 
-                      fontFamily: 'Consolas, Monaco, monospace',
-                      fontSize: `${config.fontSize}px`,
+                      fontFamily: 'Consolas, Monaco, "Courier New", monospace',
+                      fontSize: 'clamp(3px, 1vw, 10px)',
                       color: theme.text,
                       whiteSpace: 'pre',
-                      lineHeight: 1.2,
+                      lineHeight: 1.15,
+                      textShadow: `0 0 8px ${theme.glow}`,
+                      letterSpacing: '0.02em',
+                      margin: '0 auto',
                       maxWidth: '100%',
-                      maxHeight: '100%',
-                      overflow: 'auto',
-                      textShadow: `0 0 10px ${theme.glow}`,
-                      letterSpacing: '0.05em'
+                      overflow: 'hidden',
+                      textAlign: 'center'
                     }}
                   >
                     {previewFrame}
@@ -1970,10 +2043,10 @@ const ASCIIVideoConverter: React.FC = () => {
                   )}
                 </div>
               ) : (
-                <div className="flex items-center justify-center h-full p-8">
+                <div className="flex items-center justify-center h-full p-8" style={{ minHeight: '300px' }}>
                   <div className="text-center">
-                    <Activity className="w-16 h-16 mx-auto mb-4 opacity-30" />
-                    <p className="opacity-50">Upload media to see the ASCII preview</p>
+                    <Terminal className="w-12 h-12 mx-auto mb-3 opacity-30" style={{ color: theme.primary }} />
+                    <p className="opacity-50 text-sm">Upload media to see the ASCII preview</p>
                   </div>
                 </div>
               )}

@@ -20,6 +20,7 @@ interface ProcessingRequest {
     fontSize?: number;
     charDensity?: number;
     colored?: boolean;
+    depthMode?: boolean;
   };
 }
 
@@ -34,94 +35,54 @@ const DETAILED_CHAR_SETS = {
 
 // Performance monitoring
 let lastPerformanceCheck = 0;
-const PERFORMANCE_CHECK_INTERVAL = 1000; // Check every second
+const PERFORMANCE_CHECK_INTERVAL = 1000;
 
-// Optimized Sobel edge detection
-class EdgeDetector {
-  private sobelX = [
-    [-1, 0, 1],
-    [-2, 0, 2],
-    [-1, 0, 1]
-  ];
-  
-  private sobelY = [
-    [-1, -2, -1],
-    [0, 0, 0],
-    [1, 2, 1]
-  ];
-
-  detect(pixels: Uint8ClampedArray, width: number, height: number): Float32Array {
-    const edges = new Float32Array(width * height);
-    
-    for (let y = 1; y < height - 1; y++) {
-      for (let x = 1; x < width - 1; x++) {
-        let gx = 0, gy = 0;
-        
-        // Apply Sobel operators
-        for (let i = -1; i <= 1; i++) {
-          for (let j = -1; j <= 1; j++) {
-            const idx = ((y + i) * width + (x + j)) * 4;
-            const intensity = (pixels[idx] + pixels[idx + 1] + pixels[idx + 2]) / 3;
-            
-            gx += intensity * this.sobelX[i + 1][j + 1];
-            gy += intensity * this.sobelY[i + 1][j + 1];
-          }
-        }
-        
-        // Calculate edge magnitude
-        edges[y * width + x] = Math.sqrt(gx * gx + gy * gy);
-      }
-    }
-    
-    return edges;
-  }
-}
-
-const edgeDetector = new EdgeDetector();
-
-// Fixed color processing functions to prevent green/color issues
+// Color theme mapping - uses brightness-modulated theme colors for better output
 const getColorForMode = (r: number, g: number, b: number, mode: string): [number, number, number] => {
+  const luma = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  
   switch(mode) {
     case 'mono':
       return [255, 255, 255];
     case 'matrix': {
-      const brightness = (r + g + b) / 765;
-      if (brightness > 0.75) return [0, 255, 65];
-      if (brightness > 0.5) return [0, 221, 49];
-      if (brightness > 0.25) return [0, 187, 33];
-      return [0, 153, 17];
+      const intensity = Math.max(0.15, luma);
+      return [0, Math.round(255 * intensity), Math.round(65 * intensity)];
     }
-    case 'cyberpunk':
-      if (b > r && b > g) return [0, 255, 255];
-      if (r > b) return [255, 0, 255];
-      return [255, 136, 255];
-    case 'retro':
-      if (r > g && r > b) return [255, 107, 26];
-      if (g > b) return [255, 215, 0];
-      return [255, 170, 102];
-    case 'neon':
-      if (b > r && b > g) return [0, 255, 240];
-      if (r > g) return [255, 0, 153];
-      return [102, 255, 255];
-    case 'vaporwave':
-      if (r > g && r > b) return [255, 113, 206];
-      if (b > r) return [185, 103, 255];
-      return [255, 170, 221];
+    case 'cyberpunk': {
+      const ratio = r / (b + 1);
+      if (ratio > 1.2) return [Math.round(255 * luma), 0, Math.round(255 * luma)]; // magenta
+      if (ratio < 0.8) return [0, Math.round(255 * luma), Math.round(255 * luma)]; // cyan
+      return [Math.round(200 * luma), Math.round(100 * luma), Math.round(255 * luma)];
+    }
+    case 'retro': {
+      const warmth = (r * 2 + g) / (b + r + g + 1);
+      if (warmth > 1.5) return [Math.round(255 * luma), Math.round(107 * luma), Math.round(26 * luma)];
+      return [Math.round(255 * luma), Math.round(215 * luma), 0];
+    }
+    case 'neon': {
+      const hueShift = (r - b) / 255;
+      if (hueShift > 0.2) return [Math.round(255 * luma), 0, Math.round(153 * luma)]; // pink
+      if (hueShift < -0.2) return [0, Math.round(255 * luma), Math.round(240 * luma)]; // cyan
+      return [Math.round(100 * luma), Math.round(255 * luma), Math.round(255 * luma)];
+    }
+    case 'vaporwave': {
+      const blend = (r + b) / (g + 1);
+      if (blend > 2) return [Math.round(255 * luma), Math.round(113 * luma), Math.round(206 * luma)];
+      return [Math.round(185 * luma), Math.round(103 * luma), Math.round(255 * luma)];
+    }
     default:
       return [255, 255, 255];
   }
 };
 
-// Enhanced brightness calculation with better color perception
+// Perceptual brightness - Rec. 709 luma
 const calculateBrightness = (r: number, g: number, b: number): number => {
-  // Using Rec. 709 luma coefficients for better perceptual accuracy
   return 0.2126 * r + 0.7152 * g + 0.0722 * b;
 };
 
-// Get enhanced character set based on density
+// Get character set based on density
 const getCharacterSet = (charDensity: number, customChars?: string): string => {
   if (customChars) return customChars;
-  
   if (charDensity >= 2.0) return DETAILED_CHAR_SETS.ultra;
   if (charDensity >= 1.5) return DETAILED_CHAR_SETS.super;
   if (charDensity >= 1.0) return DETAILED_CHAR_SETS.high;
@@ -129,54 +90,68 @@ const getCharacterSet = (charDensity: number, customChars?: string): string => {
   return DETAILED_CHAR_SETS.low;
 };
 
-// Main processing function with improved performance and color support
+// Compute local contrast for depth estimation (used in depth mode)
+const computeLocalContrast = (
+  pixels: Uint8ClampedArray, width: number, height: number,
+  blockStartX: number, blockEndX: number, blockStartY: number, blockEndY: number
+): number => {
+  let sumBright = 0;
+  let sumSq = 0;
+  let n = 0;
+  const step = Math.max(1, Math.floor((blockEndX - blockStartX) / 3));
+  
+  for (let sy = blockStartY; sy < blockEndY; sy += step) {
+    for (let sx = blockStartX; sx < blockEndX; sx += step) {
+      const idx = (sy * width + sx) * 4;
+      const bright = (pixels[idx] + pixels[idx + 1] + pixels[idx + 2]) / 765;
+      sumBright += bright;
+      sumSq += bright * bright;
+      n++;
+    }
+  }
+  
+  if (n < 2) return 0;
+  const mean = sumBright / n;
+  const variance = (sumSq / n) - (mean * mean);
+  return Math.sqrt(Math.max(0, variance)); // standard deviation as contrast measure
+};
+
+// Main processing function
 const processFrame = (request: ProcessingRequest) => {
   const startTime = performance.now();
   const { frameData, config } = request;
   const { width, height, pixels } = frameData;
-  const { brightness, contrast, edgeDetection, edgeThreshold, negative, charDensity = 1.0, colored = false } = config;
+  const { brightness, contrast, edgeDetection, edgeThreshold, negative, charDensity = 1.0, colored = false, depthMode = false } = config;
   
-  // Get appropriate character set
   const asciiChars = getCharacterSet(charDensity, config.asciiChars);
   
-  // Calculate optimal character dimensions based on input size and density
-  // Improved calculation for better output
-  const aspectRatio = 2.0; // Characters are typically twice as tall as wide
-  const targetWidth = Math.floor(80 * charDensity); // Base width of 80 chars
-  const charWidth = Math.min(targetWidth, 120); // Cap at 120 chars wide
+  // Calculate output character grid dimensions
+  const aspectRatio = 2.0; // Characters are ~2x taller than wide
+  const targetWidth = Math.floor(80 * charDensity);
+  const charWidth = Math.min(targetWidth, 120);
   const charHeight = Math.ceil(charWidth * (height / width) / aspectRatio);
   
   const asciiLines: string[] = [];
   const colorData: number[] = [];
   
-  // Pre-calculate adjustment factors
   const contrastFactor = contrast;
   const brightnessMultiplier = brightness;
-  
-  // Apply brightness and contrast adjustments only if needed
   const needsAdjustment = brightness !== 1.0 || contrast !== 1.0 || negative;
   
-  // Detect edges if needed
-  let edges: Float32Array | null = null;
-  if (edgeDetection) {
-    edges = edgeDetector.detect(pixels, width, height);
-  }
-  
-  // Generate ASCII art with improved sampling
+  // Block dimensions for mapping pixels to characters
   const blockWidth = width / charWidth;
   const blockHeight = height / charHeight;
   const numChars = asciiChars.length;
   const numCharsMinusOne = numChars - 1;
   
-  // Use adaptive sampling based on block size
-  const sampleStep = Math.max(1, Math.floor(Math.min(blockWidth, blockHeight) / 4)); // Increased sampling
+  // Sampling step - adaptive based on block size (smaller = more accurate but slower)
+  const sampleStep = Math.max(1, Math.floor(Math.min(blockWidth, blockHeight) / 3));
   
   // Process each character position
   for (let y = 0; y < charHeight; y++) {
     let line = '';
     
     for (let x = 0; x < charWidth; x++) {
-      // Calculate block bounds
       const blockStartX = Math.floor(x * blockWidth);
       const blockEndX = Math.min(Math.floor((x + 1) * blockWidth), width);
       const blockStartY = Math.floor(y * blockHeight);
@@ -186,7 +161,6 @@ const processFrame = (request: ProcessingRequest) => {
       let totalR = 0, totalG = 0, totalB = 0;
       let samples = 0;
       
-      // Sample pixels with adaptive step
       for (let sy = blockStartY; sy < blockEndY; sy += sampleStep) {
         for (let sx = blockStartX; sx < blockEndX; sx += sampleStep) {
           const idx = (sy * width + sx) * 4;
@@ -195,14 +169,8 @@ const processFrame = (request: ProcessingRequest) => {
           let g = pixels[idx + 1];
           let b = pixels[idx + 2];
           
-          // Apply adjustments if needed
           if (needsAdjustment) {
-            if (negative) {
-              r = 255 - r;
-              g = 255 - g;
-              b = 255 - b;
-            }
-            
+            if (negative) { r = 255 - r; g = 255 - g; b = 255 - b; }
             if (contrast !== 1.0 || brightness !== 1.0) {
               r = Math.max(0, Math.min(255, ((r - 128) * contrastFactor + 128) * brightnessMultiplier));
               g = Math.max(0, Math.min(255, ((g - 128) * contrastFactor + 128) * brightnessMultiplier));
@@ -210,16 +178,8 @@ const processFrame = (request: ProcessingRequest) => {
             }
           }
           
-          if (edgeDetection && edges) {
-            const edgeValue = edges[sy * width + sx] / 255;
-            totalBrightness += edgeValue > edgeThreshold ? 1 : 0;
-          } else {
-            // Use perceptual brightness calculation
-            const pixelBrightness = calculateBrightness(r, g, b) / 255;
-            totalBrightness += pixelBrightness;
-          }
-          
-          // Always accumulate color data to prevent inconsistencies
+          const pixelBrightness = calculateBrightness(r, g, b) / 255;
+          totalBrightness += pixelBrightness;
           totalR += r;
           totalG += g;
           totalB += b;
@@ -228,21 +188,40 @@ const processFrame = (request: ProcessingRequest) => {
       }
       
       if (samples > 0) {
-        const avgBrightness = totalBrightness / samples;
-        // Improved character mapping for better distribution
-        const charIndex = Math.min(numCharsMinusOne, Math.floor(avgBrightness * avgBrightness * numChars));
+        let avgBrightness = totalBrightness / samples;
+        
+        // Depth mode: combine brightness with local contrast for depth-like effect
+        if (depthMode) {
+          const localContrast = computeLocalContrast(pixels, width, height, blockStartX, blockEndX, blockStartY, blockEndY);
+          // High contrast areas = edges/foreground (dense chars), low contrast = background (sparse)
+          const depthFactor = Math.min(1, localContrast * 6 + avgBrightness * 0.5);
+          avgBrightness = depthFactor;
+        }
+        
+        // Character mapping - gamma-corrected for better distribution
+        const gamma = depthMode ? 1.0 : 1.5; // Depth mode uses linear, normal uses gamma
+        const charIndex = Math.min(numCharsMinusOne, Math.floor(Math.pow(avgBrightness, 1 / gamma) * numChars));
         line += asciiChars[charIndex];
         
-        // Store color data
+        // Color data
         const avgR = Math.round(totalR / samples);
         const avgG = Math.round(totalG / samples);
         const avgB = Math.round(totalB / samples);
         
         if (colored) {
-          // For true color mode, use actual pixel colors
-          colorData.push(avgR, avgG, avgB);
+          // Full Color mode - boost saturation slightly for better visual accuracy
+          const maxC = Math.max(avgR, avgG, avgB);
+          const minC = Math.min(avgR, avgG, avgB);
+          const satBoost = 1.15; // Slight saturation boost
+          const mid = (maxC + minC) / 2;
+          
+          const boostedR = Math.min(255, Math.round(mid + (avgR - mid) * satBoost));
+          const boostedG = Math.min(255, Math.round(mid + (avgG - mid) * satBoost));
+          const boostedB = Math.min(255, Math.round(mid + (avgB - mid) * satBoost));
+          
+          colorData.push(boostedR, boostedG, boostedB);
         } else if (config.colorMode !== 'mono') {
-          // For themed modes, apply color theme
+          // Themed color mode
           const [r, g, b] = getColorForMode(avgR, avgG, avgB, config.colorMode);
           colorData.push(r, g, b);
         }
@@ -260,25 +239,15 @@ const processFrame = (request: ProcessingRequest) => {
   const asciiFrame = asciiLines.join('\n');
   const processingTime = performance.now() - startTime;
   
-  // Check performance periodically
+  // Periodic performance reporting
   const now = performance.now();
   if (now - lastPerformanceCheck > PERFORMANCE_CHECK_INTERVAL) {
     lastPerformanceCheck = now;
-    
-    // Estimate CPU usage (rough approximation)
     const cpuUsage = Math.min(100, (processingTime / (1000 / 30)) * 100);
-    
-    // Estimate memory usage
-    const memoryUsage = (colorData.length * 3 + asciiFrame.length * 2) / (1024 * 1024); // MB
-    
-    self.postMessage({
-      type: 'performance',
-      cpuUsage,
-      memoryUsage
-    });
+    const memoryUsage = (colorData.length * 3 + asciiFrame.length * 2) / (1024 * 1024);
+    self.postMessage({ type: 'performance', cpuUsage, memoryUsage });
   }
   
-  // Send processed frame back with frame number for proper ordering
   self.postMessage({
     type: 'frameProcessed',
     data: {
@@ -293,7 +262,7 @@ const processFrame = (request: ProcessingRequest) => {
   });
 };
 
-// Handle messages with error handling
+// Handle messages
 self.onmessage = (e) => {
   try {
     if (e.data.type === 'processFrame') {
@@ -303,10 +272,7 @@ self.onmessage = (e) => {
     console.error('Worker error:', error);
     self.postMessage({
       type: 'error',
-      data: {
-        error: error.message,
-        frameNumber: e.data?.data?.frameData?.frameNumber
-      }
+      data: { error: error.message, frameNumber: e.data?.data?.frameData?.frameNumber }
     });
   }
-}; 
+};

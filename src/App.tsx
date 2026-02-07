@@ -26,11 +26,13 @@ import TermsOfServicePage from './pages/TermsOfServicePage';
 import SplatViewerPage from './pages/SplatViewerPage';
 import TestPage from './pages/TestPage';
 import AnimeVideoToCodePage from './pages/AnimeVideoToCodePage';
-import TPoseToolPage from './pages/TPoseToolPage';
+// TPoseToolPage shelved - incomplete
+// import TPoseToolPage from './pages/TPoseToolPage';
 import VideoObjectRemoverPage from './pages/VideoObjectRemoverPage';
 import SynthIDRemoverPage from './pages/SynthIDRemoverPage';
 import SynthIDRemoverLanding from './pages/landing/SynthIDRemoverLanding';
-import CoffeeDonation from './components/CoffeeDonation';
+// CoffeeDonation shelved - buymeacoffee link expired
+// import CoffeeDonation from './components/CoffeeDonation';
 // import FileUploadFix from './components/FileUploadFix';
 import { SupabaseAuthProvider } from './context/SupabaseAuthContext';
 import SupabaseLoginPage from './pages/SupabaseLoginPage';
@@ -59,7 +61,8 @@ import SplatViewerLanding from './pages/landing/SplatViewerLanding';
 import TriangleSplattingLanding from './pages/landing/TriangleSplattingLanding';
 import OCRCompareLanding from './pages/landing/OCRCompareLanding';
 import AnimeGalleryLanding from './pages/landing/AnimeGalleryLanding';
-import TPoseLanding from './pages/landing/TPoseLanding';
+// TPoseLanding shelved - incomplete
+// import TPoseLanding from './pages/landing/TPoseLanding';
 import ImageChatLanding from './pages/landing/ImageChatLanding';
 import ASCIIVideoLanding from './pages/landing/ASCIIVideoLanding';
 import SharpLanding from './pages/landing/SharpLanding';
@@ -344,14 +347,8 @@ function App() {
                 </AnimatedPage>
               }
             />
-            <Route
-              path="/t-poser/landing"
-              element={
-                <AnimatedPage>
-                  <TPoseLanding />
-                </AnimatedPage>
-              }
-            />
+            {/* T-Pose shelved */}
+            <Route path="/t-poser/landing" element={<Navigate to="/" replace />} />
             <Route
               path="/image-chat/landing"
               element={
@@ -649,14 +646,8 @@ function App() {
                 </AnimatedPage>
               }
             />
-            <Route
-              path="/t-poser"
-              element={
-                <AnimatedPage>
-                  <TPoseToolPage />
-                </AnimatedPage>
-              }
-            />
+            {/* T-Pose shelved */}
+            <Route path="/t-poser" element={<Navigate to="/" replace />} />
             <Route
               path="/video-object-remover"
               element={
@@ -686,7 +677,7 @@ function App() {
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </SupabaseAuthProvider>
-        <CoffeeDonation />
+        {/* CoffeeDonation shelved - buymeacoffee link expired */}
       </div>
     </ErrorBoundary>
   );

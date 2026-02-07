@@ -16,13 +16,11 @@ const Header = () => {
   return (
     <header className="flex items-center justify-between whitespace-nowrap border-b border-[#1a1a1a] px-6 md:px-10 lg:px-20 xl:px-40 py-4 backdrop-blur-md bg-black/50 relative z-20">
       <div className="flex items-center text-white">
-        <Link to="/" className="flex items-center gap-3 group">
-          <div className="w-9 h-9 flex items-center justify-center flex-shrink-0">
-            <img src="/A_logo.png" alt="Anemoia" className="w-full h-full object-contain" />
-          </div>
-          <h2 className="text-2xl font-bold tracking-tight bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent group-hover:from-cyan-300 group-hover:to-blue-400 transition-all duration-300">
+        <Link to="/" className="inline-flex items-center gap-2.5 group" style={{ lineHeight: 0 }}>
+          <img src="/A_logo.png" alt="Anemoia" className="w-7 h-7 object-contain flex-shrink-0" style={{ display: 'inline-block', verticalAlign: 'middle' }} />
+          <span className="text-2xl font-bold tracking-tight bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent group-hover:from-cyan-300 group-hover:to-blue-400 transition-all duration-300" style={{ lineHeight: '1', verticalAlign: 'middle' }}>
             Anemoia
-          </h2>
+          </span>
         </Link>
       </div>
       
