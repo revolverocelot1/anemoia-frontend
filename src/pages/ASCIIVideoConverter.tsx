@@ -893,49 +893,40 @@ const ASCIIVideoConverter: React.FC = () => {
   const handleExportVideo = async () => {
     if (orderedFrames.length === 0) return;
     
+    setIsProcessing(true);
+    setMetrics(prev => ({ ...prev, progress: 0 }));
+    
+    const firstFrame = orderedFrames[0];
+    const lines = firstFrame.ascii.split('\n');
+    const maxLineLength = Math.max(...lines.map(line => line.length));
+    const lineCount = lines.length;
+    
+    const charWidth = config.fontSize * 0.6;
+    const charHeight = config.fontSize * 1.2;
+    
+    const exportCanvas = document.createElement('canvas');
+    exportCanvas.width = Math.ceil(maxLineLength * charWidth / 2) * 2;
+    exportCanvas.height = Math.ceil(lineCount * charHeight / 2) * 2;
+    const ctx = exportCanvas.getContext('2d', { alpha: false });
+    
+    if (!ctx) { setIsProcessing(false); return; }
+
+    // Strategy: Try FFmpeg (MP4) first, fall back to WebM if it fails
+    let exported = false;
+
+    // --- Attempt 1: FFmpeg WASM for proper MP4 ---
     try {
-      setIsProcessing(true);
-      setMetrics(prev => ({ ...prev, progress: 0 }));
-      setError('Loading FFmpeg encoder... (first time may take a moment)');
+      setError('Loading encoder... (first time may take a moment)');
       
-      const firstFrame = orderedFrames[0];
-      const lines = firstFrame.ascii.split('\n');
-      const maxLineLength = Math.max(...lines.map(line => line.length));
-      const lineCount = lines.length;
-      
-      const charWidth = config.fontSize * 0.6;
-      const charHeight = config.fontSize * 1.2;
-      
-      const exportCanvas = document.createElement('canvas');
-      // Ensure even dimensions for H.264 encoding
-      exportCanvas.width = Math.ceil(maxLineLength * charWidth / 2) * 2;
-      exportCanvas.height = Math.ceil(lineCount * charHeight / 2) * 2;
-      const ctx = exportCanvas.getContext('2d', { alpha: false });
-      
-      if (!ctx) return;
-      
-      setError(null);
-      
-      // Use FFmpeg WASM for proper MP4 export with correct duration + audio
       const outputBlob = await asciiVideoExportService.exportVideo(
-        orderedFrames,
-        exportCanvas,
-        ctx,
-        {
-          frameRate: config.frameRate,
-          fontSize: config.fontSize,
-          backgroundColor: theme.background,
-          format: 'mp4',
-          quality: config.quality
-        },
+        orderedFrames, exportCanvas, ctx,
+        { frameRate: config.frameRate, fontSize: config.fontSize, backgroundColor: theme.background, format: 'mp4', quality: config.quality },
         renderFrameToCanvas,
-        (progress) => {
-          setMetrics(prev => ({ ...prev, progress }));
-        },
-        file // Pass original file for audio extraction
+        (progress) => { setMetrics(prev => ({ ...prev, progress })); },
+        file
       );
       
-      // Download the MP4
+      setError(null);
       const url = URL.createObjectURL(outputBlob);
       const a = document.createElement('a');
       a.href = url;
@@ -944,15 +935,68 @@ const ASCIIVideoConverter: React.FC = () => {
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-      
-    } catch (error) {
-      console.error('Export failed:', error);
-      setError('Failed to export MP4. Please try again.');
-      setTimeout(() => setError(null), 5000);
-    } finally {
-      setIsProcessing(false);
-      setMetrics(prev => ({ ...prev, progress: 100 }));
+      exported = true;
+    } catch (ffmpegErr) {
+      console.warn('FFmpeg export failed, falling back to WebM:', ffmpegErr);
     }
+
+    // --- Attempt 2: WebM fallback via MediaRecorder ---
+    if (!exported) {
+      try {
+        setError('MP4 encoder unavailable — exporting as WebM...');
+        
+        const stream = exportCanvas.captureStream(config.frameRate);
+        let mimeType = 'video/webm;codecs=vp9';
+        if (!MediaRecorder.isTypeSupported(mimeType)) {
+          mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp8') ? 'video/webm;codecs=vp8' : 'video/webm';
+        }
+        
+        const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 5_000_000 });
+        const chunks: Blob[] = [];
+        recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
+        
+        await new Promise<void>((resolve, reject) => {
+          recorder.onstop = () => {
+            const blob = new Blob(chunks, { type: 'video/webm' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `ascii-video-${config.outputMode}-${Date.now()}.webm`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            resolve();
+          };
+          recorder.onerror = () => reject(new Error('MediaRecorder error'));
+          recorder.start();
+          
+          let fi = 0;
+          const delay = 1000 / config.frameRate;
+          const tick = () => {
+            if (fi >= orderedFrames.length) { recorder.stop(); return; }
+            const f = orderedFrames[fi];
+            renderFrameToCanvas(exportCanvas, ctx, f.ascii, f.colors);
+            const track = stream.getVideoTracks()[0];
+            if (track && 'requestFrame' in track) (track as any).requestFrame();
+            setMetrics(prev => ({ ...prev, progress: ((fi + 1) / orderedFrames.length) * 100 }));
+            fi++;
+            setTimeout(tick, delay);
+          };
+          tick();
+        });
+        
+        setError(null);
+        exported = true;
+      } catch (webmErr) {
+        console.error('WebM fallback also failed:', webmErr);
+        setError('Export failed. Try a different browser or reduce video length.');
+        setTimeout(() => setError(null), 5000);
+      }
+    }
+
+    setIsProcessing(false);
+    setMetrics(prev => ({ ...prev, progress: 100 }));
   };
 
   const playAnimation = useCallback(() => {

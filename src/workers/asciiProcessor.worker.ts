@@ -90,30 +90,63 @@ const getCharacterSet = (charDensity: number, customChars?: string): string => {
   return DETAILED_CHAR_SETS.low;
 };
 
-// Compute local contrast for depth estimation (used in depth mode)
-const computeLocalContrast = (
+// Compute depth estimation for a block using gradient magnitude + local contrast
+// Returns a value 0..1 where 0 = far (background) and 1 = near (foreground)
+const computeBlockDepth = (
   pixels: Uint8ClampedArray, width: number, height: number,
   blockStartX: number, blockEndX: number, blockStartY: number, blockEndY: number
 ): number => {
+  let maxGradient = 0;
   let sumBright = 0;
   let sumSq = 0;
   let n = 0;
-  const step = Math.max(1, Math.floor((blockEndX - blockStartX) / 3));
   
-  for (let sy = blockStartY; sy < blockEndY; sy += step) {
-    for (let sx = blockStartX; sx < blockEndX; sx += step) {
+  const step = Math.max(1, Math.floor(Math.max(blockEndX - blockStartX, blockEndY - blockStartY) / 4));
+  
+  for (let sy = blockStartY + 1; sy < blockEndY - 1; sy += step) {
+    for (let sx = blockStartX + 1; sx < blockEndX - 1; sx += step) {
       const idx = (sy * width + sx) * 4;
-      const bright = (pixels[idx] + pixels[idx + 1] + pixels[idx + 2]) / 765;
+      const bright = (pixels[idx] * 0.299 + pixels[idx + 1] * 0.587 + pixels[idx + 2] * 0.114) / 255;
+      
       sumBright += bright;
       sumSq += bright * bright;
       n++;
+      
+      // Sobel gradient magnitude (horizontal + vertical)
+      const idxL = (sy * width + (sx - 1)) * 4;
+      const idxR = (sy * width + (sx + 1)) * 4;
+      const idxU = ((sy - 1) * width + sx) * 4;
+      const idxD = ((sy + 1) * width + sx) * 4;
+      
+      const lum = (i: number) => (pixels[i] * 0.299 + pixels[i + 1] * 0.587 + pixels[i + 2] * 0.114);
+      const gx = lum(idxR) - lum(idxL);
+      const gy = lum(idxD) - lum(idxU);
+      const grad = Math.sqrt(gx * gx + gy * gy) / 255;
+      
+      if (grad > maxGradient) maxGradient = grad;
     }
   }
   
-  if (n < 2) return 0;
-  const mean = sumBright / n;
-  const variance = (sumSq / n) - (mean * mean);
-  return Math.sqrt(Math.max(0, variance)); // standard deviation as contrast measure
+  if (n < 1) return 0;
+  
+  const meanBright = sumBright / n;
+  const variance = Math.max(0, (sumSq / n) - (meanBright * meanBright));
+  const contrast = Math.sqrt(variance);
+  
+  // Depth heuristic: combine edge strength, contrast, and brightness
+  // Strong edges + high contrast + brightness = foreground (CLOSE)
+  // Smooth + low contrast + dark = background (FAR)
+  const edgeScore = Math.min(1, maxGradient * 4);    // Edge presence = closer
+  const contrastScore = Math.min(1, contrast * 5);    // High local contrast = closer
+  const brightScore = meanBright;                      // Brighter = closer
+  
+  // Weighted combination — edges are strongest depth cue
+  const rawDepth = edgeScore * 0.5 + contrastScore * 0.3 + brightScore * 0.2;
+  
+  // Apply S-curve for more dramatic separation between near/far
+  const sCurve = 1 / (1 + Math.exp(-8 * (rawDepth - 0.35)));
+  
+  return sCurve;
 };
 
 // Main processing function
@@ -190,17 +223,19 @@ const processFrame = (request: ProcessingRequest) => {
       if (samples > 0) {
         let avgBrightness = totalBrightness / samples;
         
-        // Depth mode: combine brightness with local contrast for depth-like effect
+        // Depth mode: near objects = dense heavy chars, far objects = sparse light chars
+        // Creates a 3D-space illusion where depth is visible through character density
         if (depthMode) {
-          const localContrast = computeLocalContrast(pixels, width, height, blockStartX, blockEndX, blockStartY, blockEndY);
-          // High contrast areas = edges/foreground (dense chars), low contrast = background (sparse)
-          const depthFactor = Math.min(1, localContrast * 6 + avgBrightness * 0.5);
-          avgBrightness = depthFactor;
+          const depth = computeBlockDepth(pixels, width, height, blockStartX, blockEndX, blockStartY, blockEndY);
+          // depth 0 = FAR (background) → very sparse chars (spaces, dots)
+          // depth 1 = NEAR (foreground) → dense heavy chars (@, #, %)
+          avgBrightness = depth;
         }
         
-        // Character mapping - gamma-corrected for better distribution
-        const gamma = depthMode ? 1.0 : 1.5; // Depth mode uses linear, normal uses gamma
-        const charIndex = Math.min(numCharsMinusOne, Math.floor(Math.pow(avgBrightness, 1 / gamma) * numChars));
+        // Character mapping
+        const charIndex = depthMode
+          ? Math.min(numCharsMinusOne, Math.floor(avgBrightness * numChars)) // Linear for depth (full range separation)
+          : Math.min(numCharsMinusOne, Math.floor(Math.pow(avgBrightness, 0.65) * numChars)); // Gamma-corrected for normal
         line += asciiChars[charIndex];
         
         // Color data
