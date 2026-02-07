@@ -833,12 +833,13 @@ const ASCIIVideoConverter: React.FC = () => {
                     colorMode: config.colorMode,
                     brightness: config.brightness,
                     contrast: config.contrast,
-                    edgeDetection: config.outputMode === 'edge',
+                    edgeDetection: false,
                     edgeThreshold: config.edgeThreshold,
                     negative: config.outputMode === 'negative',
                     fontSize: config.fontSize,
                     charDensity: config.charDensity,
-                    colored: config.outputMode === 'colored'
+                    colored: config.outputMode === 'colored',
+                    depthMode: config.outputMode === 'depth'
                   }
                 }
               });
@@ -1043,9 +1044,9 @@ const ASCIIVideoConverter: React.FC = () => {
         setMetrics(prev => ({ ...prev, progress: 100 }));
       });
       
-      gif.on('progress', (p: number) => {
-        setMetrics(prev => ({ ...prev, progress: 50 + p * 50 })); // Second half for GIF encoding
-      });
+      gif.on('progress', ((p: any) => {
+        setMetrics(prev => ({ ...prev, progress: 50 + (typeof p === 'number' ? p : 0) * 50 }));
+      }) as any);
       
       // Create canvas for rendering frames
       const gifCanvas = document.createElement('canvas');
@@ -1070,7 +1071,7 @@ const ASCIIVideoConverter: React.FC = () => {
           const frameCtx = frameCanvas.getContext('2d');
           if (frameCtx) {
             frameCtx.drawImage(gifCanvas, 0, 0);
-            gif.addFrame(frameCanvas, { delay: frameDelay, copy: true });
+            gif.addFrame(frameCanvas, { delay: frameDelay });
           }
           
           setMetrics(prev => ({ ...prev, progress: ((index + 1) / orderedFrames.length) * 50 })); // First half for adding frames
