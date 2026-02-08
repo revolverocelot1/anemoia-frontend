@@ -7,6 +7,7 @@ export interface ViewerSettings {
   wireframe: boolean;
   backgroundColor: string; // hex
   quality: QualitySetting;
+  fov: number; // Field of view in degrees (inversely related to focal length)
 }
 
 const defaultSettings: ViewerSettings = {
@@ -14,6 +15,7 @@ const defaultSettings: ViewerSettings = {
   wireframe: false,
   backgroundColor: '#000000',
   quality: 'High',
+  fov: 60,
 };
 
 interface ViewerSettingsContextProps {

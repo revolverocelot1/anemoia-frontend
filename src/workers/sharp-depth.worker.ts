@@ -182,6 +182,7 @@ function generateSharpPly(
     
     // Calculate number of gaussians
     const numPoints = gridSize * gridSize;
+    const isLargeModel = numPoints > 1_500_000; // 1.5M+ splats need progress reporting
     
     // PLY header
     const header = 
@@ -207,9 +208,20 @@ end_header
 
     const headerBytes = new TextEncoder().encode(header);
     const floatsPerPoint = 14;
-    const dataBytes = numPoints * floatsPerPoint * 4;
+    const bytesPerPoint = floatsPerPoint * 4; // 56 bytes per splat
+    const dataBytes = numPoints * bytesPerPoint;
     
-    const buffer = new ArrayBuffer(headerBytes.length + dataBytes);
+    // Memory check for large models
+    const totalBufferMB = (headerBytes.length + dataBytes) / (1024 * 1024);
+    log(`Allocating PLY buffer: ${totalBufferMB.toFixed(1)} MB for ${numPoints.toLocaleString()} splats`);
+    
+    let buffer: ArrayBuffer;
+    try {
+        buffer = new ArrayBuffer(headerBytes.length + dataBytes);
+    } catch (e) {
+        throw new Error(`Failed to allocate ${totalBufferMB.toFixed(0)}MB buffer for ${numPoints.toLocaleString()} splats. Your device may not have enough memory.`);
+    }
+    
     const view = new DataView(buffer);
     
     // Copy header
@@ -233,63 +245,99 @@ end_header
     // Splat size calculation for optimal coverage without blur
     // Use tighter spacing (1.05x) for sharper front view, slightly overlapping for coverage
     // Higher grid sizes = smaller splats = sharper image
-    const baseSplatSize = (sceneWidth / gridSize) * 1.05;
+    // For extreme grid sizes (2M/3M), use slightly tighter overlap factor for crisper detail
+    const overlapFactor = gridSize >= 1414 ? 1.02 : 1.05;
+    const baseSplatSize = (sceneWidth / gridSize) * overlapFactor;
     
     let minDepth = Infinity, maxDepth = -Infinity;
     
+    // Pre-cache reciprocals for performance (avoids repeated division in hot loop)
+    const gridSizeM1 = gridSize - 1;
+    const invGridSizeM1 = 1.0 / gridSizeM1;
+    const imgWidthM1 = imgWidth - 1;
+    const imgHeightM1 = imgHeight - 1;
+    const depthWidthM1 = depthWidth - 1;
+    const depthHeightM1 = depthHeight - 1;
+    
+    // Progress reporting interval for large models (every ~5% of rows)
+    const progressInterval = isLargeModel ? Math.max(1, Math.floor(gridSize / 20)) : 0;
+    let lastProgressRow = 0;
+    
     for (let gy = 0; gy < gridSize; gy++) {
+        // Report progress for large models (2M/3M)
+        if (isLargeModel && progressInterval > 0 && gy - lastProgressRow >= progressInterval) {
+            lastProgressRow = gy;
+            const plyProgress = 70 + (gy / gridSize) * 25; // 70% to 95%
+            self.postMessage({ 
+                status: 'processing', 
+                progress: Math.round(plyProgress), 
+                message: `Building ${(numPoints / 1_000_000).toFixed(1)}M splats... ${Math.round((gy / gridSize) * 100)}%` 
+            });
+        }
+        
         for (let gx = 0; gx < gridSize; gx++) {
             // Sample from image using bilinear interpolation
-            const imgXFloat = (gx / (gridSize - 1)) * (imgWidth - 1);
-            const imgYFloat = (gy / (gridSize - 1)) * (imgHeight - 1);
+            const imgXFloat = (gx * invGridSizeM1) * imgWidthM1;
+            const imgYFloat = (gy * invGridSizeM1) * imgHeightM1;
             const imgX = Math.floor(imgXFloat);
             const imgY = Math.floor(imgYFloat);
             const fracX = imgXFloat - imgX;
             const fracY = imgYFloat - imgY;
             
-            // Bilinear sampling for color
-            const getPixel = (px: number, py: number) => {
-                const cx = Math.min(Math.max(px, 0), imgWidth - 1);
-                const cy = Math.min(Math.max(py, 0), imgHeight - 1);
-                const idx = (cy * imgWidth + cx) * 4;
-                return [imgData[idx] / 255, imgData[idx + 1] / 255, imgData[idx + 2] / 255, imgData[idx + 3] / 255];
-            };
+            // Bilinear sampling for color (inlined for performance in large models)
+            const cx00 = Math.min(imgX, imgWidthM1);
+            const cy00 = Math.min(imgY, imgHeightM1);
+            const cx10 = Math.min(imgX + 1, imgWidthM1);
+            const cy10 = cy00;
+            const cx01 = cx00;
+            const cy01 = Math.min(imgY + 1, imgHeightM1);
+            const cx11 = cx10;
+            const cy11 = cy01;
             
-            const p00 = getPixel(imgX, imgY);
-            const p10 = getPixel(imgX + 1, imgY);
-            const p01 = getPixel(imgX, imgY + 1);
-            const p11 = getPixel(imgX + 1, imgY + 1);
+            const idx00 = (cy00 * imgWidth + cx00) * 4;
+            const idx10 = (cy10 * imgWidth + cx10) * 4;
+            const idx01 = (cy01 * imgWidth + cx01) * 4;
+            const idx11 = (cy11 * imgWidth + cx11) * 4;
             
-            const r = (1 - fracX) * (1 - fracY) * p00[0] + fracX * (1 - fracY) * p10[0] + 
-                      (1 - fracX) * fracY * p01[0] + fracX * fracY * p11[0];
-            const g = (1 - fracX) * (1 - fracY) * p00[1] + fracX * (1 - fracY) * p10[1] + 
-                      (1 - fracX) * fracY * p01[1] + fracX * fracY * p11[1];
-            const b = (1 - fracX) * (1 - fracY) * p00[2] + fracX * (1 - fracY) * p10[2] + 
-                      (1 - fracX) * fracY * p01[2] + fracX * fracY * p11[2];
-            const alpha = (1 - fracX) * (1 - fracY) * p00[3] + fracX * (1 - fracY) * p10[3] + 
-                          (1 - fracX) * fracY * p01[3] + fracX * fracY * p11[3];
+            const inv255 = 1.0 / 255.0;
+            const w00 = (1 - fracX) * (1 - fracY);
+            const w10 = fracX * (1 - fracY);
+            const w01 = (1 - fracX) * fracY;
+            const w11 = fracX * fracY;
+            
+            const r = w00 * imgData[idx00] * inv255 + w10 * imgData[idx10] * inv255 + 
+                      w01 * imgData[idx01] * inv255 + w11 * imgData[idx11] * inv255;
+            const g = w00 * imgData[idx00 + 1] * inv255 + w10 * imgData[idx10 + 1] * inv255 + 
+                      w01 * imgData[idx01 + 1] * inv255 + w11 * imgData[idx11 + 1] * inv255;
+            const b = w00 * imgData[idx00 + 2] * inv255 + w10 * imgData[idx10 + 2] * inv255 + 
+                      w01 * imgData[idx01 + 2] * inv255 + w11 * imgData[idx11 + 2] * inv255;
+            const alpha = w00 * imgData[idx00 + 3] * inv255 + w10 * imgData[idx10 + 3] * inv255 + 
+                          w01 * imgData[idx01 + 3] * inv255 + w11 * imgData[idx11 + 3] * inv255;
             
             // Sample depth with bilinear interpolation (mapping to depth map coords)
-            const depthXFloat = (gx / (gridSize - 1)) * (depthWidth - 1);
-            const depthYFloat = (gy / (gridSize - 1)) * (depthHeight - 1);
+            const depthXFloat = (gx * invGridSizeM1) * depthWidthM1;
+            const depthYFloat = (gy * invGridSizeM1) * depthHeightM1;
             const depthX = Math.floor(depthXFloat);
             const depthY = Math.floor(depthYFloat);
             const depthFracX = depthXFloat - depthX;
             const depthFracY = depthYFloat - depthY;
             
-            const getDepth = (px: number, py: number) => {
-                const cx = Math.min(Math.max(px, 0), depthWidth - 1);
-                const cy = Math.min(Math.max(py, 0), depthHeight - 1);
-                return depthData[cy * depthWidth + cx];
-            };
+            const dcx0 = Math.min(Math.max(depthX, 0), depthWidthM1);
+            const dcy0 = Math.min(Math.max(depthY, 0), depthHeightM1);
+            const dcx1 = Math.min(depthX + 1, depthWidthM1);
+            const dcy1 = Math.min(depthY + 1, depthHeightM1);
             
-            const d00 = getDepth(depthX, depthY);
-            const d10 = getDepth(depthX + 1, depthY);
-            const d01 = getDepth(depthX, depthY + 1);
-            const d11 = getDepth(depthX + 1, depthY + 1);
+            const d00 = depthData[dcy0 * depthWidth + dcx0];
+            const d10 = depthData[dcy0 * depthWidth + dcx1];
+            const d01 = depthData[dcy1 * depthWidth + dcx0];
+            const d11 = depthData[dcy1 * depthWidth + dcx1];
             
-            const depthValue = (1 - depthFracX) * (1 - depthFracY) * d00 + depthFracX * (1 - depthFracY) * d10 + 
-                               (1 - depthFracX) * depthFracY * d01 + depthFracX * depthFracY * d11;
+            const dw00 = (1 - depthFracX) * (1 - depthFracY);
+            const dw10 = depthFracX * (1 - depthFracY);
+            const dw01 = (1 - depthFracX) * depthFracY;
+            const dw11 = depthFracX * depthFracY;
+            
+            const depthValue = dw00 * d00 + dw10 * d10 + dw01 * d01 + dw11 * d11;
             
             // Track depth stats
             if (depthValue < minDepth) minDepth = depthValue;
@@ -297,8 +345,8 @@ end_header
             
             // --- Position calculation ---
             // X, Y: Normalized screen coordinates (-0.5 to 0.5) scaled to scene size
-            const normalizedX = (gx / (gridSize - 1)) - 0.5;
-            const normalizedY = (gy / (gridSize - 1)) - 0.5;
+            const normalizedX = (gx * invGridSizeM1) - 0.5;
+            const normalizedY = (gy * invGridSizeM1) - 0.5;
             
             const x = normalizedX * sceneWidth;  // Left-right
             const y = normalizedY * sceneHeight; // Top-bottom
@@ -332,10 +380,7 @@ end_header
             const scale2 = Math.log(splatSize * 0.05); // Z scale (very thin for billboard)
             
             // --- Quaternion (identity - facing camera) ---
-            const rot0 = 1.0; // w
-            const rot1 = 0.0; // x
-            const rot2 = 0.0; // y
-            const rot3 = 0.0; // z
+            // rot0=1, rot1/2/3=0 (identity quaternion)
             
             // Write 14 floats in SHARP order
             view.setFloat32(offset, x, true); offset += 4;
@@ -348,10 +393,10 @@ end_header
             view.setFloat32(offset, scale0, true); offset += 4;
             view.setFloat32(offset, scale1, true); offset += 4;
             view.setFloat32(offset, scale2, true); offset += 4;
-            view.setFloat32(offset, rot0, true); offset += 4;
-            view.setFloat32(offset, rot1, true); offset += 4;
-            view.setFloat32(offset, rot2, true); offset += 4;
-            view.setFloat32(offset, rot3, true); offset += 4;
+            view.setFloat32(offset, 1.0, true); offset += 4; // rot_0 (w)
+            view.setFloat32(offset, 0.0, true); offset += 4; // rot_1 (x)
+            view.setFloat32(offset, 0.0, true); offset += 4; // rot_2 (y)
+            view.setFloat32(offset, 0.0, true); offset += 4; // rot_3 (z)
         }
     }
     

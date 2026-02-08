@@ -12,7 +12,8 @@ import { detectGPU, type GPUInfo } from '../utils/gpuUtils';
 import {
   Upload, Sparkles, Download, Eye, Settings2, Zap,
   Image, Camera, Box, Loader2, AlertCircle, CheckCircle2,
-  Info, ChevronDown, ExternalLink, RefreshCw, RotateCcw, Maximize2
+  Info, ChevronDown, ExternalLink, RefreshCw, RotateCcw, Maximize2,
+  FlaskConical
 } from 'lucide-react';
 
 // Custom animated background component
@@ -354,14 +355,16 @@ const SharpPage: React.FC = () => {
   const [focalLengthMode, setFocalLengthMode] = useState<'auto' | 'mm' | 'fov'>('auto');
   const [focalLengthMm, setFocalLengthMm] = useState(30);
   const [horizontalFov, setHorizontalFov] = useState(60);
-  const [quality, setQuality] = useState<'low' | 'medium' | 'high' | 'ultra'>('high');
+  const [quality, setQuality] = useState<'low' | 'medium' | 'high' | 'ultra' | 'extreme2m' | 'extreme3m'>('high');
   
   // Quality presets: gridSize determines splat count (gridSize²)
   const qualityPresets = {
-    low: { gridSize: 256, label: 'Low (65K)', description: 'Faster generation, lower detail' },
-    medium: { gridSize: 512, label: 'Medium (262K)', description: 'Balanced quality and speed' },
-    high: { gridSize: 768, label: 'High (590K)', description: 'Best quality for most images' },
-    ultra: { gridSize: 1024, label: 'Ultra (1M)', description: 'Maximum detail, slower' },
+    low: { gridSize: 256, label: 'Low (65K)', description: 'Faster generation, lower detail', experimental: false },
+    medium: { gridSize: 512, label: 'Medium (262K)', description: 'Balanced quality and speed', experimental: false },
+    high: { gridSize: 768, label: 'High (590K)', description: 'Best quality for most images', experimental: false },
+    ultra: { gridSize: 1024, label: 'Ultra (1M)', description: 'Maximum detail, slower', experimental: false },
+    extreme2m: { gridSize: 1414, label: '2M Splats', description: '~2M gaussians from 2K images. High memory usage (~120MB). Experimental.', experimental: true },
+    extreme3m: { gridSize: 1732, label: '3M Splats', description: '~3M gaussians from 2K+ images. Very high memory (~180MB). Experimental.', experimental: true },
   };
 
   // Initialize and SEO
@@ -653,7 +656,9 @@ const SharpPage: React.FC = () => {
                             <div>
                               <label className="text-sm text-gray-400 block mb-2">Output Quality</label>
                               <div className="grid grid-cols-2 gap-2">
-                                {(Object.keys(qualityPresets) as Array<keyof typeof qualityPresets>).map((q) => (
+                                {(Object.keys(qualityPresets) as Array<keyof typeof qualityPresets>)
+                                  .filter((q) => !qualityPresets[q].experimental)
+                                  .map((q) => (
                                   <button
                                     key={q}
                                     onClick={() => setQuality(q)}
@@ -667,7 +672,54 @@ const SharpPage: React.FC = () => {
                                   </button>
                                 ))}
                               </div>
+
+                              {/* Experimental Presets */}
+                              <div className="mt-3">
+                                <div className="flex items-center gap-1.5 mb-2">
+                                  <FlaskConical className="w-3.5 h-3.5 text-amber-400" />
+                                  <span className="text-xs font-medium text-amber-400 uppercase tracking-wider">Experimental</span>
+                                </div>
+                                <div className="grid grid-cols-2 gap-2">
+                                  {(Object.keys(qualityPresets) as Array<keyof typeof qualityPresets>)
+                                    .filter((q) => qualityPresets[q].experimental)
+                                    .map((q) => (
+                                    <button
+                                      key={q}
+                                      onClick={() => setQuality(q)}
+                                      className={`px-3 py-2 rounded-lg text-sm font-medium transition-all text-left relative overflow-hidden ${
+                                        quality === q
+                                          ? 'bg-gradient-to-br from-amber-600 to-orange-600 text-white ring-2 ring-amber-400'
+                                          : 'bg-slate-700/80 text-gray-400 hover:bg-slate-600 border border-amber-500/20'
+                                      }`}
+                                    >
+                                      <div className="font-semibold flex items-center gap-1.5">
+                                        {qualityPresets[q].label}
+                                        <FlaskConical className="w-3 h-3 text-amber-300 opacity-70" />
+                                      </div>
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+
                               <p className="text-xs text-gray-500 mt-2">{qualityPresets[quality].description}</p>
+
+                              {/* Memory warning for experimental presets */}
+                              {qualityPresets[quality].experimental && (
+                                <motion.div
+                                  initial={{ opacity: 0, height: 0 }}
+                                  animate={{ opacity: 1, height: 'auto' }}
+                                  className="mt-2 p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/20"
+                                >
+                                  <div className="flex items-start gap-2">
+                                    <AlertCircle className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
+                                    <div className="text-xs text-amber-300/80">
+                                      <strong className="text-amber-300">High Memory Mode:</strong> This option generates {
+                                        quality === 'extreme2m' ? '~2 million' : '~3 million'
+                                      } gaussians and uses significantly more RAM. Best suited for devices with 8GB+ memory and a dedicated GPU. Processing may take 30-60+ seconds.
+                                    </div>
+                                  </div>
+                                </motion.div>
+                              )}
                             </div>
 
                             {/* Focal Length */}

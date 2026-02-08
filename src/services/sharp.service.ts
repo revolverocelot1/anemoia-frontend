@@ -418,7 +418,15 @@ class SharpService {
     // Load image data for the worker - use higher resolution for better quality
     onProgress(8, 'Preparing image...');
     // Scale max image size based on grid size for better color sampling at high quality
-    const maxImageSize = gridSize >= 768 ? 1536 : 1024;
+    // 2M/3M experimental modes need 2K+ resolution for proper detail extraction
+    let maxImageSize = 1024;
+    if (gridSize >= 1414) {
+      maxImageSize = 2560; // 3M splats - use maximum resolution for 2K+ source images
+    } else if (gridSize >= 1024) {
+      maxImageSize = 2048; // Ultra/2M - use 2K resolution
+    } else if (gridSize >= 768) {
+      maxImageSize = 1536; // High quality
+    }
     const imageData = await this.loadImageData(imageFile, maxImageSize);
     
     return new Promise<GenerationResult>((resolve, reject) => {

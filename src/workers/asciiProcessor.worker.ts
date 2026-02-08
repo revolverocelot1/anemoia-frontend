@@ -101,10 +101,18 @@ const computeBlockDepth = (
   let sumSq = 0;
   let n = 0;
   
-  const step = Math.max(1, Math.floor(Math.max(blockEndX - blockStartX, blockEndY - blockStartY) / 4));
+  const blockW = blockEndX - blockStartX;
+  const blockH = blockEndY - blockStartY;
+  const step = Math.max(1, Math.floor(Math.max(blockW, blockH) / 4));
   
-  for (let sy = blockStartY + 1; sy < blockEndY - 1; sy += step) {
-    for (let sx = blockStartX + 1; sx < blockEndX - 1; sx += step) {
+  // Use clamped bounds to handle blocks at image edges and small blocks
+  // Start from the block start (not +1) and clamp neighbor access to image bounds
+  const clampX = (x: number) => Math.max(0, Math.min(width - 1, x));
+  const clampY = (y: number) => Math.max(0, Math.min(height - 1, y));
+  
+  // Ensure we always sample at least one pixel from the block
+  for (let sy = blockStartY; sy < blockEndY; sy += step) {
+    for (let sx = blockStartX; sx < blockEndX; sx += step) {
       const idx = (sy * width + sx) * 4;
       const bright = (pixels[idx] * 0.299 + pixels[idx + 1] * 0.587 + pixels[idx + 2] * 0.114) / 255;
       
@@ -112,13 +120,19 @@ const computeBlockDepth = (
       sumSq += bright * bright;
       n++;
       
-      // Sobel gradient magnitude (horizontal + vertical)
-      const idxL = (sy * width + (sx - 1)) * 4;
-      const idxR = (sy * width + (sx + 1)) * 4;
-      const idxU = ((sy - 1) * width + sx) * 4;
-      const idxD = ((sy + 1) * width + sx) * 4;
-      
+      // Sobel gradient magnitude using clamped neighbor coordinates
       const lum = (i: number) => (pixels[i] * 0.299 + pixels[i + 1] * 0.587 + pixels[i + 2] * 0.114);
+      
+      const leftX = clampX(sx - 1);
+      const rightX = clampX(sx + 1);
+      const upY = clampY(sy - 1);
+      const downY = clampY(sy + 1);
+      
+      const idxL = (sy * width + leftX) * 4;
+      const idxR = (sy * width + rightX) * 4;
+      const idxU = (upY * width + sx) * 4;
+      const idxD = (downY * width + sx) * 4;
+      
       const gx = lum(idxR) - lum(idxL);
       const gy = lum(idxD) - lum(idxU);
       const grad = Math.sqrt(gx * gx + gy * gy) / 255;
@@ -127,24 +141,22 @@ const computeBlockDepth = (
     }
   }
   
-  if (n < 1) return 0;
+  if (n < 1) return 0.5; // Fallback to mid-range instead of 0 (invisible)
   
   const meanBright = sumBright / n;
   const variance = Math.max(0, (sumSq / n) - (meanBright * meanBright));
   const contrast = Math.sqrt(variance);
   
   // Depth heuristic: combine edge strength, contrast, and brightness
-  // Strong edges + high contrast + brightness = foreground (CLOSE)
-  // Smooth + low contrast + dark = background (FAR)
-  const edgeScore = Math.min(1, maxGradient * 4);    // Edge presence = closer
-  const contrastScore = Math.min(1, contrast * 5);    // High local contrast = closer
-  const brightScore = meanBright;                      // Brighter = closer
+  const edgeScore = Math.min(1, maxGradient * 3);
+  const contrastScore = Math.min(1, contrast * 4);
+  const brightScore = meanBright;
   
-  // Weighted combination — edges are strongest depth cue
-  const rawDepth = edgeScore * 0.5 + contrastScore * 0.3 + brightScore * 0.2;
+  // Weighted combination
+  const rawDepth = edgeScore * 0.4 + contrastScore * 0.3 + brightScore * 0.3;
   
-  // Apply S-curve for more dramatic separation between near/far
-  const sCurve = 1 / (1 + Math.exp(-8 * (rawDepth - 0.35)));
+  // Gentle S-curve — lower threshold so more content reaches visible range
+  const sCurve = 1 / (1 + Math.exp(-5 * (rawDepth - 0.2)));
   
   return sCurve;
 };
@@ -223,13 +235,18 @@ const processFrame = (request: ProcessingRequest) => {
       if (samples > 0) {
         let avgBrightness = totalBrightness / samples;
         
-        // Depth mode: near objects = dense heavy chars, far objects = sparse light chars
-        // Creates a 3D-space illusion where depth is visible through character density
+        // Depth mode: modulates brightness with depth — foreground gets denser/heavier
+        // characters, background gets lighter ones. Brightness is preserved as the base
+        // so the output is always visible (never blank).
         if (depthMode) {
           const depth = computeBlockDepth(pixels, width, height, blockStartX, blockEndX, blockStartY, blockEndY);
-          // depth 0 = FAR (background) → very sparse chars (spaces, dots)
-          // depth 1 = NEAR (foreground) → dense heavy chars (@, #, %)
-          avgBrightness = depth;
+          // Mix: brightness provides base visibility, depth adds 3D density variation
+          // depth 0 = FAR → lighter chars but still visible (35% brightness preserved)
+          // depth 1 = NEAR → full brightness, dense heavy chars
+          const depthModulation = 0.35 + 0.65 * depth;
+          avgBrightness = avgBrightness * depthModulation;
+          // Ensure minimum visibility — even far background shows something
+          avgBrightness = Math.max(0.06, avgBrightness);
         }
         
         // Character mapping

@@ -911,12 +911,9 @@ const ASCIIVideoConverter: React.FC = () => {
     
     if (!ctx) { setIsProcessing(false); return; }
 
-    // Strategy: Try FFmpeg (MP4) first, fall back to WebM if it fails
-    let exported = false;
-
-    // --- Attempt 1: FFmpeg WASM for proper MP4 ---
+    // MP4 export only — no WebM fallback
     try {
-      setError('Loading encoder... (first time may take a moment)');
+      setError('Encoding MP4... (first load may take a moment)');
       
       const outputBlob = await asciiVideoExportService.exportVideo(
         orderedFrames, exportCanvas, ctx,
@@ -935,64 +932,10 @@ const ASCIIVideoConverter: React.FC = () => {
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-      exported = true;
-    } catch (ffmpegErr) {
-      console.warn('FFmpeg export failed, falling back to WebM:', ffmpegErr);
-    }
-
-    // --- Attempt 2: WebM fallback via MediaRecorder ---
-    if (!exported) {
-      try {
-        setError('MP4 encoder unavailable — exporting as WebM...');
-        
-        const stream = exportCanvas.captureStream(config.frameRate);
-        let mimeType = 'video/webm;codecs=vp9';
-        if (!MediaRecorder.isTypeSupported(mimeType)) {
-          mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp8') ? 'video/webm;codecs=vp8' : 'video/webm';
-        }
-        
-        const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 5_000_000 });
-        const chunks: Blob[] = [];
-        recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
-        
-        await new Promise<void>((resolve, reject) => {
-          recorder.onstop = () => {
-            const blob = new Blob(chunks, { type: 'video/webm' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `ascii-video-${config.outputMode}-${Date.now()}.webm`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-            resolve();
-          };
-          recorder.onerror = () => reject(new Error('MediaRecorder error'));
-          recorder.start();
-          
-          let fi = 0;
-          const delay = 1000 / config.frameRate;
-          const tick = () => {
-            if (fi >= orderedFrames.length) { recorder.stop(); return; }
-            const f = orderedFrames[fi];
-            renderFrameToCanvas(exportCanvas, ctx, f.ascii, f.colors);
-            const track = stream.getVideoTracks()[0];
-            if (track && 'requestFrame' in track) (track as any).requestFrame();
-            setMetrics(prev => ({ ...prev, progress: ((fi + 1) / orderedFrames.length) * 100 }));
-            fi++;
-            setTimeout(tick, delay);
-          };
-          tick();
-        });
-        
-        setError(null);
-        exported = true;
-      } catch (webmErr) {
-        console.error('WebM fallback also failed:', webmErr);
-        setError('Export failed. Try a different browser or reduce video length.');
-        setTimeout(() => setError(null), 5000);
-      }
+    } catch (exportErr) {
+      console.error('MP4 export failed:', exportErr);
+      setError(`Export failed: ${exportErr instanceof Error ? exportErr.message : 'Unknown error'}. Try reducing video length or using Chrome/Edge.`);
+      setTimeout(() => setError(null), 8000);
     }
 
     setIsProcessing(false);
@@ -2030,13 +1973,13 @@ const ASCIIVideoConverter: React.FC = () => {
                 Preview
               </h2>
               
-            {/* ASCII Preview - responsive, auto-scaling */}
+            {/* ASCII Preview - responsive, scalable */}
               <div 
-              className="relative rounded-lg overflow-hidden bg-black border border-white/20"
+              className="relative rounded-lg bg-black border border-white/20"
                 style={{
                   minHeight: '300px',
                   maxHeight: '75vh',
-                  overflow: 'hidden',
+                  overflow: 'auto',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center'
@@ -2050,7 +1993,7 @@ const ASCIIVideoConverter: React.FC = () => {
                 </div>
               )}
               {previewFrame ? (
-                <div className="w-full h-full flex items-center justify-center" style={{ padding: '8px' }}>
+                <div className="w-full h-full flex items-center justify-center" style={{ padding: '8px', overflow: 'auto' }}>
                   {config.outputMode === 'colored' ? (
                     <div
                       className="ascii-preview-colored"
@@ -2071,7 +2014,7 @@ const ASCIIVideoConverter: React.FC = () => {
                     className="leading-none"
                     style={{ 
                       fontFamily: 'Consolas, Monaco, "Courier New", monospace',
-                      fontSize: 'clamp(3px, 1vw, 10px)',
+                      fontSize: 'clamp(3px, 0.9vw, 10px)',
                       color: theme.text,
                       whiteSpace: 'pre',
                       lineHeight: 1.15,
@@ -2079,7 +2022,7 @@ const ASCIIVideoConverter: React.FC = () => {
                       letterSpacing: '0.02em',
                       margin: '0 auto',
                       maxWidth: '100%',
-                      overflow: 'hidden',
+                      overflow: 'auto',
                       textAlign: 'center'
                     }}
                   >
