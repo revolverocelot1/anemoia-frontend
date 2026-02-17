@@ -1,5 +1,5 @@
 import React, { useState, useEffect, lazy, Suspense } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import AnimatedPage from './components/AnimatedPage';
 import ErrorBoundary from './components/ErrorBoundary';
 import LoadingFallback from './components/LoadingFallback';
@@ -37,11 +37,13 @@ import SynthIDRemoverLanding from './pages/landing/SynthIDRemoverLanding';
 import { SupabaseAuthProvider } from './context/SupabaseAuthContext';
 import SupabaseLoginPage from './pages/SupabaseLoginPage';
 import { detectGPU, logDeploymentInfo } from './utils/gpuUtils';
+import { trackPageView } from './services/analytics';
 import FaceSwapPage from './pages/FaceSwapPage';
 import { AnimatePresence } from 'framer-motion';
 import ASCIIVideoConverter from './pages/ASCIIVideoConverter'
 import SupportPage from './pages/SupportPage'
 import AdminSupportPage from './pages/AdminSupportPage'
+import AdminDashboardPage from './pages/AdminDashboardPage'
 import GeminiImageChatPage from './pages/GeminiImageChatPage'
 
 // Lazy load SubtitlePage to prevent ONNX runtime conflicts on app startup
@@ -74,6 +76,12 @@ const SharpPage = lazy(() => import('./pages/SharpPage'));
 const R3FCanvas = lazy(() => import('./three/R3FCanvas'));
 
 function App() {
+  // ── Analytics: track page views on route changes ──
+  const location = useLocation();
+  useEffect(() => {
+    trackPageView(location.pathname);
+  }, [location.pathname]);
+
   // Check localStorage for 3D background preference
   const [show3DBackground, setShow3DBackground] = useState(() => {
     const saved = localStorage.getItem('show3DBackground');
@@ -479,6 +487,14 @@ function App() {
               element={
                 <AnimatedPage>
                   <AdminSupportPage />
+                </AnimatedPage>
+              }
+            />
+            <Route
+              path="/admin/dashboard"
+              element={
+                <AnimatedPage>
+                  <AdminDashboardPage />
                 </AnimatedPage>
               }
             />
