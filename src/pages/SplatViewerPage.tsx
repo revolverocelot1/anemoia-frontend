@@ -612,9 +612,6 @@ const GaussianSplatRenderer = ({
     // Front view: alpha=0, beta=0.15 (slight downward tilt avoids axis-aligned sorting edge case)
     createControls(0, 0.15, 5);
 
-    // Apply initial FOV from settings
-    applyFov(settingsRef.current.fov ?? 60);
-
     if (cameraAPIRef) {
       cameraAPIRef.current = {
         resetView: () => createControls(0, 0.15, 5),
@@ -665,10 +662,7 @@ const GaussianSplatRenderer = ({
         }
 
         console.log('[GaussianSplatRenderer] Scene loaded, starting animation');
-        // Set camera size to match canvas
         camera.data.setSize(canvas.width, canvas.height);
-        applyFov(settingsRef.current.fov ?? 60);
-
         animate();
       } catch (e) {
         console.error('Failed to load PLY:', e);
@@ -702,8 +696,13 @@ const GaussianSplatRenderer = ({
     }
   }, [settings.backgroundColor]);
 
-  // Reactive FOV changes from settings
+  // Reactive FOV changes from settings (only after initial render)
+  const initialRenderDone = useRef(false);
   useEffect(() => {
+    if (!initialRenderDone.current) {
+      initialRenderDone.current = true;
+      return;
+    }
     applyFov(settings.fov);
   }, [settings.fov, applyFov]);
 
