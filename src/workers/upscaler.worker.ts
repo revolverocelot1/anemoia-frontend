@@ -140,7 +140,8 @@ class ImgBuffer {
 }
 
 async function upscaleTile(tile: ImgBuffer, model: tf.GraphModel): Promise<ImgBuffer> {
-  const result = tf.tidy(() => {
+  // @ts-ignore - tf.tidy exists at runtime
+  const result: tf.Tensor = tf.tidy(() => {
     const imgData = new ImageData(tile.width, tile.height);
     imgData.data.set(tile.data);
     const tensor = tf.browser.fromPixels(imgData).div(255).toFloat().expandDims(0);
@@ -148,11 +149,22 @@ async function upscaleTile(tile: ImgBuffer, model: tf.GraphModel): Promise<ImgBu
   });
 
   const [, h, w] = result.shape;
-  const clipped = tf.tidy(() => result.reshape([h!, w!, 3]).mul(255).cast('int32').clipByValue(0, 255));
+  // @ts-ignore - tf.tidy exists at runtime
+  const clipped: tf.Tensor3D = tf.tidy(() => result.reshape([h!, w!, 3]).mul(255).cast('int32').clipByValue(0, 255));
   result.dispose();
-  const pixels = await tf.browser.toPixels(clipped as tf.Tensor3D);
+  // Use OffscreenCanvas to extract pixel data instead of tf.browser.toPixels
+  // which requires an HTMLCanvasElement not available in workers
+  const rawData = await clipped.data();
   clipped.dispose();
-  return new ImgBuffer(w!, h!, new Uint8Array(pixels));
+  const pixelCount = w! * h!;
+  const rgba = new Uint8Array(pixelCount * 4);
+  for (let i = 0; i < pixelCount; i++) {
+    rgba[i * 4] = rawData[i * 3];
+    rgba[i * 4 + 1] = rawData[i * 3 + 1];
+    rgba[i * 4 + 2] = rawData[i * 3 + 2];
+    rgba[i * 4 + 3] = 255;
+  }
+  return new ImgBuffer(w!, h!, rgba);
 }
 
 class RealESRGANUpscaler {
