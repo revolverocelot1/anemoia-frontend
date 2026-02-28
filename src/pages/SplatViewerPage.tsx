@@ -579,15 +579,16 @@ const GaussianSplatRenderer = ({
       return controls;
     };
 
-    createControls(-Math.PI / 2, Math.PI / 2, 3);
+    // alpha=0, beta=0 → camera at (0, 0, -radius), looking along +Z (front view)
+    createControls(0, 0, 3);
 
     // Expose camera API via ref
     if (cameraAPIRef) {
       cameraAPIRef.current = {
-        resetView: () => createControls(-Math.PI / 2, Math.PI / 2, 3),
-        frontView: () => createControls(-Math.PI / 2, Math.PI / 2, 3),
-        sideView: () => createControls(0, Math.PI / 2, 3),
-        topView: () => createControls(-Math.PI / 2, 0.01, 5),
+        resetView: () => createControls(0, 0, 3),
+        frontView: () => createControls(0, 0, 3),
+        sideView: () => createControls(-Math.PI / 2, 0, 3),
+        topView: () => createControls(0, -(Math.PI / 2 - 0.01), 5),
         setAutoRotate: (enabled: boolean) => { autoRotateRef.current = enabled; },
         setFov: (fov: number) => {
           // gsplat Camera: adjust zoom via orbit controls radius as FOV proxy

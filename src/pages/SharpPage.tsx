@@ -153,11 +153,13 @@ const SplatPreview3D: React.FC<{ blob: Blob | null; onFullscreen?: () => void }>
       const renderer = new SPLAT.WebGLRenderer(canvas);
       
       // Configure OrbitControls for frontal viewing
+      // gsplat convention: alpha=0, beta=0 places camera at (0, 0, -radius)
+      // looking along +Z axis — directly at the model's front face
       const controls = new SPLAT.OrbitControls(
         camera, 
         canvas,
-        -Math.PI / 2,   // alpha: -90° - looking from negative Z (front view)
-        Math.PI / 2,    // beta: at horizon level
+        0,              // alpha: 0° - camera on -Z axis (front view)
+        0,              // beta: 0° - at eye level
         3,              // radius: viewing distance
         true,           // enable keyboard
         new SPLAT.Vector3(0, 0, 0) // target: scene center
