@@ -644,17 +644,21 @@ const GaussianSplatRenderer = ({
         console.log('[GaussianSplatRenderer] Scene loaded, starting animation');
         animate();
 
-        // Force initial render: nudge orbit controls so dampening triggers
-        // a view-matrix update (avoids black screen in software WebGL)
-        setTimeout(() => {
-          if (controlsObjRef.current) {
+        // Force initial render: nudge orbit controls and render immediately
+        const forceRender = () => {
+          if (controlsObjRef.current && rendererRef.current && sceneObjRef.current && cameraObjRef.current) {
             try {
               const c = controlsObjRef.current as any;
               if (typeof c._desiredAlpha === 'number') c._desiredAlpha += 0.001;
               if (typeof c._desiredBeta === 'number') c._desiredBeta += 0.001;
             } catch { /* ignore if internal API changed */ }
+            controlsObjRef.current.update();
+            rendererRef.current.render(sceneObjRef.current, cameraObjRef.current);
           }
-        }, 50);
+        };
+        setTimeout(forceRender, 50);
+        setTimeout(forceRender, 150);
+        setTimeout(forceRender, 300);
       } catch (e) {
         console.error('Failed to load PLY:', e);
         const errorMessage = (e as Error).message;

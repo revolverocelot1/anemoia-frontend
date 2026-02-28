@@ -196,18 +196,24 @@ const SplatPreview3D: React.FC<{ blob: Blob | null; onFullscreen?: () => void }>
         setIsLoading(false);
         animate();
 
-        // Force initial render: nudge the orbit controls so dampening triggers
-        // a view-matrix update. Without this, software WebGL may show black
-        // until the first user interaction.
-        setTimeout(() => {
-          if (controlsRef.current) {
+        // Force initial render: nudge orbit controls and immediately render
+        // Without this, gsplat dampening may not produce a first frame until
+        // user interaction (controls start with current === desired position).
+        const forceRender = () => {
+          if (controlsRef.current && rendererRef.current && sceneRef.current && cameraRef.current) {
             try {
               const c = controlsRef.current as any;
               if (typeof c._desiredAlpha === 'number') c._desiredAlpha += 0.001;
               if (typeof c._desiredBeta === 'number') c._desiredBeta += 0.001;
             } catch { /* ignore if internal API changed */ }
+            controlsRef.current.update();
+            rendererRef.current.render(sceneRef.current, cameraRef.current);
           }
-        }, 50);
+        };
+        // Run multiple times to ensure the dampening catches up
+        setTimeout(forceRender, 50);
+        setTimeout(forceRender, 150);
+        setTimeout(forceRender, 300);
       }).catch((err) => {
         console.error('[SplatPreview3D] Failed to load PLY:', err);
         setError('Failed to load 3D preview');
