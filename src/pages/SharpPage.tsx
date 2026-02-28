@@ -153,12 +153,14 @@ const SplatPreview3D: React.FC<{ blob: Blob | null; onFullscreen?: () => void }>
       const renderer = new SPLAT.WebGLRenderer(canvas);
       
       // Configure OrbitControls for frontal viewing
+      // gsplat convention: alpha=0, beta=0 places camera at (0, 0, -radius)
+      // Small beta offset (0.15 rad ≈ 8.6°) avoids axis-aligned degenerate sorting
       const controls = new SPLAT.OrbitControls(
         camera, 
         canvas,
-        -Math.PI / 2,   // alpha: -90° - looking from negative Z (front view)
-        Math.PI / 2,    // beta: at horizon level
-        3,              // radius: viewing distance
+        0,              // alpha: 0° - camera on -Z axis (front view)
+        0.15,           // beta: slight downward tilt to avoid degenerate axis alignment
+        5,              // radius: viewing distance (wider to fit full model)
         true,           // enable keyboard
         new SPLAT.Vector3(0, 0, 0) // target: scene center
       );
@@ -166,9 +168,15 @@ const SplatPreview3D: React.FC<{ blob: Blob | null; onFullscreen?: () => void }>
       controls.orbitSpeed = 1.5;
       controls.panSpeed = 1.0;
       controls.zoomSpeed = 2.0;
-      controls.dampening = 0.1;
+      controls.dampening = 0.12;
       controls.minZoom = 1;
       controls.maxZoom = 15;
+
+      // Kick-start dampening so first frame renders without user interaction
+      try {
+        const c = controls as any;
+        if (typeof c._desiredAlpha === 'number') c._desiredAlpha += 0.002;
+      } catch { /* ignore */ }
 
       sceneRef.current = scene;
       cameraRef.current = camera;
@@ -178,9 +186,20 @@ const SplatPreview3D: React.FC<{ blob: Blob | null; onFullscreen?: () => void }>
       // Set camera size
       camera.data.setSize(canvas.width, canvas.height);
 
-      // Animation loop
+      // Animation loop with frame counter for initial render warmup
+      let frameCount = 0;
       const animate = () => {
         if (!rendererRef.current || !sceneRef.current || !cameraRef.current || !controlsRef.current) return;
+
+        // First 5 frames: nudge controls to ensure dampening converges
+        if (frameCount < 5) {
+          try {
+            const c = controlsRef.current as any;
+            if (typeof c._desiredAlpha === 'number') c._desiredAlpha += 0.0005;
+          } catch { /* ignore */ }
+        }
+        frameCount++;
+
         controlsRef.current.update();
         rendererRef.current.render(sceneRef.current, cameraRef.current);
         animationRef.current = requestAnimationFrame(animate);

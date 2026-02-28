@@ -537,6 +537,22 @@ const GaussianSplatRenderer = ({
   const settingsRef = useRef(settings);
   useEffect(() => { settingsRef.current = settings; }, [settings]);
 
+  /** Apply FOV by updating the gsplat camera's internal focal lengths */
+  const applyFov = useCallback((fov: number) => {
+    if (!cameraObjRef.current) return;
+    try {
+      const data = (cameraObjRef.current as any)._data ?? cameraObjRef.current.data;
+      if (!data) return;
+      const fovRad = (Math.max(5, Math.min(120, fov)) * Math.PI) / 180;
+      const w = data._width || 800;
+      const h = data._height || 600;
+      data._fx = (w / 2) / Math.tan(fovRad / 2);
+      data._fy = (h / 2) / Math.tan(fovRad / 2);
+      if (typeof data._updateProjectionMatrix === 'function') data._updateProjectionMatrix();
+      if (typeof data.update === 'function') data.update();
+    } catch { /* gsplat internals may change across versions */ }
+  }, []);
+
   useEffect(() => {
     if (!canvasRef.current) return;
     const canvas = canvasRef.current;
@@ -556,12 +572,18 @@ const GaussianSplatRenderer = ({
 
     const scene = new SPLAT.Scene();
     const camera = new SPLAT.Camera();
-    const renderer = new SPLAT.WebGLRenderer(canvas);
+    let renderer: SPLAT.WebGLRenderer;
+    try {
+      renderer = new SPLAT.WebGLRenderer(canvas);
+    } catch (e) {
+      console.error('[GaussianSplatRenderer] WebGL init failed:', e);
+      setError('WebGL initialization failed. Your browser may not support WebGL.');
+      return;
+    }
     sceneObjRef.current = scene;
     cameraObjRef.current = camera;
     rendererRef.current = renderer;
 
-    // Helper: create orbit controls with specific angles
     const createControls = (alpha: number, beta: number, radius: number) => {
       controlsObjRef.current?.dispose();
       const controls = new SPLAT.OrbitControls(
@@ -572,56 +594,56 @@ const GaussianSplatRenderer = ({
       controls.orbitSpeed = 1.5;
       controls.panSpeed = 1.0;
       controls.zoomSpeed = 2.0;
-      controls.dampening = 0.1;
+      controls.dampening = 0.12;
       controls.minZoom = 0.5;
       controls.maxZoom = 20;
       controlsObjRef.current = controls;
+
+      // Kick-start dampening so first frame renders without user interaction:
+      // offset desired position slightly so update() detects a delta
+      try {
+        const c = controls as any;
+        if (typeof c._desiredAlpha === 'number') c._desiredAlpha += 0.002;
+      } catch { /* ignore */ }
+
       return controls;
     };
 
-    createControls(-Math.PI / 2, Math.PI / 2, 3);
+    // Front view: alpha=0, beta=0.15 (slight downward tilt avoids axis-aligned sorting edge case)
+    createControls(0, 0.15, 5);
 
-    // Expose camera API via ref
     if (cameraAPIRef) {
       cameraAPIRef.current = {
-        resetView: () => createControls(-Math.PI / 2, Math.PI / 2, 3),
-        frontView: () => createControls(-Math.PI / 2, Math.PI / 2, 3),
-        sideView: () => createControls(0, Math.PI / 2, 3),
-        topView: () => createControls(-Math.PI / 2, 0.01, 5),
+        resetView: () => createControls(0, 0.15, 5),
+        frontView: () => createControls(0, 0.15, 5),
+        sideView: () => createControls(-Math.PI / 2, 0.15, 5),
+        topView: () => createControls(0, -(Math.PI / 2 - 0.01), 7),
         setAutoRotate: (enabled: boolean) => { autoRotateRef.current = enabled; },
-        setFov: (fov: number) => {
-          // gsplat Camera: adjust zoom via orbit controls radius as FOV proxy
-          if (controlsObjRef.current) {
-            try {
-              const c = controlsObjRef.current as any;
-              // Map FOV to zoom: lower FOV (telephoto) = closer radius, higher FOV = wider
-              const baseRadius = 3;
-              const fovRatio = 60 / Math.max(5, fov); // 60° is default
-              const newRadius = baseRadius * fovRatio;
-              if (typeof c._desiredRadius === 'number') {
-                c._desiredRadius = newRadius;
-              } else if (typeof c.desiredRadius === 'number') {
-                c.desiredRadius = newRadius;
-              }
-            } catch { /* gsplat may not support direct radius setting */ }
-          }
-        },
+        setFov: (fov: number) => applyFov(fov),
       };
     }
 
     let animationFrameId: number;
+    let frameCount = 0;
+
     const animate = () => {
-      // Auto-rotate: nudge the internal desired alpha each frame
+      // Auto-rotate
       if (autoRotateRef.current && controlsObjRef.current) {
         try {
           const c = controlsObjRef.current as any;
-          if (typeof c._desiredAlpha === 'number') {
-            c._desiredAlpha += 0.005;
-          } else if (typeof c.desiredAlpha === 'number') {
-            c.desiredAlpha += 0.005;
-          }
-        } catch { /* silently ignore if props are unavailable */ }
+          if (typeof c._desiredAlpha === 'number') c._desiredAlpha += 0.005;
+          else if (typeof c.desiredAlpha === 'number') c.desiredAlpha += 0.005;
+        } catch { /* ignore */ }
       }
+
+      // First 5 frames: nudge controls to ensure dampening kicks in (fixes black screen)
+      if (frameCount < 5 && controlsObjRef.current) {
+        try {
+          const c = controlsObjRef.current as any;
+          if (typeof c._desiredAlpha === 'number') c._desiredAlpha += 0.0005;
+        } catch { /* ignore */ }
+      }
+      frameCount++;
 
       controlsObjRef.current?.update();
       renderer.render(scene, camera);
@@ -631,15 +653,16 @@ const GaussianSplatRenderer = ({
     (async () => {
       try {
         const isPly = format === '.ply' || url.includes('.ply') || !url.includes('.splat');
-        console.log('[GaussianSplatRenderer] Loading with PLYLoader:', isPly, 'URL:', url.substring(0, 50));
+        console.log('[GaussianSplatRenderer] Loading:', url.substring(0, 60));
 
         if (isPly) {
-          await SPLAT.PLYLoader.LoadAsync(url, scene, () => { });
+          await SPLAT.PLYLoader.LoadAsync(url, scene, () => {});
         } else {
-          await SPLAT.Loader.LoadAsync(url, scene, () => { });
+          await SPLAT.Loader.LoadAsync(url, scene, () => {});
         }
 
         console.log('[GaussianSplatRenderer] Scene loaded, starting animation');
+        camera.data.setSize(canvas.width, canvas.height);
         animate();
       } catch (e) {
         console.error('Failed to load PLY:', e);
@@ -664,14 +687,24 @@ const GaussianSplatRenderer = ({
       if (cameraAPIRef) cameraAPIRef.current = null;
       window.removeEventListener('resize', resizeCanvas);
     };
-  }, [url, format]);
+  }, [url, format, applyFov]);
 
-  // Apply background color without reloading scene
+  // Apply background color
   useEffect(() => {
     if (canvasRef.current) {
       canvasRef.current.style.backgroundColor = settings.backgroundColor;
     }
   }, [settings.backgroundColor]);
+
+  // Reactive FOV changes from settings (only after initial render)
+  const initialRenderDone = useRef(false);
+  useEffect(() => {
+    if (!initialRenderDone.current) {
+      initialRenderDone.current = true;
+      return;
+    }
+    applyFov(settings.fov);
+  }, [settings.fov, applyFov]);
 
   if (error) {
     return <div className="text-red-400 p-4 text-center">{error}</div>;

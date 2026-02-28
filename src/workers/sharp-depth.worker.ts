@@ -349,15 +349,14 @@ end_header
             const normalizedY = (gy * invGridSizeM1) - 0.5;
             
             const x = normalizedX * sceneWidth;  // Left-right
-            const y = normalizedY * sceneHeight; // Top-bottom
+            const y = normalizedY * sceneHeight; // Keep image Y orientation (gsplat projection flips Y internally)
             
-            // Z: Depth positioning
+            // Z: Depth positioning, centered at origin
             // depthValue: 1 = closest to camera, 0 = farthest
-            // We want close objects (high depthValue) to have SMALLER Z (nearer to camera at Z=0)
-            // Formula: Z = baseDistance - (depthValue * depthRange)
-            // - When depthValue = 1 (close): Z = baseDistance - depthRange (small Z, near camera)
-            // - When depthValue = 0 (far):   Z = baseDistance (large Z, away from camera)
-            const z = baseDistance - depthValue * depthRange;
+            // Camera views from negative Z, so close objects get negative Z
+            // - When depthValue = 1 (close): Z = -depthRange/2 (negative Z, near camera)
+            // - When depthValue = 0 (far):   Z = +depthRange/2 (positive Z, away from camera)
+            const z = (0.5 - depthValue) * depthRange;
             
             // --- SH color coefficients (sRGB to SH degree-0) ---
             const f_dc_0 = (r - 0.5) / SH_C0;
