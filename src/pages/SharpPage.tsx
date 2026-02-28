@@ -154,13 +154,13 @@ const SplatPreview3D: React.FC<{ blob: Blob | null; onFullscreen?: () => void }>
       
       // Configure OrbitControls for frontal viewing
       // gsplat convention: alpha=0, beta=0 places camera at (0, 0, -radius)
-      // looking along +Z axis — directly at the model's front face
+      // Small beta offset (0.15 rad ≈ 8.6°) avoids axis-aligned degenerate sorting
       const controls = new SPLAT.OrbitControls(
         camera, 
         canvas,
         0,              // alpha: 0° - camera on -Z axis (front view)
-        0,              // beta: 0° - at eye level
-        3,              // radius: viewing distance
+        0.15,           // beta: slight downward tilt to avoid degenerate axis alignment
+        5,              // radius: viewing distance (wider to fit full model)
         true,           // enable keyboard
         new SPLAT.Vector3(0, 0, 0) // target: scene center
       );
@@ -195,6 +195,19 @@ const SplatPreview3D: React.FC<{ blob: Blob | null; onFullscreen?: () => void }>
         console.log('[SplatPreview3D] PLY loaded successfully, starting animation');
         setIsLoading(false);
         animate();
+
+        // Force initial render: nudge the orbit controls so dampening triggers
+        // a view-matrix update. Without this, software WebGL may show black
+        // until the first user interaction.
+        setTimeout(() => {
+          if (controlsRef.current) {
+            try {
+              const c = controlsRef.current as any;
+              if (typeof c._desiredAlpha === 'number') c._desiredAlpha += 0.001;
+              if (typeof c._desiredBeta === 'number') c._desiredBeta += 0.001;
+            } catch { /* ignore if internal API changed */ }
+          }
+        }, 50);
       }).catch((err) => {
         console.error('[SplatPreview3D] Failed to load PLY:', err);
         setError('Failed to load 3D preview');

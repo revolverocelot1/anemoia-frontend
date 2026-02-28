@@ -349,7 +349,7 @@ end_header
             const normalizedY = (gy * invGridSizeM1) - 0.5;
             
             const x = normalizedX * sceneWidth;  // Left-right
-            const y = -normalizedY * sceneHeight; // Flip Y so image top = +Y (Y-up convention)
+            const y = normalizedY * sceneHeight; // Keep image Y orientation (gsplat projection flips Y internally)
             
             // Z: Depth positioning, centered at origin
             // depthValue: 1 = closest to camera, 0 = farthest

@@ -579,16 +579,17 @@ const GaussianSplatRenderer = ({
       return controls;
     };
 
-    // alpha=0, beta=0 → camera at (0, 0, -radius), looking along +Z (front view)
-    createControls(0, 0, 3);
+    // alpha=0, beta=0.15 → camera slightly above -Z axis, front view
+    // Small beta offset avoids axis-aligned degenerate sorting in gsplat
+    createControls(0, 0.15, 5);
 
     // Expose camera API via ref
     if (cameraAPIRef) {
       cameraAPIRef.current = {
-        resetView: () => createControls(0, 0, 3),
-        frontView: () => createControls(0, 0, 3),
-        sideView: () => createControls(-Math.PI / 2, 0, 3),
-        topView: () => createControls(0, -(Math.PI / 2 - 0.01), 5),
+        resetView: () => createControls(0, 0.15, 5),
+        frontView: () => createControls(0, 0.15, 5),
+        sideView: () => createControls(-Math.PI / 2, 0.15, 5),
+        topView: () => createControls(0, -(Math.PI / 2 - 0.01), 7),
         setAutoRotate: (enabled: boolean) => { autoRotateRef.current = enabled; },
         setFov: (fov: number) => {
           // gsplat Camera: adjust zoom via orbit controls radius as FOV proxy
@@ -642,6 +643,18 @@ const GaussianSplatRenderer = ({
 
         console.log('[GaussianSplatRenderer] Scene loaded, starting animation');
         animate();
+
+        // Force initial render: nudge orbit controls so dampening triggers
+        // a view-matrix update (avoids black screen in software WebGL)
+        setTimeout(() => {
+          if (controlsObjRef.current) {
+            try {
+              const c = controlsObjRef.current as any;
+              if (typeof c._desiredAlpha === 'number') c._desiredAlpha += 0.001;
+              if (typeof c._desiredBeta === 'number') c._desiredBeta += 0.001;
+            } catch { /* ignore if internal API changed */ }
+          }
+        }, 50);
       } catch (e) {
         console.error('Failed to load PLY:', e);
         const errorMessage = (e as Error).message;
