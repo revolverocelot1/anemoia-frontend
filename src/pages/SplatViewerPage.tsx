@@ -1524,7 +1524,9 @@ const SplatViewerPage: React.FC = () => {
   // Load file from IndexedDB if loadId is present
   useEffect(() => {
     const loadId = searchParams.get('loadId');
+    console.log('[SplatViewerPage] useEffect fired, loadId:', loadId, 'searchParams:', searchParams.toString());
     if (loadId) {
+      console.log('[SplatViewerPage] Attempting to load file from IndexedDB for:', loadId);
       setLoadingFromStore(true);
       sharpFileStore.get(loadId)
         .then((storedFile) => {
