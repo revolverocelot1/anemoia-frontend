@@ -1,4 +1,5 @@
 import * as tf from '@tensorflow/tfjs';
+import '@tensorflow/tfjs-backend-webgpu';
 
 // ---------------------------------------------------------------------------
 // Tile-aware image helper (ported from web-realesrgan reference project)
@@ -144,27 +145,33 @@ function getModelConfig(modelType: string, scaleFactor: number): ModelConfig {
 // Single-tile upscale via TF.js model
 // ---------------------------------------------------------------------------
 function upscaleTile(tile: TileImage, model: tf.GraphModel): TileImage {
-  return tf.tidy(() => {
-    const imgData = new ImageData(
-      new Uint8ClampedArray(tile.data.buffer, tile.data.byteOffset, tile.data.byteLength),
-      tile.width,
-      tile.height,
-    );
+  const imgData = new ImageData(
+    new Uint8ClampedArray(tile.data.buffer, tile.data.byteOffset, tile.data.byteLength),
+    tile.width,
+    tile.height,
+  );
+
+  const pixels: Int32Array = tf.tidy(() => {
     const tensor = tf.browser.fromPixels(imgData).div(255).toFloat().expandDims(0);
     const result = model.predict(tensor) as tf.Tensor;
     const [, h, w] = result.shape as number[];
-    const squeezed = result.reshape([h, w, 3]).mul(255).clipByValue(0, 255).cast('int32');
-    const pixels = squeezed.dataSync();
-
-    const out = new TileImage(w, h);
-    for (let i = 0; i < w * h; i++) {
-      out.data[i * 4] = pixels[i * 3];
-      out.data[i * 4 + 1] = pixels[i * 3 + 1];
-      out.data[i * 4 + 2] = pixels[i * 3 + 2];
-      out.data[i * 4 + 3] = 255;
-    }
-    return out;
+    return result.reshape([h, w, 3]).mul(255).clipByValue(0, 255).cast('int32').dataSync() as Int32Array;
   });
+
+  // Derive output dimensions from the model's scale factor
+  const totalPx = pixels.length / 3;
+  const ratio = Math.round(Math.sqrt(totalPx / (tile.width * tile.height)));
+  const w = tile.width * ratio;
+  const h = tile.height * ratio;
+
+  const out = new TileImage(w, h);
+  for (let i = 0; i < w * h; i++) {
+    out.data[i * 4] = pixels[i * 3];
+    out.data[i * 4 + 1] = pixels[i * 3 + 1];
+    out.data[i * 4 + 2] = pixels[i * 3 + 2];
+    out.data[i * 4 + 3] = 255;
+  }
+  return out;
 }
 
 // ---------------------------------------------------------------------------
@@ -261,36 +268,18 @@ class RealESRGANUpscaler {
   private backend = 'webgl';
   private isInitialized = false;
 
-  async initialize(): Promise<void> {
+  async initialize(preferredBackend?: string): Promise<void> {
     try {
-      let ready = false;
+      // Build ordered list: preferred first, then fastest-to-slowest
+      const order = preferredBackend
+        ? [preferredBackend, 'webgpu', 'webgl', 'cpu']
+        : ['webgpu', 'webgl', 'cpu'];
+      // Deduplicate while preserving order
+      const seen: Record<string, boolean> = {};
+      const backends = order.filter(b => { if (seen[b]) return false; seen[b] = true; return true; });
 
-      // Try WebGL – but verify it actually works with a warmup op
-      try {
-        const testCanvas = new OffscreenCanvas(1, 1);
-        const gl = testCanvas.getContext('webgl2') || testCanvas.getContext('webgl');
-        if (!gl) throw new Error('No WebGL context available');
-
-        await tf.setBackend('webgl');
-        await tf.ready();
-
-        // Warmup: force a real GPU kernel to ensure it truly works
-        const t = tf.zeros([1, 4, 4, 3]);
-        const r = tf.image.resizeBilinear(t as tf.Tensor4D, [8, 8]);
-        r.dataSync();
-        r.dispose();
-        t.dispose();
-
-        this.backend = 'webgl';
-        ready = true;
-      } catch (e) {
-        console.warn('WebGL not usable in worker, falling back to CPU:', e);
-      }
-
-      if (!ready) {
-        await tf.setBackend('cpu');
-        await tf.ready();
-        this.backend = 'cpu';
+      for (const name of backends) {
+        if (await this.tryBackend(name)) break;
       }
 
       this.isInitialized = true;
@@ -298,6 +287,42 @@ class RealESRGANUpscaler {
     } catch (error) {
       console.error('Failed to initialize TF.js:', error);
       throw new Error('Failed to initialize AI backend');
+    }
+  }
+
+  private async tryBackend(name: string): Promise<boolean> {
+    try {
+      if (name === 'webgpu') {
+        if (typeof navigator === 'undefined' || !('gpu' in navigator)) {
+          throw new Error('WebGPU API not available');
+        }
+        const adapter = await (navigator as any).gpu.requestAdapter();
+        if (!adapter) throw new Error('No WebGPU adapter');
+      }
+
+      if (name === 'webgl') {
+        const c = new OffscreenCanvas(1, 1);
+        const gl = c.getContext('webgl2') || c.getContext('webgl');
+        if (!gl) throw new Error('No WebGL context');
+      }
+
+      await tf.setBackend(name);
+      await tf.ready();
+
+      // Warmup: run a small kernel to verify the backend really works
+      if (name !== 'cpu') {
+        const t = tf.zeros([1, 4, 4, 3]);
+        const r = tf.image.resizeBilinear(t as tf.Tensor4D, [8, 8]);
+        r.dataSync();
+        r.dispose();
+        t.dispose();
+      }
+
+      this.backend = name;
+      return true;
+    } catch (e) {
+      console.warn(`Backend "${name}" not usable, skipping:`, e);
+      return false;
     }
   }
 
@@ -450,12 +475,12 @@ function formatFileSize(bytes: number): string {
 const upscaler = new RealESRGANUpscaler();
 
 self.onmessage = async (event: MessageEvent) => {
-  const { command, imageData, scaleFactor, modelType } = event.data;
+  const { command, imageData, scaleFactor, modelType, backend } = event.data;
 
   try {
     switch (command) {
       case 'initialize':
-        await upscaler.initialize();
+        await upscaler.initialize(backend);
         self.postMessage({ status: 'worker_initialized', message: 'AI upscaler ready' });
         break;
 

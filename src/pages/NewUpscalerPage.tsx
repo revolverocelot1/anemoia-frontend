@@ -88,7 +88,6 @@ const NewUpscalerPage: React.FC = () => {
           imageData,
           scaleFactor,
           modelType,
-          backend: 'webgl'
         });
       };
       img.src = imageData.dataUrl;
