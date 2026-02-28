@@ -33,3 +33,7 @@ public/models/face-swap/*.onnx
 public/models/**/*.onnx
 public/models/**/*.bin
 public/models/**/*.safetensors
+
+# TF.js upscaler models (downloaded at dev time, not committed)
+public/realcugan/
+public/realesrgan/

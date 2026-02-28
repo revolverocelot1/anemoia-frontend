@@ -22,6 +22,13 @@ npm test             # vitest
 - **Pre-existing test failures**: 24 tests in `SplatViewerPage.test.tsx` fail due to component import issues (pre-existing). 78 tests pass.
 - **Pre-existing lint errors**: ~700+ `@typescript-eslint/no-explicit-any` errors (pre-existing, not from any PR changes).
 
+### AI Image Upscaler
+- The upscaler uses TensorFlow.js `loadGraphModel()` in a Web Worker with tile-based processing (64×64 tiles).
+- Model files (TF.js GraphModel format) must exist in `public/realcugan/` and `public/realesrgan/`. Run `node scripts/download-upscaler-models.cjs` to download them from the [xororz/web-realesrgan](https://github.com/xororz/web-realesrgan/releases/tag/v0.1.0) GitHub release.
+- Models are cached in IndexedDB after first load; subsequent page loads skip the network fetch.
+- In cloud VMs without GPU, TF.js falls back to WebGL via SwiftShader (or CPU). Inference is slower (~30s per 100×100 image) but produces correct results.
+- Available models: CUGAN 2x (2.6 MB), CUGAN 4x (2.9 MB), ESRGAN Anime 4x (9.2 MB), ESRGAN General 4x (34.2 MB).
+
 ### gsplat coordinate system
 The gsplat library's `OrbitControls(camera, canvas, alpha, beta, radius, ...)` uses spherical coordinates:
 - `alpha=0, beta=0` → camera at `(0, 0, -radius)`, looking along +Z
