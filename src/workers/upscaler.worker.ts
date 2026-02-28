@@ -139,21 +139,20 @@ class ImgBuffer {
   }
 }
 
-function upscaleTile(tile: ImgBuffer, model: tf.GraphModel): Promise<ImgBuffer> {
-  return tf.tidy(() => {
+async function upscaleTile(tile: ImgBuffer, model: tf.GraphModel): Promise<ImgBuffer> {
+  const result = tf.tidy(() => {
     const imgData = new ImageData(tile.width, tile.height);
     imgData.data.set(tile.data);
     const tensor = tf.browser.fromPixels(imgData).div(255).toFloat().expandDims(0);
-    const result = model.predict(tensor) as tf.Tensor;
-    return result;
-  }).then(async (result: tf.Tensor) => {
-    const [, h, w] = result.shape;
-    const clipped = tf.tidy(() => result.reshape([h!, w!, 3]).mul(255).cast('int32').clipByValue(0, 255));
-    result.dispose();
-    const pixels = await tf.browser.toPixels(clipped as tf.Tensor3D);
-    clipped.dispose();
-    return new ImgBuffer(w!, h!, new Uint8Array(pixels));
+    return model.predict(tensor) as tf.Tensor;
   });
+
+  const [, h, w] = result.shape;
+  const clipped = tf.tidy(() => result.reshape([h!, w!, 3]).mul(255).cast('int32').clipByValue(0, 255));
+  result.dispose();
+  const pixels = await tf.browser.toPixels(clipped as tf.Tensor3D);
+  clipped.dispose();
+  return new ImgBuffer(w!, h!, new Uint8Array(pixels));
 }
 
 class RealESRGANUpscaler {
