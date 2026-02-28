@@ -234,13 +234,15 @@ end_header
     const sceneWidth = 2.0 * aspectRatio;
     const sceneHeight = 2.0;
     
-    // Base distance and depth range for proper 3D placement
-    // baseDistance: where the "average" depth plane sits
+    // Depth range for 3D relief effect
     // depthRange: how much depth variation (closer objects protrude more)
-    const baseDistance = 3.0;
-    const depthRange = depthScale * 1.5; // Amplify depth for more pronounced 3D effect
+    const depthRange = depthScale * 1.5;
     
-    log(`Scene params: width=${sceneWidth.toFixed(2)}, height=${sceneHeight.toFixed(2)}, baseZ=${baseDistance}, depthRange=${depthRange.toFixed(2)}`);
+    // Model is centered at origin so the camera's default front view works.
+    // Z runs from -depthRange/2 (closest to camera) to +depthRange/2 (farthest).
+    // Y is flipped so positive Y = up (standard 3D convention, matching gsplat).
+    
+    log(`Scene params: width=${sceneWidth.toFixed(2)}, height=${sceneHeight.toFixed(2)}, depthRange=${depthRange.toFixed(2)}`);
     
     // Splat size calculation for optimal coverage without blur
     // Use tighter spacing (1.05x) for sharper front view, slightly overlapping for coverage
@@ -344,20 +346,17 @@ end_header
             if (depthValue > maxDepth) maxDepth = depthValue;
             
             // --- Position calculation ---
-            // X, Y: Normalized screen coordinates (-0.5 to 0.5) scaled to scene size
+            // X: left-right, centered at 0
             const normalizedX = (gx * invGridSizeM1) - 0.5;
+            const x = normalizedX * sceneWidth;
+            
+            // Y: flip so positive Y = up (image row 0 at top → positive Y)
             const normalizedY = (gy * invGridSizeM1) - 0.5;
+            const y = -normalizedY * sceneHeight;
             
-            const x = normalizedX * sceneWidth;  // Left-right
-            const y = normalizedY * sceneHeight; // Top-bottom
-            
-            // Z: Depth positioning
-            // depthValue: 1 = closest to camera, 0 = farthest
-            // We want close objects (high depthValue) to have SMALLER Z (nearer to camera at Z=0)
-            // Formula: Z = baseDistance - (depthValue * depthRange)
-            // - When depthValue = 1 (close): Z = baseDistance - depthRange (small Z, near camera)
-            // - When depthValue = 0 (far):   Z = baseDistance (large Z, away from camera)
-            const z = baseDistance - depthValue * depthRange;
+            // Z: centered at origin. depthValue 1 = close (negative Z, toward camera),
+            // depthValue 0 = far (positive Z, away from camera).
+            const z = (0.5 - depthValue) * depthRange;
             
             // --- SH color coefficients (sRGB to SH degree-0) ---
             const f_dc_0 = (r - 0.5) / SH_C0;
