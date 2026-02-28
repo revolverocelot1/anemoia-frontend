@@ -168,9 +168,15 @@ const SplatPreview3D: React.FC<{ blob: Blob | null; onFullscreen?: () => void }>
       controls.orbitSpeed = 1.5;
       controls.panSpeed = 1.0;
       controls.zoomSpeed = 2.0;
-      controls.dampening = 0.1;
+      controls.dampening = 0.12;
       controls.minZoom = 1;
       controls.maxZoom = 15;
+
+      // Kick-start dampening so first frame renders without user interaction
+      try {
+        const c = controls as any;
+        if (typeof c._desiredAlpha === 'number') c._desiredAlpha += 0.002;
+      } catch { /* ignore */ }
 
       sceneRef.current = scene;
       cameraRef.current = camera;
@@ -180,9 +186,20 @@ const SplatPreview3D: React.FC<{ blob: Blob | null; onFullscreen?: () => void }>
       // Set camera size
       camera.data.setSize(canvas.width, canvas.height);
 
-      // Animation loop
+      // Animation loop with frame counter for initial render warmup
+      let frameCount = 0;
       const animate = () => {
         if (!rendererRef.current || !sceneRef.current || !cameraRef.current || !controlsRef.current) return;
+
+        // First 5 frames: nudge controls to ensure dampening converges
+        if (frameCount < 5) {
+          try {
+            const c = controlsRef.current as any;
+            if (typeof c._desiredAlpha === 'number') c._desiredAlpha += 0.0005;
+          } catch { /* ignore */ }
+        }
+        frameCount++;
+
         controlsRef.current.update();
         rendererRef.current.render(sceneRef.current, cameraRef.current);
         animationRef.current = requestAnimationFrame(animate);
@@ -195,25 +212,6 @@ const SplatPreview3D: React.FC<{ blob: Blob | null; onFullscreen?: () => void }>
         console.log('[SplatPreview3D] PLY loaded successfully, starting animation');
         setIsLoading(false);
         animate();
-
-        // Force initial render: nudge orbit controls and immediately render
-        // Without this, gsplat dampening may not produce a first frame until
-        // user interaction (controls start with current === desired position).
-        const forceRender = () => {
-          if (controlsRef.current && rendererRef.current && sceneRef.current && cameraRef.current) {
-            try {
-              const c = controlsRef.current as any;
-              if (typeof c._desiredAlpha === 'number') c._desiredAlpha += 0.001;
-              if (typeof c._desiredBeta === 'number') c._desiredBeta += 0.001;
-            } catch { /* ignore if internal API changed */ }
-            controlsRef.current.update();
-            rendererRef.current.render(sceneRef.current, cameraRef.current);
-          }
-        };
-        // Run multiple times to ensure the dampening catches up
-        setTimeout(forceRender, 50);
-        setTimeout(forceRender, 150);
-        setTimeout(forceRender, 300);
       }).catch((err) => {
         console.error('[SplatPreview3D] Failed to load PLY:', err);
         setError('Failed to load 3D preview');
