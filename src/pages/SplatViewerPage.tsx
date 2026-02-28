@@ -579,7 +579,7 @@ const GaussianSplatRenderer = ({
       return controls;
     };
 
-    // alpha=0, beta=0 → camera at (0, 0, -radius), looking toward +Z (front of model)
+    // alpha=0, beta=0 → camera in front of model, looking in +Z direction
     createControls(0, 0, 5);
 
     // Expose camera API via ref

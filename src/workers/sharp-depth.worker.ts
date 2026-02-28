@@ -234,13 +234,8 @@ end_header
     const sceneWidth = 2.0 * aspectRatio;
     const sceneHeight = 2.0;
     
-    // Depth range for 3D relief effect
-    // depthRange: how much depth variation (closer objects protrude more)
+    // Depth range controls how much 3D relief the model has
     const depthRange = depthScale * 1.5;
-    
-    // Model is centered at origin so the camera's default front view works.
-    // Z runs from -depthRange/2 (closest to camera) to +depthRange/2 (farthest).
-    // Y is flipped so positive Y = up (standard 3D convention, matching gsplat).
     
     log(`Scene params: width=${sceneWidth.toFixed(2)}, height=${sceneHeight.toFixed(2)}, depthRange=${depthRange.toFixed(2)}`);
     
@@ -345,17 +340,18 @@ end_header
             if (depthValue < minDepth) minDepth = depthValue;
             if (depthValue > maxDepth) maxDepth = depthValue;
             
-            // --- Position calculation ---
-            // X: left-right, centered at 0
+            // --- Position calculation (model centered at origin) ---
             const normalizedX = (gx * invGridSizeM1) - 0.5;
-            const x = normalizedX * sceneWidth;
-            
-            // Y: flip so positive Y = up (image row 0 at top → positive Y)
             const normalizedY = (gy * invGridSizeM1) - 0.5;
-            const y = -normalizedY * sceneHeight;
             
-            // Z: centered at origin. depthValue 1 = close (negative Z, toward camera),
-            // depthValue 0 = far (positive Z, away from camera).
+            const x = normalizedX * sceneWidth;
+            // Y: keep image convention (gy=0 at top → negative normalizedY)
+            // gsplat's coordinate system has Y-down for image-like content
+            const y = normalizedY * sceneHeight;
+            
+            // Z centered at 0: close surfaces (depthValue≈1) at negative Z,
+            // far surfaces (depthValue≈0) at positive Z.
+            // Camera at negative Z looking toward +Z sees the front.
             const z = (0.5 - depthValue) * depthRange;
             
             // --- SH color coefficients (sRGB to SH degree-0) ---
