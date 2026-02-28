@@ -396,30 +396,43 @@ self.onmessage = async (event: MessageEvent) => {
     switch (command) {
       case 'initialize':
         await upscaler.initialize();
-        self.postMessage({ status: 'initialized', message: 'AI backend ready' });
+        self.postMessage({ status: 'worker_initialized', message: 'AI backend ready' });
         break;
 
       case 'loadModel':
         await upscaler.loadModel(modelType, scaleFactor);
         break;
 
-      case 'upscale':
+      case 'upscale': {
         if (!imageData) throw new Error('No image data provided');
-        const result = await upscaler.upscaleImage(imageData, scaleFactor);
+
+        // Auto-load the model if not loaded yet
+        await upscaler.loadModel(modelType, scaleFactor);
+
+        // The page sends imageData as { dataUrl, width, height } — decode into ImageData
+        const bitmap = await createImageBitmap(await (await fetch(imageData.dataUrl)).blob());
+        const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
+        const ctx = canvas.getContext('2d')!;
+        ctx.drawImage(bitmap, 0, 0);
+        const realImageData = ctx.getImageData(0, 0, bitmap.width, bitmap.height);
+
+        const result = await upscaler.upscaleImage(realImageData, scaleFactor);
         self.postMessage({
           status: 'complete',
           message: 'Upscaling complete',
-          url: result.url,
+          upscaledImageUrl: result.url,
           fileSize: result.fileSize,
           stats: result.stats,
           progress: 100
         });
         break;
+      }
 
       default:
         throw new Error(`Unknown command: ${command}`);
     }
   } catch (error) {
+    console.error('Upscaler worker error:', error);
     self.postMessage({
       status: 'error',
       message: (error as Error).message,
