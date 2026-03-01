@@ -592,6 +592,7 @@ const GaussianSplatRenderer = ({
     const spherical = { alpha: 0, beta: 0.15, radius: 5 };
 
     const createControls = (alpha: number, beta: number, radius: number) => {
+      // console.log('[GaussianSplat] createControls:', { alpha, beta, radius });
       controlsObjRef.current?.dispose();
 
       // Store the new spherical coords
@@ -599,10 +600,12 @@ const GaussianSplatRenderer = ({
       spherical.beta = beta;
       spherical.radius = radius;
 
+      // Disable keyboard controls (true → false) to avoid gsplat intercepting
+      // global keyboard events (WASD/QERF) that conflict with React UI
       const controls = new SPLAT.OrbitControls(
         camera, canvas,
         alpha, beta, radius,
-        true, new SPLAT.Vector3(0, 0, 0)
+        false, new SPLAT.Vector3(0, 0, 0)
       );
       controls.orbitSpeed = 1.5;
       controls.panSpeed = 1.0;
@@ -612,9 +615,12 @@ const GaussianSplatRenderer = ({
       controls.maxZoom = 20;
       controlsObjRef.current = controls;
 
-      // Force an immediate update so the camera position is set right away
+      // Force several immediate updates so the camera position converges
+      controls.update();
+      controls.update();
       controls.update();
 
+      // console.log('[GaussianSplat] Camera pos:', camera.position);
       return controls;
     };
 
@@ -627,7 +633,21 @@ const GaussianSplatRenderer = ({
         frontView: () => { createControls(0, 0.15, 5); },
         sideView: () => { createControls(-Math.PI / 2, 0.15, 5); },
         topView: () => { createControls(0, -(Math.PI / 2 - 0.01), 7); },
-        setAutoRotate: (enabled: boolean) => { autoRotateRef.current = enabled; },
+        setAutoRotate: (enabled: boolean) => {
+          autoRotateRef.current = enabled;
+          // If enabling, start auto-rotate state
+          if (enabled) {
+            autoRotateState.active = false; // will be started on next frame
+          } else {
+            // Stop: release the synthetic drag
+            if (autoRotateState.active) {
+              window.dispatchEvent(new MouseEvent('mouseup', {
+                clientX: autoRotateState.lastX, clientY: autoRotateState.lastY, button: 0,
+              }));
+              autoRotateState.active = false;
+            }
+          }
+        },
         setFov: (fov: number) => applyFov(fov),
       };
     }
@@ -638,37 +658,51 @@ const GaussianSplatRenderer = ({
     /**
      * Auto-rotate: gsplat OrbitControls keeps desired alpha/beta/radius as
      * closure variables (not instance properties), so we can't poke them
-     * directly.  Instead we synthesise a small horizontal mouse-drag on the
-     * canvas each frame — the controls' internal mousemove handler modifies
-     * the desired alpha for us, giving smooth orbit behaviour.
+     * directly.  We use a persistent synthetic drag approach:
+     *   - On start: send mousedown once
+     *   - Each frame: send mousemove with small X delta
+     *   - On stop: send mouseup
      */
-    const syntheticDrag = (dx: number) => {
-      if (!canvas) return;
-      const rect = canvas.getBoundingClientRect();
-      const cx = rect.left + rect.width / 2;
-      const cy = rect.top + rect.height / 2;
-
-      // mousedown → mousemove → mouseup (left button)
-      canvas.dispatchEvent(new MouseEvent('mousedown', {
-        clientX: cx, clientY: cy, button: 0, bubbles: true,
-      }));
-      canvas.dispatchEvent(new MouseEvent('mousemove', {
-        clientX: cx + dx, clientY: cy, button: 0, bubbles: true,
-      }));
-      window.dispatchEvent(new MouseEvent('mouseup', {
-        clientX: cx + dx, clientY: cy, button: 0, bubbles: true,
-      }));
-    };
+    const autoRotateState = { active: false, lastX: 0, lastY: 0 };
 
     const animate = () => {
-      // Auto-rotate: drive the controls via synthetic drag
+      // Auto-rotate
       if (autoRotateRef.current && controlsObjRef.current) {
-        syntheticDrag(2);  // ~2px per frame ≈ smooth rotation
+        const rect = canvas.getBoundingClientRect();
+        const cy = rect.top + rect.height / 2;
+
+        if (!autoRotateState.active) {
+          // Start auto-rotate: synthetic mousedown
+          const cx = rect.left + rect.width / 2;
+          canvas.dispatchEvent(new MouseEvent('mousedown', {
+            clientX: cx, clientY: cy, button: 0, bubbles: false,
+          }));
+          autoRotateState.active = true;
+          autoRotateState.lastX = cx;
+          autoRotateState.lastY = cy;
+        }
+
+        // Continue auto-rotate: synthetic mousemove (small delta)
+        autoRotateState.lastX += 1.5;
+        canvas.dispatchEvent(new MouseEvent('mousemove', {
+          clientX: autoRotateState.lastX, clientY: autoRotateState.lastY, button: 0, bubbles: false,
+        }));
       }
 
       // First 5 frames: tiny nudge to kick-start dampening (fixes black screen on SwiftShader)
       if (frameCount < 5 && controlsObjRef.current) {
-        syntheticDrag(0.1);
+        const rect = canvas.getBoundingClientRect();
+        const cx = rect.left + rect.width / 2;
+        const cy = rect.top + rect.height / 2;
+        canvas.dispatchEvent(new MouseEvent('mousedown', {
+          clientX: cx, clientY: cy, button: 0, bubbles: false,
+        }));
+        canvas.dispatchEvent(new MouseEvent('mousemove', {
+          clientX: cx + 0.05, clientY: cy, button: 0, bubbles: false,
+        }));
+        window.dispatchEvent(new MouseEvent('mouseup', {
+          clientX: cx + 0.05, clientY: cy, button: 0, bubbles: false,
+        }));
       }
       frameCount++;
 
