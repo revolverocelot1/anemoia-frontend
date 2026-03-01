@@ -1,0 +1,51 @@
+services:
+  - type: web
+    name: anemoia-frontend
+    runtime: static
+    buildCommand: npm install && npm run build
+    staticPublishPath: ./dist
+    headers:
+      # Cross-Origin Isolation headers for SharedArrayBuffer support
+      - path: "/*"
+        name: Cross-Origin-Embedder-Policy
+        value: require-corp
+      - path: "/*"
+        name: Cross-Origin-Opener-Policy
+        value: same-origin
+      - path: "/*"
+        name: Cross-Origin-Resource-Policy
+        value: cross-origin
+      # CORS headers
+      - path: "/*"
+        name: Access-Control-Allow-Origin
+        value: "*"
+      - path: "/*"
+        name: Access-Control-Allow-Methods
+        value: "GET, POST, PUT, DELETE, OPTIONS"
+      - path: "/*"
+        name: Access-Control-Allow-Headers
+        value: "Content-Type, Authorization"
+      # WASM file headers
+      - path: "/ort-wasm/*.wasm"
+        name: Content-Type
+        value: application/wasm
+      - path: "/ffmpeg/*.wasm"
+        name: Content-Type
+        value: application/wasm
+      - path: "/*.wasm"
+        name: Content-Type
+        value: application/wasm
+      # Cache headers for static assets
+      - path: "/ort-wasm/*"
+        name: Cache-Control
+        value: "public, max-age=31536000, immutable"
+      - path: "/ffmpeg/*"
+        name: Cache-Control
+        value: "public, max-age=31536000, immutable"
+    routes:
+      - type: rewrite
+        source: "/*"
+        destination: /index.html
+    envVars:
+      - key: NODE_VERSION
+        value: "18" 

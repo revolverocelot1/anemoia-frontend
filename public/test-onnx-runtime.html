@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ONNX Runtime WASM Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #1a1a1a;
+            color: white;
+        }
+        button {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #2563eb;
+        }
+        button:disabled {
+            background: #6b7280;
+            cursor: not-allowed;
+        }
+        #log {
+            background: #000;
+            padding: 10px;
+            border-radius: 5px;
+            margin-top: 20px;
+            max-height: 600px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .error { color: #ef4444; }
+        .success { color: #10b981; }
+        .info { color: #3b82f6; }
+        .warning { color: #f59e0b; }
+    </style>
+</head>
+<body>
+    <h1>ONNX Runtime WASM Backend Test</h1>
+    <p>This page tests if ONNX Runtime can properly load and use the WASM backend.</p>
+    
+    <button id="testBasic">Test Basic ONNX Loading</button>
+    <button id="testWasm">Test WASM Backend</button>
+    <button id="testSession">Test Session Creation</button>
+    <button id="clearLog">Clear Log</button>
+    
+    <div id="log"></div>
+    
+    <script type="module">
+        const log = (message, type = 'info') => {
+            const logDiv = document.getElementById('log');
+            const entry = document.createElement('div');
+            entry.className = type;
+            entry.textContent = `[${new Date().toISOString().split('T')[1].split('.')[0]}] ${message}`;
+            logDiv.appendChild(entry);
+            logDiv.scrollTop = logDiv.scrollHeight;
+            console.log(message);
+        };
+        
+        document.getElementById('clearLog').addEventListener('click', () => {
+            document.getElementById('log').innerHTML = '';
+        });
+        
+        // Test 1: Basic ONNX Runtime loading
+        document.getElementById('testBasic').addEventListener('click', async () => {
+            log('Testing basic ONNX Runtime loading...');
+            
+            try {
+                const ortModule = await import('/ort-wasm/ort.min.js');
+                log('✓ ONNX Runtime script loaded successfully', 'success');
+                
+                if (window.ort) {
+                    log('✓ ONNX Runtime global object available', 'success');
+                    log(`ONNX Runtime version: ${window.ort.version || 'unknown'}`, 'info');
+                } else {
+                    log('✗ ONNX Runtime global object not found', 'error');
+                }
+                
+            } catch (error) {
+                log(`✗ Failed to load ONNX Runtime: ${error.message}`, 'error');
+            }
+        });
+        
+        // Test 2: WASM Backend configuration
+        document.getElementById('testWasm').addEventListener('click', async () => {
+            log('Testing WASM backend configuration...');
+            
+            try {
+                if (!window.ort) {
+                    log('Loading ONNX Runtime first...', 'info');
+                    await import('/ort-wasm/ort.min.js');
+                }
+                
+                if (!window.ort) {
+                    throw new Error('ONNX Runtime not available');
+                }
+                
+                log('✓ ONNX Runtime available', 'success');
+                
+                // Configure WASM paths
+                window.ort.env.wasm.wasmPaths = window.location.origin + '/ort-wasm/';
+                log('✓ WASM paths configured', 'success');
+                
+                // Test WASM file accessibility
+                const wasmFiles = [
+                    'ort-wasm.wasm',
+                    'ort-wasm-simd.wasm',
+                    'ort-wasm-threaded.wasm'
+                ];
+                
+                for (const file of wasmFiles) {
+                    try {
+                        const response = await fetch(`/ort-wasm/${file}`, { method: 'HEAD' });
+                        if (response.ok) {
+                            log(`✓ ${file} accessible`, 'success');
+                        } else {
+                            log(`✗ ${file} not accessible: ${response.status}`, 'error');
+                        }
+                    } catch (error) {
+                        log(`✗ ${file} fetch failed: ${error.message}`, 'error');
+                    }
+                }
+                
+                log('WASM backend test completed', 'info');
+                
+            } catch (error) {
+                log(`✗ WASM backend test failed: ${error.message}`, 'error');
+            }
+        });
+        
+        // Test 3: Session creation
+        document.getElementById('testSession').addEventListener('click', async () => {
+            log('Testing ONNX Runtime session creation...');
+            
+            try {
+                if (!window.ort) {
+                    log('Loading ONNX Runtime first...', 'info');
+                    await import('/ort-wasm/ort.min.js');
+                    
+                    if (!window.ort) {
+                        throw new Error('ONNX Runtime not available after loading');
+                    }
+                }
+                
+                // Configure environment
+                window.ort.env.wasm.wasmPaths = window.location.origin + '/ort-wasm/';
+                window.ort.env.logLevel = 'warning';
+                
+                log('Creating minimal test session...', 'info');
+                
+                // Create a minimal ONNX model for testing
+                const testModelData = new Uint8Array([
+                    0x08, 0x01, 0x12, 0x0C, 0x62, 0x61, 0x63, 0x6B, 0x65, 0x6E, 0x64, 0x2D, 0x74, 0x65, 0x73, 0x74,
+                    0x1A, 0x00, 0x22, 0x00, 0x2A, 0x00, 0x32, 0x00, 0x3A, 0x00, 0x42, 0x12, 0x08, 0x01, 0x12, 0x04,
+                    0x74, 0x65, 0x73, 0x74, 0x1A, 0x04, 0x74, 0x65, 0x73, 0x74, 0x22, 0x04, 0x74, 0x65, 0x73, 0x74
+                ]);
+                
+                try {
+                    const session = await window.ort.InferenceSession.create(testModelData, {
+                        executionProviders: ['wasm'],
+                        logSeverityLevel: 0
+                    });
+                    
+                    log('✓ Test session created successfully!', 'success');
+                    log('✓ WASM backend is working properly', 'success');
+                    
+                    // Clean up
+                    if (session.release) {
+                        session.release();
+                        log('✓ Session cleaned up', 'info');
+                    }
+                    
+                } catch (sessionError) {
+                    log(`✗ Session creation failed: ${sessionError.message}`, 'error');
+                    
+                    if (sessionError.message.includes('f is not a function')) {
+                        log('This is the "f is not a function" error - WASM functions not properly loaded', 'error');
+                        log('Possible causes:', 'warning');
+                        log('- CORS issues preventing WASM file access', 'warning');
+                        log('- Browser compatibility issues', 'warning');
+                        log('- Missing or corrupted WASM files', 'warning');
+                    }
+                }
+                
+            } catch (error) {
+                log(`✗ Session test failed: ${error.message}`, 'error');
+                log(`Stack: ${error.stack}`, 'error');
+            }
+        });
+        
+        log('ONNX Runtime WASM test page ready. Click buttons to run tests.', 'info');
+    </script>
+</body>
+</html> 

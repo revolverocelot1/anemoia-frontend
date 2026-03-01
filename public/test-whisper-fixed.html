@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Whisper Fixed Implementation</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 10px;
+            cursor: pointer;
+        }
+        #status {
+            margin: 20px 0;
+            padding: 10px;
+            background: #f0f0f0;
+            border-radius: 5px;
+            min-height: 50px;
+        }
+        #result {
+            margin: 20px 0;
+            padding: 20px;
+            background: #e0f0e0;
+            border-radius: 5px;
+            white-space: pre-wrap;
+        }
+        .error {
+            color: red;
+        }
+        .success {
+            color: green;
+        }
+        input[type="file"] {
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>Test Whisper Fixed Implementation</h1>
+    
+    <div>
+        <label>
+            Select Backend:
+            <select id="backend">
+                <option value="transformers">Transformers.js (Recommended)</option>
+                <option value="wasm">WASM</option>
+                <option value="webgpu">WebGPU</option>
+            </select>
+        </label>
+    </div>
+    
+    <div>
+        <label>
+            Select Model:
+            <select id="model">
+                <option value="whisper-tiny">Whisper Tiny (Fastest)</option>
+                <option value="whisper-base" selected>Whisper Base (Balanced)</option>
+                <option value="whisper-small">Whisper Small (Better Quality)</option>
+            </select>
+        </label>
+    </div>
+    
+    <div>
+        <input type="file" id="fileInput" accept="audio/*,video/*">
+    </div>
+    
+    <div>
+        <button onclick="testTranscription()">Test Transcription</button>
+        <button onclick="clearStatus()">Clear</button>
+    </div>
+    
+    <div id="status">Ready to test...</div>
+    <div id="result" style="display: none;"></div>
+
+    <script type="module">
+        import { whisperTransformersService } from '/src/services/whisper-transformers.service.ts';
+        
+        window.testTranscription = async function() {
+            const fileInput = document.getElementById('fileInput');
+            const statusDiv = document.getElementById('status');
+            const resultDiv = document.getElementById('result');
+            const backend = document.getElementById('backend').value;
+            const model = document.getElementById('model').value;
+            
+            if (!fileInput.files || !fileInput.files[0]) {
+                statusDiv.innerHTML = '<span class="error">Please select a file first!</span>';
+                return;
+            }
+            
+            const file = fileInput.files[0];
+            statusDiv.innerHTML = 'Starting transcription...';
+            resultDiv.style.display = 'none';
+            
+            try {
+                if (backend === 'transformers') {
+                    // Use the transformers service
+                    const result = await whisperTransformersService.transcribe(
+                        file,
+                        { 
+                            model: model,
+                            language: 'english',
+                            task: 'transcribe'
+                        },
+                        (progress) => {
+                            statusDiv.innerHTML = `
+                                <div>Status: ${progress.status}</div>
+                                <div>Progress: ${progress.progress}%</div>
+                                <div>Message: ${progress.message}</div>
+                            `;
+                        }
+                    );
+                    
+                    statusDiv.innerHTML = '<span class="success">Transcription completed!</span>';
+                    resultDiv.style.display = 'block';
+                    resultDiv.innerHTML = `
+                        <h3>Result:</h3>
+                        <p><strong>Text:</strong> ${result.text}</p>
+                        <h4>Segments:</h4>
+                        ${result.segments.map(s => `
+                            <div>
+                                [${s.start.toFixed(2)}s - ${s.end.toFixed(2)}s]: ${s.text}
+                            </div>
+                        `).join('')}
+                    `;
+                } else {
+                    statusDiv.innerHTML = '<span class="error">Only Transformers.js backend is supported in this test</span>';
+                }
+            } catch (error) {
+                console.error('Transcription error:', error);
+                statusDiv.innerHTML = `<span class="error">Error: ${error.message}</span>`;
+            }
+        };
+        
+        window.clearStatus = function() {
+            document.getElementById('status').innerHTML = 'Ready to test...';
+            document.getElementById('result').style.display = 'none';
+        };
+    </script>
+</body>
+</html> 

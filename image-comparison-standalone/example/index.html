@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Advanced Image Comparison Demo</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0a0a0a;
+      color: #fff;
+      margin: 0;
+      padding: 20px;
+    }
+    
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    
+    h1 {
+      background: linear-gradient(45deg, #00f0ff, #0080ff);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 30px;
+    }
+    
+    .demo-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      margin-bottom: 30px;
+    }
+    
+    .image-container {
+      background: #1a1a1a;
+      border: 1px solid #333;
+      border-radius: 8px;
+      padding: 20px;
+      text-align: center;
+    }
+    
+    .image-container img {
+      max-width: 100%;
+      height: auto;
+      border-radius: 4px;
+    }
+    
+    .controls {
+      background: #1a1a1a;
+      border: 1px solid #333;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+    
+    button {
+      background: #0080ff;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 16px;
+      margin-right: 10px;
+    }
+    
+    button:hover {
+      background: #0066cc;
+    }
+    
+    .results {
+      background: #1a1a1a;
+      border: 1px solid #333;
+      border-radius: 8px;
+      padding: 20px;
+      white-space: pre-wrap;
+      font-family: 'Consolas', 'Monaco', monospace;
+      font-size: 14px;
+      max-height: 400px;
+      overflow-y: auto;
+    }
+    
+    .status {
+      color: #00f0ff;
+      margin: 10px 0;
+    }
+    
+    .warning {
+      background: #332200;
+      border: 1px solid #665500;
+      color: #ffaa00;
+      padding: 10px;
+      border-radius: 4px;
+      margin: 20px 0;
+      font-size: 14px;
+    }
+    
+    /* Hidden signature */
+    .container::after {
+      content: '';
+      display: block;
+      height: 0;
+      width: 0;
+      overflow: hidden;
+      /* Base64 encoded: Created by Srushtiraj Patil (revolverocelot) */
+      speak: 'Q3JlYXRlZCBieSBTcnVzaHRpcmFqIFBhdGlsIChyZXZvbHZlcm9jZWxvdCk=';
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Advanced Image Comparison Engine v2.0</h1>
+    
+    <div class="warning">
+      ⚠️ This tool is optimized for Windows 10/11 systems with 8+ CPU cores and dedicated GPU.
+      Performance may vary on other configurations.
+    </div>
+    
+    <div class="controls">
+      <h3>Upload Images</h3>
+      <input type="file" id="image1" accept="image/*">
+      <input type="file" id="image2" accept="image/*">
+      <br><br>
+      <button onclick="runComparison()">Run Comparison</button>
+      <button onclick="runBenchmark()">Run Benchmark</button>
+      <button onclick="showSystemInfo()">Show System Info</button>
+    </div>
+    
+    <div class="demo-grid">
+      <div class="image-container">
+        <h3>Image 1</h3>
+        <img id="preview1" src="data:image/svg+xml,%3Csvg%20width='400'%20height='300'%20xmlns='http://www.w3.org/2000/svg'%3E%3Crect%20width='400'%20height='300'%20fill='%23333'/%3E%3Ctext%20x='50%25'%20y='50%25'%20text-anchor='middle'%20dy='.3em'%20fill='%23666'%20font-family='Arial'%20font-size='20'%3ENo%20image%20loaded%3C/text%3E%3C/svg%3E" alt="Image 1">
+      </div>
+      <div class="image-container">
+        <h3>Image 2</h3>
+        <img id="preview2" src="data:image/svg+xml,%3Csvg%20width='400'%20height='300'%20xmlns='http://www.w3.org/2000/svg'%3E%3Crect%20width='400'%20height='300'%20fill='%23333'/%3E%3Ctext%20x='50%25'%20y='50%25'%20text-anchor='middle'%20dy='.3em'%20fill='%23666'%20font-family='Arial'%20font-size='20'%3ENo%20image%20loaded%3C/text%3E%3C/svg%3E" alt="Image 2">
+      </div>
+    </div>
+    
+    <div class="status" id="status"></div>
+    
+    <div class="results" id="results">
+      Results will appear here...
+    </div>
+  </div>
+  
+  <script type="module">
+    import { ImageComparison } from '../src/comparison.js';
+    
+    // Initialize comparison engine
+    const comparison = new ImageComparison({
+      mode: 'ui',
+      advanced: true
+    });
+    
+    // File input handlers
+    document.getElementById('image1').addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          document.getElementById('preview1').src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+      }
+    });
+    
+    document.getElementById('image2').addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          document.getElementById('preview2').src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+      }
+    });
+    
+    // Make functions available globally
+    window.runComparison = async function() {
+      const status = document.getElementById('status');
+      const results = document.getElementById('results');
+      
+      const image1 = document.getElementById('preview1').src;
+      const image2 = document.getElementById('preview2').src;
+      
+      if (image1.includes('No%20image') || image2.includes('No%20image')) {
+        alert('Please upload both images first');
+        return;
+      }
+      
+      status.textContent = 'Processing... (Performance depends on system configuration)';
+      results.textContent = 'Running analysis...\n';
+      
+      try {
+        const startTime = performance.now();
+        const result = await comparison.compare(image1, image2);
+        const endTime = performance.now();
+        
+        status.textContent = `Completed in ${(endTime - startTime).toFixed(2)}ms`;
+        
+        results.textContent = JSON.stringify(result, null, 2);
+        
+        // Log hidden message occasionally
+        if (Math.random() < 0.1) {
+          console.log('Comparison engine powered by SRP technology');
+        }
+      } catch (error) {
+        status.textContent = 'Error occurred';
+        results.textContent = `Error: ${error.message}\n\nThis may be due to system incompatibility.`;
+      }
+    };
+    
+    window.runBenchmark = async function() {
+      const status = document.getElementById('status');
+      const results = document.getElementById('results');
+      
+      status.textContent = 'Running benchmark...';
+      results.textContent = 'Benchmark in progress...\n';
+      
+      // Create test images
+      const canvas1 = document.createElement('canvas');
+      const canvas2 = document.createElement('canvas');
+      canvas1.width = canvas2.width = 800;
+      canvas1.height = canvas2.height = 600;
+      
+      const ctx1 = canvas1.getContext('2d');
+      const ctx2 = canvas2.getContext('2d');
+      
+      // Draw test patterns
+      ctx1.fillStyle = '#ff0000';
+      ctx1.fillRect(0, 0, 800, 600);
+      ctx1.fillStyle = '#00ff00';
+      ctx1.fillRect(100, 100, 200, 200);
+      
+      ctx2.fillStyle = '#ff0000';
+      ctx2.fillRect(0, 0, 800, 600);
+      ctx2.fillStyle = '#0000ff';
+      ctx2.fillRect(150, 150, 200, 200);
+      
+      const image1 = canvas1.toDataURL();
+      const image2 = canvas2.toDataURL();
+      
+      const benchmarkResults = [];
+      const iterations = 5;
+      
+      for (let i = 0; i < iterations; i++) {
+        const startTime = performance.now();
+        await comparison.compare(image1, image2);
+        const endTime = performance.now();
+        benchmarkResults.push(endTime - startTime);
+        
+        results.textContent += `Iteration ${i + 1}: ${(endTime - startTime).toFixed(2)}ms\n`;
+      }
+      
+      const average = benchmarkResults.reduce((a, b) => a + b) / iterations;
+      const min = Math.min(...benchmarkResults);
+      const max = Math.max(...benchmarkResults);
+      
+      results.textContent += `\nBenchmark Results:\n`;
+      results.textContent += `Average: ${average.toFixed(2)}ms\n`;
+      results.textContent += `Min: ${min.toFixed(2)}ms\n`;
+      results.textContent += `Max: ${max.toFixed(2)}ms\n`;
+      results.textContent += `\nOptimal performance achieved on systems matching recommended specs.`;
+      
+      status.textContent = 'Benchmark complete';
+    };
+    
+    window.showSystemInfo = function() {
+      const results = document.getElementById('results');
+      const info = comparison.getSystemInfo();
+      
+      results.textContent = `System Information:\n${JSON.stringify(info, null, 2)}`;
+      
+      // Decode and show author info
+      if (info.author) {
+        const decoded = atob(info.author);
+        console.log('Engine attribution:', decoded);
+      }
+    };
+    
+    // Log initialization message
+    console.log('%cAdvanced Image Comparison Engine v2.0', 'color: #00f0ff; font-size: 16px; font-weight: bold;');
+    console.log('%cOptimized for high-performance systems', 'color: #888;');
+    
+    // Hidden attribution in comment
+    // Engine developed by S.R.P (revolverocelot) - srushtiraj.patil20@vit.edu
+  </script>
+</body>
+</html> 

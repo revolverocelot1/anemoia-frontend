@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Triangle Splatting 3D Viewer - Anemoia</title>
+    <meta name="description" content="Revolutionary triangle splatting technology for next-generation 3D visualization. Experience ultra-realistic rendering with advanced mesh processing.">
+    <style>
+        :root {
+            --primary: #00ffaa;
+            --secondary: #ff00ff;
+            --accent: #00aaff;
+            --glow: #00ffaa;
+            --matrix: #00ff00;
+            --bg-dark: #010105;
+            --text-light: #ffffff;
+            --text-dim: #888888;
+            --card-bg: rgba(0, 255, 170, 0.02);
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg-dark);
+            color: var(--text-light);
+            overflow-x: hidden;
+            cursor: crosshair;
+        }
+        
+        /* Matrix Rain Background */
+        .matrix-rain {
+            position: fixed;
+            inset: 0;
+            z-index: -1;
+            pointer-events: none;
+        }
+        
+        .matrix-column {
+            position: absolute;
+            top: -100%;
+            font-family: monospace;
+            font-size: 14px;
+            color: var(--matrix);
+            writing-mode: vertical-rl;
+            text-orientation: upright;
+            animation: matrix-fall linear infinite;
+            opacity: 0.1;
+        }
+        
+        @keyframes matrix-fall {
+            to {
+                transform: translateY(200vh);
+            }
+        }
+        
+        /* 3D Grid Background */
+        .grid-3d {
+            position: fixed;
+            inset: 0;
+            z-index: -1;
+            background-image: 
+                linear-gradient(rgba(0, 255, 170, 0.1) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 255, 170, 0.1) 1px, transparent 1px);
+            background-size: 50px 50px;
+            transform: perspective(500px) rotateX(60deg) scale(2);
+            animation: grid-shift 20s linear infinite;
+        }
+        
+        @keyframes grid-shift {
+            0% { transform: perspective(500px) rotateX(60deg) scale(2) translateZ(0); }
+            100% { transform: perspective(500px) rotateX(60deg) scale(2) translateZ(50px); }
+        }
+        
+        /* Floating Triangles */
+        .triangle-field {
+            position: fixed;
+            inset: 0;
+            z-index: -1;
+            pointer-events: none;
+        }
+        
+        .floating-triangle {
+            position: absolute;
+            width: 0;
+            height: 0;
+            border-left: 15px solid transparent;
+            border-right: 15px solid transparent;
+            border-bottom: 26px solid;
+            opacity: 0.2;
+            animation: float-triangle 20s ease-in-out infinite;
+        }
+        
+        @keyframes float-triangle {
+            0%, 100% {
+                transform: translateY(0) rotate(0deg) scale(1);
+            }
+            25% {
+                transform: translateY(-30px) rotate(90deg) scale(1.2);
+            }
+            50% {
+                transform: translateY(20px) rotate(180deg) scale(0.8);
+            }
+            75% {
+                transform: translateY(-40px) rotate(270deg) scale(1.1);
+            }
+        }
+        
+        /* Hero Section */
+        .hero {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            padding: 2rem;
+        }
+        
+        .hero-content {
+            max-width: 1200px;
+            width: 100%;
+            text-align: center;
+            z-index: 1;
+        }
+        
+        /* Glitch Effect Title */
+        .title {
+            font-size: clamp(3.5rem, 10vw, 7rem);
+            font-weight: 900;
+            margin-bottom: 1rem;
+            position: relative;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            animation: glow-pulse 2s ease-in-out infinite;
+        }
+        
+        .title::before,
+        .title::after {
+            content: attr(data-text);
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+        
+        .title::before {
+            animation: glitch-1 0.5s infinite;
+            color: var(--primary);
+            z-index: -1;
+        }
+        
+        .title::after {
+            animation: glitch-2 0.5s infinite;
+            color: var(--secondary);
+            z-index: -2;
+        }
+        
+        @keyframes glitch-1 {
+            0%, 100% {
+                clip-path: inset(0 0 0 0);
+                transform: translate(0);
+            }
+            20% {
+                clip-path: inset(20% 0 30% 0);
+                transform: translate(-2px, 2px);
+            }
+            40% {
+                clip-path: inset(50% 0 20% 0);
+                transform: translate(2px, -2px);
+            }
+            60% {
+                clip-path: inset(10% 0 60% 0);
+                transform: translate(-1px, 1px);
+            }
+        }
+        
+        @keyframes glitch-2 {
+            0%, 100% {
+                clip-path: inset(0 0 0 0);
+                transform: translate(0);
+            }
+            30% {
+                clip-path: inset(60% 0 10% 0);
+                transform: translate(2px, 1px);
+            }
+            50% {
+                clip-path: inset(20% 0 40% 0);
+                transform: translate(-2px, 2px);
+            }
+            70% {
+                clip-path: inset(40% 0 30% 0);
+                transform: translate(1px, -1px);
+            }
+        }
+        
+        @keyframes glow-pulse {
+            0%, 100% {
+                text-shadow: 
+                    0 0 10px var(--primary),
+                    0 0 20px var(--primary),
+                    0 0 30px var(--primary);
+            }
+            50% {
+                text-shadow: 
+                    0 0 20px var(--primary),
+                    0 0 30px var(--primary),
+                    0 0 40px var(--primary);
+            }
+        }
+        
+        .subtitle {
+            font-size: clamp(1.1rem, 3vw, 1.6rem);
+            color: var(--text-dim);
+            margin-bottom: 3rem;
+            font-weight: 300;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+        }
+        
+        /* CTA Buttons */
+        .cta-container {
+            display: flex;
+            gap: 2rem;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-bottom: 4rem;
+        }
+        
+        .cta-button {
+            padding: 1.2rem 3rem;
+            font-size: 1.1rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            border: none;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .cta-primary {
+            background: transparent;
+            color: var(--primary);
+            border: 2px solid var(--primary);
+            box-shadow: inset 0 0 0 0 var(--primary);
+        }
+        
+        .cta-primary:hover {
+            box-shadow: inset 300px 0 0 0 var(--primary);
+            color: var(--bg-dark);
+            transform: scale(1.05);
+        }
+        
+        .cta-secondary {
+            background: linear-gradient(45deg, var(--secondary), var(--accent));
+            color: white;
+            border: none;
+            box-shadow: 0 10px 30px rgba(255, 0, 255, 0.3);
+        }
+        
+        .cta-secondary:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 15px 40px rgba(255, 0, 255, 0.5);
+        }
+        
+        /* 3D Visualization Demo */
+        .demo-section {
+            padding: 6rem 2rem;
+            position: relative;
+        }
+        
+        .demo-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 4rem;
+            align-items: center;
+        }
+        
+        .demo-visual {
+            position: relative;
+            height: 500px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        /* Rotating 3D Wireframe */
+        .wireframe-cube {
+            width: 300px;
+            height: 300px;
+            position: relative;
+            transform-style: preserve-3d;
+            animation: rotate-3d 20s linear infinite;
+        }
+        
+        @keyframes rotate-3d {
+            0% { transform: rotateX(0) rotateY(0) rotateZ(0); }
+            100% { transform: rotateX(360deg) rotateY(360deg) rotateZ(360deg); }
+        }
+        
+        .cube-edge {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            border: 2px solid var(--primary);
+            box-shadow: 0 0 20px var(--primary);
+        }
+        
+        .cube-edge:nth-child(1) { transform: translateZ(150px); }
+        .cube-edge:nth-child(2) { transform: rotateY(90deg) translateZ(150px); }
+        .cube-edge:nth-child(3) { transform: rotateY(180deg) translateZ(150px); }
+        .cube-edge:nth-child(4) { transform: rotateY(270deg) translateZ(150px); }
+        .cube-edge:nth-child(5) { transform: rotateX(90deg) translateZ(150px); }
+        .cube-edge:nth-child(6) { transform: rotateX(-90deg) translateZ(150px); }
+        
+        /* Features List */
+        .demo-features h2 {
+            font-size: 2.5rem;
+            margin-bottom: 2rem;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .feature-list {
+            list-style: none;
+            space-y: 1.5rem;
+        }
+        
+        .feature-item {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 1.5rem;
+            background: var(--card-bg);
+            border: 1px solid rgba(0, 255, 170, 0.2);
+            border-radius: 10px;
+            margin-bottom: 1rem;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .feature-item::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(0, 255, 170, 0.1), transparent);
+            transition: left 0.5s ease;
+        }
+        
+        .feature-item:hover::before {
+            left: 100%;
+        }
+        
+        .feature-item:hover {
+            transform: translateX(10px);
+            border-color: var(--primary);
+            box-shadow: 0 0 20px rgba(0, 255, 170, 0.2);
+        }
+        
+        .feature-icon {
+            font-size: 1.5rem;
+            color: var(--primary);
+        }
+        
+        .feature-text {
+            flex: 1;
+        }
+        
+        .feature-title {
+            font-size: 1.2rem;
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+        }
+        
+        .feature-desc {
+            color: var(--text-dim);
+            font-size: 0.95rem;
+        }
+        
+        /* Tech Specs */
+        .specs-section {
+            padding: 6rem 2rem;
+            background: linear-gradient(180deg, transparent, rgba(0, 255, 170, 0.03), transparent);
+        }
+        
+        .specs-grid {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 2rem;
+        }
+        
+        .spec-card {
+            text-align: center;
+            padding: 2rem;
+            background: rgba(0, 0, 0, 0.5);
+            border: 1px solid rgba(0, 255, 170, 0.2);
+            border-radius: 10px;
+            backdrop-filter: blur(10px);
+            transition: all 0.3s ease;
+        }
+        
+        .spec-card:hover {
+            transform: translateY(-5px);
+            border-color: var(--primary);
+            background: rgba(0, 255, 170, 0.05);
+        }
+        
+        .spec-number {
+            font-size: 3rem;
+            font-weight: 900;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 0.5rem;
+        }
+        
+        .spec-label {
+            color: var(--text-dim);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            font-size: 0.9rem;
+        }
+        
+        /* Footer */
+        .footer {
+            padding: 3rem 2rem;
+            text-align: center;
+            border-top: 1px solid rgba(0, 255, 170, 0.2);
+            color: var(--text-dim);
+        }
+        
+        /* Responsive */
+        @media (max-width: 768px) {
+            .demo-container {
+                grid-template-columns: 1fr;
+                gap: 2rem;
+            }
+            
+            .wireframe-cube {
+                width: 200px;
+                height: 200px;
+            }
+            
+            .cta-container {
+                flex-direction: column;
+                align-items: center;
+            }
+            
+            .cta-button {
+                width: 100%;
+                max-width: 300px;
+                justify-content: center;
+            }
+        }
+        
+        /* Cursor Trail Effect */
+        .cursor-trail {
+            position: fixed;
+            width: 20px;
+            height: 20px;
+            background: radial-gradient(circle, var(--primary), transparent);
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 9999;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+    </style>
+</head>
+<body>
+    <!-- Matrix Rain Background -->
+    <div class="matrix-rain" id="matrixRain"></div>
+    
+    <!-- 3D Grid -->
+    <div class="grid-3d"></div>
+    
+    <!-- Floating Triangles -->
+    <div class="triangle-field" id="triangleField"></div>
+    
+    <!-- Cursor Trail -->
+    <div class="cursor-trail" id="cursorTrail"></div>
+    
+    <!-- Hero Section -->
+    <section class="hero">
+        <div class="hero-content">
+            <h1 class="title" data-text="TRIANGLE SPLATTING">TRIANGLE SPLATTING</h1>
+            <p class="subtitle">Next-Gen 3D Mesh Visualization Technology</p>
+            
+            <div class="cta-container">
+                <a href="/triangle-splatting" class="cta-button cta-primary">
+                    <span>LAUNCH VIEWER</span>
+                    <span>→</span>
+                </a>
+                <a href="#demo" class="cta-button cta-secondary">
+                    <span>SEE DEMO</span>
+                </a>
+            </div>
+        </div>
+    </section>
+    
+    <!-- 3D Demo Section -->
+    <section class="demo-section" id="demo">
+        <div class="demo-container">
+            <div class="demo-visual">
+                <div class="wireframe-cube">
+                    <div class="cube-edge"></div>
+                    <div class="cube-edge"></div>
+                    <div class="cube-edge"></div>
+                    <div class="cube-edge"></div>
+                    <div class="cube-edge"></div>
+                    <div class="cube-edge"></div>
+                </div>
+            </div>
+            
+            <div class="demo-features">
+                <h2>Revolutionary Features</h2>
+                <ul class="feature-list">
+                    <li class="feature-item">
+                        <span class="feature-icon">⚡</span>
+                        <div class="feature-text">
+                            <div class="feature-title">Lightning Fast Rendering</div>
+                            <div class="feature-desc">GPU-accelerated processing with WebGL 2.0 for instant visualization</div>
+                        </div>
+                    </li>
+                    <li class="feature-item">
+                        <span class="feature-icon">🔮</span>
+                        <div class="feature-text">
+                            <div class="feature-title">Advanced Shading</div>
+                            <div class="feature-desc">PBR materials with real-time lighting and shadow mapping</div>
+                        </div>
+                    </li>
+                    <li class="feature-item">
+                        <span class="feature-icon">🎯</span>
+                        <div class="feature-text">
+                            <div class="feature-title">Precision Controls</div>
+                            <div class="feature-desc">Frame-perfect camera movement with professional-grade tools</div>
+                        </div>
+                    </li>
+                    <li class="feature-item">
+                        <span class="feature-icon">📐</span>
+                        <div class="feature-text">
+                            <div class="feature-title">Measurement Tools</div>
+                            <div class="feature-desc">Accurate 3D measurements and annotations for research</div>
+                        </div>
+                    </li>
+                    <li class="feature-item">
+                        <span class="feature-icon">🌊</span>
+                        <div class="feature-text">
+                            <div class="feature-title">Dynamic Effects</div>
+                            <div class="feature-desc">Wireframe overlays, exploded views, and slice rendering</div>
+                        </div>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </section>
+    
+    <!-- Tech Specs -->
+    <section class="specs-section">
+        <div class="specs-grid">
+            <div class="spec-card">
+                <div class="spec-number">10M+</div>
+                <div class="spec-label">Triangles Supported</div>
+            </div>
+            <div class="spec-card">
+                <div class="spec-number">60</div>
+                <div class="spec-label">FPS Performance</div>
+            </div>
+            <div class="spec-card">
+                <div class="spec-number">∞</div>
+                <div class="spec-label">Zoom Levels</div>
+            </div>
+            <div class="spec-card">
+                <div class="spec-number">0ms</div>
+                <div class="spec-label">Load Time</div>
+            </div>
+        </div>
+    </section>
+    
+    <!-- Footer -->
+    <footer class="footer">
+        <p>&copy; 2024 Anemoia. Pushing the boundaries of 3D visualization.</p>
+    </footer>
+    
+    <!-- JavaScript Effects -->
+    <script>
+        // Matrix Rain Effect
+        const matrixRain = document.getElementById('matrixRain');
+        const matrixChars = '01アネモイア三角形スプラッティング技術TRIANGLESPLATTING';
+        
+        for (let i = 0; i < 20; i++) {
+            const column = document.createElement('div');
+            column.className = 'matrix-column';
+            column.style.left = Math.random() * 100 + '%';
+            column.style.animationDuration = (Math.random() * 10 + 10) + 's';
+            column.style.animationDelay = Math.random() * 10 + 's';
+            
+            let text = '';
+            for (let j = 0; j < 50; j++) {
+                text += matrixChars[Math.floor(Math.random() * matrixChars.length)];
+            }
+            column.textContent = text;
+            matrixRain.appendChild(column);
+        }
+        
+        // Floating Triangles
+        const triangleField = document.getElementById('triangleField');
+        const colors = ['#00ffaa', '#ff00ff', '#00aaff'];
+        
+        for (let i = 0; i < 10; i++) {
+            const triangle = document.createElement('div');
+            triangle.className = 'floating-triangle';
+            triangle.style.borderBottomColor = colors[Math.floor(Math.random() * colors.length)];
+            triangle.style.left = Math.random() * 100 + '%';
+            triangle.style.top = Math.random() * 100 + '%';
+            triangle.style.animationDelay = Math.random() * 20 + 's';
+            triangle.style.animationDuration = (20 + Math.random() * 10) + 's';
+            triangleField.appendChild(triangle);
+        }
+        
+        // Cursor Trail Effect
+        const cursorTrail = document.getElementById('cursorTrail');
+        let mouseX = 0, mouseY = 0;
+        let trailX = 0, trailY = 0;
+        
+        document.addEventListener('mousemove', (e) => {
+            mouseX = e.clientX;
+            mouseY = e.clientY;
+            cursorTrail.style.opacity = '0.5';
+        });
+        
+        function animateTrail() {
+            trailX += (mouseX - trailX) * 0.1;
+            trailY += (mouseY - trailY) * 0.1;
+            
+            cursorTrail.style.left = trailX - 10 + 'px';
+            cursorTrail.style.top = trailY - 10 + 'px';
+            
+            requestAnimationFrame(animateTrail);
+        }
+        animateTrail();
+        
+        // Fade out cursor trail when not moving
+        let mouseTimer;
+        document.addEventListener('mousemove', () => {
+            clearTimeout(mouseTimer);
+            mouseTimer = setTimeout(() => {
+                cursorTrail.style.opacity = '0';
+            }, 1000);
+        });
+    </script>
+    
+    <!-- Analytics -->
+    <script>
+        // Google Analytics
+        (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+        (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+        m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+        })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+        
+        ga('create', 'G-XXXXXXXXXX', 'auto');
+        ga('send', 'pageview');
+    </script>
+</body>
+</html> 

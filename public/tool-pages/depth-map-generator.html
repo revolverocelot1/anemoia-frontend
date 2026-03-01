@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Depth Map Generator - Anemoia</title>
+    <meta name="description" content="Generate depth maps from any image using AI. Create 3D effects, stereoscopic images, and depth-based visual effects.">
+    <style>
+        :root {
+            --primary: #00d4ff;
+            --secondary: #ff00ff;
+            --accent: #00ff88;
+            --bg-dark: #050515;
+            --text-light: #ffffff;
+            --text-dim: #8899aa;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg-dark);
+            color: var(--text-light);
+            overflow-x: hidden;
+        }
+        
+        /* 3D Grid Background */
+        .grid-bg {
+            position: fixed;
+            inset: 0;
+            z-index: -2;
+            perspective: 1000px;
+            overflow: hidden;
+        }
+        
+        .grid-plane {
+            position: absolute;
+            width: 200%;
+            height: 200%;
+            top: -50%;
+            left: -50%;
+            background-image: 
+                linear-gradient(rgba(0, 212, 255, 0.1) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 212, 255, 0.1) 1px, transparent 1px);
+            background-size: 50px 50px;
+            transform: rotateX(60deg) rotateZ(45deg);
+            animation: grid-move 20s linear infinite;
+        }
+        
+        @keyframes grid-move {
+            from {
+                transform: rotateX(60deg) rotateZ(45deg) translate(0, 0);
+            }
+            to {
+                transform: rotateX(60deg) rotateZ(45deg) translate(50px, 50px);
+            }
+        }
+        
+        /* Depth Particles */
+        .depth-particles {
+            position: fixed;
+            inset: 0;
+            z-index: -1;
+            perspective: 1000px;
+        }
+        
+        .particle {
+            position: absolute;
+            width: 2px;
+            height: 2px;
+            background: var(--primary);
+            border-radius: 50%;
+            animation: particle-float 15s linear infinite;
+        }
+        
+        @keyframes particle-float {
+            from {
+                transform: translateZ(0px) translateY(100vh);
+                opacity: 0;
+            }
+            10% {
+                opacity: 1;
+            }
+            90% {
+                opacity: 1;
+            }
+            to {
+                transform: translateZ(500px) translateY(-100vh);
+                opacity: 0;
+            }
+        }
+        
+        /* Hero Section */
+        .hero {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+            position: relative;
+        }
+        
+        .hero-content {
+            max-width: 1200px;
+            width: 100%;
+            text-align: center;
+            z-index: 1;
+        }
+        
+        .title {
+            font-size: 5rem;
+            font-weight: 900;
+            margin-bottom: 1rem;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            text-shadow: 0 0 80px rgba(0, 212, 255, 0.5);
+            animation: depth-shift 4s ease-in-out infinite;
+        }
+        
+        @keyframes depth-shift {
+            0%, 100% {
+                transform: translateZ(0);
+            }
+            50% {
+                transform: translateZ(50px);
+            }
+        }
+        
+        .subtitle {
+            font-size: 1.5rem;
+            color: var(--text-dim);
+            margin-bottom: 3rem;
+        }
+        
+        /* 3D Demo */
+        .demo-container {
+            margin: 4rem auto;
+            max-width: 800px;
+            perspective: 1000px;
+        }
+        
+        .demo-3d {
+            position: relative;
+            transform-style: preserve-3d;
+            transition: transform 0.6s;
+            cursor: move;
+        }
+        
+        .demo-layer {
+            position: absolute;
+            width: 100%;
+            height: 400px;
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow: 0 20px 60px rgba(0, 212, 255, 0.3);
+        }
+        
+        .original-layer {
+            background: linear-gradient(135deg, #1a1a2e, #16213e);
+            transform: translateZ(0);
+            z-index: 1;
+        }
+        
+        .depth-layer {
+            background: linear-gradient(135deg, #000, #111);
+            transform: translateZ(-50px);
+            opacity: 0.8;
+        }
+        
+        .demo-image {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        
+        /* Depth Visualization */
+        .depth-vis {
+            position: relative;
+            height: 400px;
+            margin: 2rem 0;
+            overflow: hidden;
+            border-radius: 20px;
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .depth-wave {
+            position: absolute;
+            bottom: 0;
+            width: 100%;
+            height: 60%;
+            background: linear-gradient(to top, var(--primary), transparent);
+            clip-path: polygon(
+                0 100%,
+                0 40%,
+                25% 30%,
+                50% 50%,
+                75% 20%,
+                100% 35%,
+                100% 100%
+            );
+            animation: wave-motion 4s ease-in-out infinite;
+        }
+        
+        @keyframes wave-motion {
+            0%, 100% {
+                transform: translateY(0);
+            }
+            50% {
+                transform: translateY(-20px);
+            }
+        }
+        
+        /* Features */
+        .features-section {
+            padding: 6rem 2rem;
+            position: relative;
+            z-index: 1;
+        }
+        
+        .features-grid {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 3rem;
+        }
+        
+        .feature-card {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(0, 212, 255, 0.2);
+            border-radius: 20px;
+            padding: 2.5rem;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.4s ease;
+            transform-style: preserve-3d;
+        }
+        
+        .feature-card::before {
+            content: '';
+            position: absolute;
+            inset: -2px;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            border-radius: 20px;
+            opacity: 0;
+            transition: opacity 0.4s ease;
+            z-index: -1;
+        }
+        
+        .feature-card:hover {
+            transform: translateZ(20px) rotateX(5deg);
+            box-shadow: 0 30px 60px rgba(0, 212, 255, 0.4);
+        }
+        
+        .feature-card:hover::before {
+            opacity: 0.1;
+        }
+        
+        .feature-icon {
+            width: 80px;
+            height: 80px;
+            margin: 0 auto 1.5rem;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2.5rem;
+            box-shadow: 0 10px 30px rgba(0, 212, 255, 0.3);
+        }
+        
+        /* Use Cases */
+        .use-cases {
+            padding: 4rem 2rem;
+            background: rgba(0, 212, 255, 0.02);
+        }
+        
+        .case-grid {
+            max-width: 1200px;
+            margin: 3rem auto 0;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 2rem;
+        }
+        
+        .case-item {
+            text-align: center;
+            padding: 2rem;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+            transition: all 0.3s ease;
+        }
+        
+        .case-item:hover {
+            transform: translateY(-5px);
+            background: rgba(255, 255, 255, 0.08);
+        }
+        
+        .case-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+        
+        /* CTA */
+        .cta-section {
+            padding: 6rem 2rem;
+            text-align: center;
+            position: relative;
+        }
+        
+        .cta-button {
+            display: inline-block;
+            padding: 1.5rem 4rem;
+            font-size: 1.3rem;
+            font-weight: bold;
+            text-decoration: none;
+            color: var(--bg-dark);
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            border-radius: 50px;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s ease;
+            box-shadow: 0 10px 30px rgba(0, 212, 255, 0.4);
+        }
+        
+        .cta-button:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 20px 40px rgba(0, 212, 255, 0.6);
+        }
+        
+        @media (max-width: 768px) {
+            .title {
+                font-size: 3rem;
+            }
+            
+            .features-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="grid-bg">
+        <div class="grid-plane"></div>
+    </div>
+    
+    <div class="depth-particles" id="particles"></div>
+    
+    <section class="hero">
+        <div class="hero-content">
+            <h1 class="title">Depth Map Generator</h1>
+            <p class="subtitle">Transform 2D images into 3D depth maps with AI</p>
+            
+            <div class="demo-container">
+                <div class="demo-3d" id="demo3d">
+                    <div class="demo-layer depth-layer">
+                        <svg class="demo-image" viewBox="0 0 800 400">
+                            <defs>
+                                <linearGradient id="depthGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                                    <stop offset="0%" style="stop-color:#fff;stop-opacity:1" />
+                                    <stop offset="50%" style="stop-color:#888;stop-opacity:1" />
+                                    <stop offset="100%" style="stop-color:#000;stop-opacity:1" />
+                                </linearGradient>
+                            </defs>
+                            <rect width="800" height="400" fill="#111"/>
+                            <circle cx="200" cy="200" r="80" fill="url(#depthGrad)"/>
+                            <rect x="400" y="150" width="150" height="100" fill="#666"/>
+                            <polygon points="600,300 700,300 650,200" fill="#ddd"/>
+                            <text x="400" y="350" text-anchor="middle" fill="#444" font-size="20">Depth Map</text>
+                        </svg>
+                    </div>
+                    <div class="demo-layer original-layer">
+                        <svg class="demo-image" viewBox="0 0 800 400">
+                            <defs>
+                                <linearGradient id="origGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                                    <stop offset="0%" style="stop-color:#00d4ff;stop-opacity:1" />
+                                    <stop offset="100%" style="stop-color:#ff00ff;stop-opacity:1" />
+                                </linearGradient>
+                            </defs>
+                            <rect width="800" height="400" fill="#1a1a2e"/>
+                            <circle cx="200" cy="200" r="80" fill="url(#origGrad)"/>
+                            <rect x="400" y="150" width="150" height="100" fill="#00ff88"/>
+                            <polygon points="600,300 700,300 650,200" fill="#ff00ff"/>
+                            <text x="400" y="350" text-anchor="middle" fill="#fff" font-size="20">Original Image</text>
+                        </svg>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="depth-vis">
+                <div class="depth-wave"></div>
+            </div>
+        </div>
+    </section>
+    
+    <section class="features-section">
+        <h2 style="text-align: center; font-size: 3rem; margin-bottom: 3rem; background: linear-gradient(135deg, var(--primary), var(--secondary)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">
+            Advanced Depth Estimation
+        </h2>
+        
+        <div class="features-grid">
+            <div class="feature-card">
+                <div class="feature-icon">🧠</div>
+                <h3 style="font-size: 1.5rem; margin-bottom: 1rem;">AI-Powered Analysis</h3>
+                <p style="color: var(--text-dim);">State-of-the-art neural networks analyze scene geometry and spatial relationships to create accurate depth maps</p>
+            </div>
+            
+            <div class="feature-card">
+                <div class="feature-icon">⚡</div>
+                <h3 style="font-size: 1.5rem; margin-bottom: 1rem;">Real-Time Processing</h3>
+                <p style="color: var(--text-dim);">Generate depth maps instantly with GPU acceleration. Process images in seconds, not minutes</p>
+            </div>
+            
+            <div class="feature-card">
+                <div class="feature-icon">🎨</div>
+                <h3 style="font-size: 1.5rem; margin-bottom: 1rem;">Multiple Formats</h3>
+                <p style="color: var(--text-dim);">Export depth maps as grayscale images, normalized values, or 3D point clouds for various applications</p>
+            </div>
+            
+            <div class="feature-card">
+                <div class="feature-icon">🔧</div>
+                <h3 style="font-size: 1.5rem; margin-bottom: 1rem;">Fine-Tune Control</h3>
+                <p style="color: var(--text-dim);">Adjust depth range, contrast, and smoothing to perfect your depth maps for specific use cases</p>
+            </div>
+            
+            <div class="feature-card">
+                <div class="feature-icon">🌐</div>
+                <h3 style="font-size: 1.5rem; margin-bottom: 1rem;">Browser-Based</h3>
+                <p style="color: var(--text-dim);">No installation needed. Works entirely in your browser with complete privacy - images never leave your device</p>
+            </div>
+            
+            <div class="feature-card">
+                <div class="feature-icon">🚀</div>
+                <h3 style="font-size: 1.5rem; margin-bottom: 1rem;">Batch Processing</h3>
+                <p style="color: var(--text-dim);">Process multiple images at once. Perfect for creating depth maps for entire photo collections</p>
+            </div>
+        </div>
+    </section>
+    
+    <section class="use-cases">
+        <h2 style="text-align: center; font-size: 2.5rem; margin-bottom: 1rem;">Use Cases</h2>
+        <p style="text-align: center; color: var(--text-dim); font-size: 1.2rem;">Transform your creative projects with depth</p>
+        
+        <div class="case-grid">
+            <div class="case-item">
+                <div class="case-icon">🎮</div>
+                <h3>Game Development</h3>
+                <p style="color: var(--text-dim); font-size: 0.9rem;">Create depth maps for parallax scrolling and 3D effects</p>
+            </div>
+            
+            <div class="case-item">
+                <div class="case-icon">📸</div>
+                <h3>Photography</h3>
+                <p style="color: var(--text-dim); font-size: 0.9rem;">Add depth blur and focus effects to images</p>
+            </div>
+            
+            <div class="case-item">
+                <div class="case-icon">🎬</div>
+                <h3>VFX & Film</h3>
+                <p style="color: var(--text-dim); font-size: 0.9rem;">Generate depth passes for compositing</p>
+            </div>
+            
+            <div class="case-item">
+                <div class="case-icon">🥽</div>
+                <h3>3D Conversion</h3>
+                <p style="color: var(--text-dim); font-size: 0.9rem;">Convert 2D images to stereoscopic 3D</p>
+            </div>
+            
+            <div class="case-item">
+                <div class="case-icon">🎨</div>
+                <h3>Digital Art</h3>
+                <p style="color: var(--text-dim); font-size: 0.9rem;">Create unique depth-based artistic effects</p>
+            </div>
+            
+            <div class="case-item">
+                <div class="case-icon">🏗️</div>
+                <h3>Architecture</h3>
+                <p style="color: var(--text-dim); font-size: 0.9rem;">Analyze spatial depth in architectural photos</p>
+            </div>
+        </div>
+    </section>
+    
+    <section class="cta-section">
+        <h2 style="font-size: 2.5rem; margin-bottom: 1rem;">Add Depth to Your Vision</h2>
+        <p style="color: var(--text-dim); font-size: 1.2rem; margin-bottom: 2rem;">
+            Start generating professional depth maps in seconds
+        </p>
+        <a href="/depth-map" class="cta-button">
+            <span style="position: relative; z-index: 1;">Generate Depth Maps</span>
+        </a>
+    </section>
+    
+    <script>
+        // Create depth particles
+        const particleContainer = document.getElementById('particles');
+        for (let i = 0; i < 50; i++) {
+            const particle = document.createElement('div');
+            particle.className = 'particle';
+            particle.style.left = Math.random() * 100 + '%';
+            particle.style.animationDelay = Math.random() * 15 + 's';
+            particle.style.animationDuration = (10 + Math.random() * 10) + 's';
+            const size = Math.random() * 3 + 1;
+            particle.style.width = size + 'px';
+            particle.style.height = size + 'px';
+            particleContainer.appendChild(particle);
+        }
+        
+        // 3D demo interaction
+        const demo3d = document.getElementById('demo3d');
+        let mouseX = 0, mouseY = 0;
+        let targetX = 0, targetY = 0;
+        
+        document.addEventListener('mousemove', (e) => {
+            const rect = demo3d.getBoundingClientRect();
+            const centerX = rect.left + rect.width / 2;
+            const centerY = rect.top + rect.height / 2;
+            
+            mouseX = (e.clientX - centerX) / (rect.width / 2);
+            mouseY = (e.clientY - centerY) / (rect.height / 2);
+        });
+        
+        function animate3D() {
+            targetX += (mouseX - targetX) * 0.1;
+            targetY += (mouseY - targetY) * 0.1;
+            
+            demo3d.style.transform = `rotateY(${targetX * 20}deg) rotateX(${-targetY * 20}deg)`;
+            
+            requestAnimationFrame(animate3D);
+        }
+        
+        animate3D();
+        
+        // Touch support
+        demo3d.addEventListener('touchmove', (e) => {
+            const touch = e.touches[0];
+            const rect = demo3d.getBoundingClientRect();
+            const centerX = rect.left + rect.width / 2;
+            const centerY = rect.top + rect.height / 2;
+            
+            mouseX = (touch.clientX - centerX) / (rect.width / 2);
+            mouseY = (touch.clientY - centerY) / (rect.height / 2);
+        });
+    </script>
+</body>
+</html> 

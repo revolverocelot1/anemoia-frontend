@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Transcription Test - Anemoia</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #1a1a1a;
+            color: #fff;
+        }
+        .container {
+            background: #2a2a2a;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+        button {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #2563eb;
+        }
+        button:disabled {
+            background: #666;
+            cursor: not-allowed;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        .success {
+            background: #10b981;
+            color: white;
+        }
+        .error {
+            background: #ef4444;
+            color: white;
+        }
+        .info {
+            background: #3b82f6;
+            color: white;
+        }
+        .warning {
+            background: #f59e0b;
+            color: white;
+        }
+        .transcription-result {
+            background: #333;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+            font-family: monospace;
+        }
+        video {
+            width: 100%;
+            max-width: 600px;
+            margin: 20px 0;
+        }
+        .segment {
+            background: #444;
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 5px;
+        }
+        .controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+    </style>
+</head>
+<body>
+    <h1>Transcription Test</h1>
+    
+    <div class="container">
+        <h2>1. Browser Support Check</h2>
+        <div id="support-status"></div>
+    </div>
+
+    <div class="container">
+        <h2>2. Test Video</h2>
+        <video id="test-video" controls>
+            <source src="/test-video.mp4" type="video/mp4">
+            <source src="/test file/output (1).mp4" type="video/mp4">
+            Your browser does not support the video tag.
+        </video>
+        <div class="controls">
+            <input type="file" id="video-upload" accept="video/*">
+            <button onclick="loadVideo()">Load Video</button>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>3. Web Speech API Test</h2>
+        <div class="controls">
+            <button id="start-webspeech" onclick="startWebSpeech()">Start Web Speech</button>
+            <button id="stop-webspeech" onclick="stopWebSpeech()" disabled>Stop</button>
+            <select id="language-select">
+                <option value="en-US">English (US)</option>
+                <option value="es-ES">Spanish</option>
+                <option value="fr-FR">French</option>
+                <option value="de-DE">German</option>
+                <option value="ja-JP">Japanese</option>
+                <option value="zh-CN">Chinese (Simplified)</option>
+            </select>
+        </div>
+        <div id="webspeech-status"></div>
+        <div id="webspeech-results" class="transcription-result" style="display:none;">
+            <h3>Transcription Results:</h3>
+            <div id="segments-list"></div>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>4. Audio Extraction Test</h2>
+        <button onclick="extractAudio()">Extract Audio from Video</button>
+        <div id="audio-status"></div>
+        <audio id="extracted-audio" controls style="display:none; width:100%; margin-top:10px;"></audio>
+    </div>
+
+    <script>
+        // Check browser support
+        function checkSupport() {
+            const status = document.getElementById('support-status');
+            let html = '';
+            
+            // Web Speech API
+            const speechSupported = 'webkitSpeechRecognition' in window || 'SpeechRecognition' in window;
+            html += `<div class="${speechSupported ? 'success' : 'error'} status">
+                Web Speech API: ${speechSupported ? '✓ Supported' : '✗ Not Supported'}
+            </div>`;
+            
+            // MediaRecorder API
+            const mediaRecorderSupported = 'MediaRecorder' in window;
+            html += `<div class="${mediaRecorderSupported ? 'success' : 'error'} status">
+                MediaRecorder API: ${mediaRecorderSupported ? '✓ Supported' : '✗ Not Supported'}
+            </div>`;
+            
+            // Web Audio API
+            const audioSupported = 'AudioContext' in window || 'webkitAudioContext' in window;
+            html += `<div class="${audioSupported ? 'success' : 'error'} status">
+                Web Audio API: ${audioSupported ? '✓ Supported' : '✗ Not Supported'}
+            </div>`;
+            
+            status.innerHTML = html;
+        }
+        
+        // Load video
+        function loadVideo() {
+            const fileInput = document.getElementById('video-upload');
+            const video = document.getElementById('test-video');
+            
+            if (fileInput.files.length > 0) {
+                const file = fileInput.files[0];
+                const url = URL.createObjectURL(file);
+                video.src = url;
+                video.load();
+            }
+        }
+        
+        // Web Speech API
+        let recognition = null;
+        let segments = [];
+        let startTime = 0;
+        
+        function startWebSpeech() {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            
+            if (!SpeechRecognition) {
+                document.getElementById('webspeech-status').innerHTML = 
+                    '<div class="error status">Web Speech API not supported in this browser</div>';
+                return;
+            }
+            
+            recognition = new SpeechRecognition();
+            recognition.continuous = true;
+            recognition.interimResults = true;
+            recognition.lang = document.getElementById('language-select').value;
+            
+            segments = [];
+            startTime = Date.now();
+            
+            recognition.onstart = () => {
+                document.getElementById('start-webspeech').disabled = true;
+                document.getElementById('stop-webspeech').disabled = false;
+                document.getElementById('webspeech-status').innerHTML = 
+                    '<div class="info status">Listening... Speak into your microphone</div>';
+                document.getElementById('webspeech-results').style.display = 'block';
+            };
+            
+            recognition.onresult = (event) => {
+                const results = event.results;
+                let interimTranscript = '';
+                
+                for (let i = event.resultIndex; i < results.length; i++) {
+                    const transcript = results[i][0].transcript;
+                    
+                    if (results[i].isFinal) {
+                        const currentTime = (Date.now() - startTime) / 1000;
+                        const segment = {
+                            text: transcript,
+                            startTime: segments.length > 0 ? segments[segments.length - 1].endTime : 0,
+                            endTime: currentTime,
+                            confidence: results[i][0].confidence || 0.9
+                        };
+                        segments.push(segment);
+                        updateSegmentsList();
+                    } else {
+                        interimTranscript += transcript;
+                    }
+                }
+                
+                if (interimTranscript) {
+                    document.getElementById('webspeech-status').innerHTML = 
+                        `<div class="info status">Interim: ${interimTranscript}</div>`;
+                }
+            };
+            
+            recognition.onerror = (event) => {
+                document.getElementById('webspeech-status').innerHTML = 
+                    `<div class="error status">Error: ${event.error}</div>`;
+                stopWebSpeech();
+            };
+            
+            recognition.onend = () => {
+                stopWebSpeech();
+            };
+            
+            recognition.start();
+        }
+        
+        function stopWebSpeech() {
+            if (recognition) {
+                recognition.stop();
+            }
+            document.getElementById('start-webspeech').disabled = false;
+            document.getElementById('stop-webspeech').disabled = true;
+            document.getElementById('webspeech-status').innerHTML = 
+                '<div class="success status">Transcription stopped</div>';
+        }
+        
+        function updateSegmentsList() {
+            const list = document.getElementById('segments-list');
+            list.innerHTML = segments.map((seg, i) => `
+                <div class="segment">
+                    <strong>Segment ${i + 1}</strong> (${seg.startTime.toFixed(2)}s - ${seg.endTime.toFixed(2)}s)<br>
+                    Text: ${seg.text}<br>
+                    Confidence: ${(seg.confidence * 100).toFixed(1)}%
+                </div>
+            `).join('');
+        }
+        
+        // Extract audio from video
+        async function extractAudio() {
+            const video = document.getElementById('test-video');
+            const status = document.getElementById('audio-status');
+            
+            if (!video.src) {
+                status.innerHTML = '<div class="error status">Please load a video first</div>';
+                return;
+            }
+            
+            try {
+                status.innerHTML = '<div class="info status">Extracting audio...</div>';
+                
+                // Create audio context
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                const audioContext = new AudioContext();
+                
+                // Create media element source
+                const source = audioContext.createMediaElementSource(video);
+                const destination = audioContext.createMediaStreamDestination();
+                source.connect(destination);
+                source.connect(audioContext.destination);
+                
+                // Record audio
+                const mediaRecorder = new MediaRecorder(destination.stream);
+                const chunks = [];
+                
+                mediaRecorder.ondataavailable = (e) => {
+                    chunks.push(e.data);
+                };
+                
+                mediaRecorder.onstop = () => {
+                    const blob = new Blob(chunks, { type: 'audio/webm' });
+                    const url = URL.createObjectURL(blob);
+                    const audio = document.getElementById('extracted-audio');
+                    audio.src = url;
+                    audio.style.display = 'block';
+                    status.innerHTML = '<div class="success status">Audio extracted successfully</div>';
+                };
+                
+                // Start recording
+                video.currentTime = 0;
+                video.play();
+                mediaRecorder.start();
+                
+                // Stop when video ends
+                video.onended = () => {
+                    mediaRecorder.stop();
+                    video.pause();
+                };
+                
+            } catch (error) {
+                status.innerHTML = `<div class="error status">Error: ${error.message}</div>`;
+            }
+        }
+        
+        // Initialize on load
+        window.onload = () => {
+            checkSupport();
+        };
+    </script>
+</body>
+</html> 

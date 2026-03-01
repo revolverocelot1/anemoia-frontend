@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Image Upscaler - Anemoia</title>
+    <meta name="description" content="Enhance your images with AI-powered upscaling. Transform low-resolution photos into crystal-clear, high-quality images using advanced neural networks.">
+    <style>
+        :root {
+            --primary: #ff71ce;
+            --secondary: #b967ff;
+            --accent: #05ffa1;
+            --bg-dark: #0a0014;
+            --text-light: #ffffff;
+            --text-dim: #b8b8b8;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg-dark);
+            color: var(--text-light);
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+        
+        /* Animated Background */
+        .background {
+            position: fixed;
+            inset: 0;
+            z-index: -1;
+            background: 
+                radial-gradient(circle at 20% 50%, rgba(255, 113, 206, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 80% 80%, rgba(185, 103, 255, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 40% 20%, rgba(5, 255, 161, 0.05) 0%, transparent 50%);
+        }
+        
+        .floating-pixels {
+            position: fixed;
+            inset: 0;
+            z-index: -1;
+            opacity: 0.5;
+        }
+        
+        .pixel {
+            position: absolute;
+            width: 4px;
+            height: 4px;
+            background: var(--primary);
+            animation: float 20s infinite linear;
+        }
+        
+        @keyframes float {
+            from {
+                transform: translateY(100vh) rotate(0deg);
+                opacity: 0;
+            }
+            10% {
+                opacity: 1;
+            }
+            90% {
+                opacity: 1;
+            }
+            to {
+                transform: translateY(-100vh) rotate(720deg);
+                opacity: 0;
+            }
+        }
+        
+        /* Hero Section */
+        .hero {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            padding: 2rem;
+        }
+        
+        .hero-content {
+            max-width: 1200px;
+            width: 100%;
+            text-align: center;
+        }
+        
+        .glitch-text {
+            font-size: 4rem;
+            font-weight: 900;
+            background: linear-gradient(135deg, var(--primary), var(--secondary), var(--accent));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 1rem;
+            position: relative;
+            animation: glow 2s ease-in-out infinite alternate;
+        }
+        
+        @keyframes glow {
+            from {
+                text-shadow: 0 0 20px rgba(255, 113, 206, 0.5);
+            }
+            to {
+                text-shadow: 0 0 30px rgba(185, 103, 255, 0.8);
+            }
+        }
+        
+        .subtitle {
+            font-size: 1.5rem;
+            color: var(--text-dim);
+            margin-bottom: 3rem;
+        }
+        
+        /* Demo Section */
+        .demo-container {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            padding: 2rem;
+            backdrop-filter: blur(10px);
+            margin: 2rem auto;
+            max-width: 1000px;
+        }
+        
+        .comparison-slider {
+            position: relative;
+            width: 100%;
+            max-width: 800px;
+            margin: 0 auto;
+            overflow: hidden;
+            border-radius: 10px;
+            border: 2px solid rgba(255, 113, 206, 0.3);
+        }
+        
+        .comparison-images {
+            display: flex;
+            height: 400px;
+            position: relative;
+        }
+        
+        .before, .after {
+            position: absolute;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        
+        .after {
+            clip-path: polygon(50% 0, 100% 0, 100% 100%, 50% 100%);
+        }
+        
+        .slider-handle {
+            position: absolute;
+            top: 0;
+            left: 50%;
+            width: 3px;
+            height: 100%;
+            background: var(--accent);
+            cursor: ew-resize;
+            transition: transform 0.2s;
+        }
+        
+        .slider-handle::before {
+            content: '◀ ▶';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: var(--accent);
+            color: var(--bg-dark);
+            padding: 0.5rem;
+            border-radius: 50px;
+            font-weight: bold;
+            white-space: nowrap;
+        }
+        
+        /* Features */
+        .features {
+            padding: 4rem 2rem;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            margin-top: 3rem;
+        }
+        
+        .feature-card {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 2rem;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .feature-card::before {
+            content: '';
+            position: absolute;
+            top: -2px;
+            left: -2px;
+            right: -2px;
+            bottom: -2px;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            border-radius: 15px;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            z-index: -1;
+        }
+        
+        .feature-card:hover {
+            transform: translateY(-5px);
+            background: rgba(255, 255, 255, 0.08);
+        }
+        
+        .feature-card:hover::before {
+            opacity: 0.3;
+        }
+        
+        .feature-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        /* CTA Button */
+        .cta-button {
+            display: inline-block;
+            padding: 1rem 3rem;
+            font-size: 1.2rem;
+            font-weight: bold;
+            text-decoration: none;
+            color: var(--bg-dark);
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            border-radius: 50px;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+            margin-top: 2rem;
+        }
+        
+        .cta-button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 10px 30px rgba(255, 113, 206, 0.4);
+        }
+        
+        .cta-button::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            transition: width 0.5s, height 0.5s;
+        }
+        
+        .cta-button:hover::before {
+            width: 300px;
+            height: 300px;
+        }
+        
+        /* Tech Stack */
+        .tech-stack {
+            display: flex;
+            justify-content: center;
+            gap: 2rem;
+            margin-top: 3rem;
+            flex-wrap: wrap;
+        }
+        
+        .tech-badge {
+            padding: 0.5rem 1.5rem;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 25px;
+            font-size: 0.9rem;
+            transition: all 0.3s ease;
+        }
+        
+        .tech-badge:hover {
+            background: rgba(255, 113, 206, 0.2);
+            border-color: var(--primary);
+            transform: translateY(-2px);
+        }
+        
+        /* Mobile Responsive */
+        @media (max-width: 768px) {
+            .glitch-text {
+                font-size: 2.5rem;
+            }
+            
+            .subtitle {
+                font-size: 1.2rem;
+            }
+            
+            .comparison-images {
+                height: 250px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="background"></div>
+    <div class="floating-pixels"></div>
+    
+    <section class="hero">
+        <div class="hero-content">
+            <h1 class="glitch-text">AI Image Upscaler</h1>
+            <p class="subtitle">Transform pixels into perfection with neural enhancement</p>
+            
+            <div class="demo-container">
+                <div class="comparison-slider">
+                    <div class="comparison-images">
+                        <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='400'%3E%3Crect fill='%23222' width='400' height='400'/%3E%3Ctext x='50%25' y='50%25' text-anchor='middle' dy='.3em' fill='%23666' font-family='Arial' font-size='20'%3ELow Resolution%3C/text%3E%3C/svg%3E" alt="Before" class="before">
+                        <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='400'%3E%3Crect fill='%23333' width='400' height='400'/%3E%3Ctext x='50%25' y='50%25' text-anchor='middle' dy='.3em' fill='%23fff' font-family='Arial' font-size='20'%3EHigh Resolution%3C/text%3E%3C/svg%3E" alt="After" class="after">
+                        <div class="slider-handle"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <a href="/upscaler" class="cta-button">
+                <span style="position: relative; z-index: 1;">Start Upscaling</span>
+            </a>
+        </div>
+    </section>
+    
+    <section class="features">
+        <h2 style="text-align: center; font-size: 2.5rem; margin-bottom: 1rem;">
+            Powered by Advanced AI
+        </h2>
+        
+        <div class="feature-grid">
+            <div class="feature-card">
+                <div class="feature-icon">🚀</div>
+                <h3>Lightning Fast</h3>
+                <p>Process images in seconds with GPU acceleration and optimized neural networks</p>
+            </div>
+            
+            <div class="feature-card">
+                <div class="feature-icon">✨</div>
+                <h3>4x Resolution</h3>
+                <p>Increase image resolution up to 4 times while preserving natural details and textures</p>
+            </div>
+            
+            <div class="feature-card">
+                <div class="feature-icon">🎨</div>
+                <h3>Smart Enhancement</h3>
+                <p>AI intelligently enhances details, reduces noise, and improves overall image quality</p>
+            </div>
+            
+            <div class="feature-card">
+                <div class="feature-icon">🔒</div>
+                <h3>Privacy First</h3>
+                <p>All processing happens locally in your browser. Your images never leave your device</p>
+            </div>
+            
+            <div class="feature-card">
+                <div class="feature-icon">📱</div>
+                <h3>Works Everywhere</h3>
+                <p>Compatible with all modern browsers on desktop and mobile devices</p>
+            </div>
+            
+            <div class="feature-card">
+                <div class="feature-icon">💎</div>
+                <h3>Multiple Models</h3>
+                <p>Choose from different AI models optimized for photos, artwork, or anime images</p>
+            </div>
+        </div>
+        
+        <div class="tech-stack">
+            <span class="tech-badge">Real-ESRGAN</span>
+            <span class="tech-badge">WebAssembly</span>
+            <span class="tech-badge">TensorFlow.js</span>
+            <span class="tech-badge">WebGL Acceleration</span>
+        </div>
+    </section>
+    
+    <script>
+        // Create floating pixels
+        const pixelContainer = document.querySelector('.floating-pixels');
+        for (let i = 0; i < 30; i++) {
+            const pixel = document.createElement('div');
+            pixel.className = 'pixel';
+            pixel.style.left = Math.random() * 100 + '%';
+            pixel.style.animationDelay = Math.random() * 20 + 's';
+            pixel.style.animationDuration = (15 + Math.random() * 10) + 's';
+            pixelContainer.appendChild(pixel);
+        }
+        
+        // Image comparison slider
+        const slider = document.querySelector('.comparison-slider');
+        const handle = document.querySelector('.slider-handle');
+        const afterImage = document.querySelector('.after');
+        let isSliding = false;
+        
+        function updateSlider(x) {
+            const rect = slider.getBoundingClientRect();
+            const percentage = Math.max(0, Math.min(100, ((x - rect.left) / rect.width) * 100));
+            handle.style.left = percentage + '%';
+            afterImage.style.clipPath = `polygon(${percentage}% 0, 100% 0, 100% 100%, ${percentage}% 100%)`;
+        }
+        
+        slider.addEventListener('mousedown', (e) => {
+            isSliding = true;
+            updateSlider(e.clientX);
+        });
+        
+        document.addEventListener('mousemove', (e) => {
+            if (isSliding) {
+                updateSlider(e.clientX);
+            }
+        });
+        
+        document.addEventListener('mouseup', () => {
+            isSliding = false;
+        });
+        
+        // Touch support
+        slider.addEventListener('touchstart', (e) => {
+            isSliding = true;
+            updateSlider(e.touches[0].clientX);
+        });
+        
+        document.addEventListener('touchmove', (e) => {
+            if (isSliding) {
+                updateSlider(e.touches[0].clientX);
+            }
+        });
+        
+        document.addEventListener('touchend', () => {
+            isSliding = false;
+        });
+    </script>
+</body>
+</html> 

@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Background Remover - Anemoia</title>
+    <meta name="description" content="Remove backgrounds instantly with AI. Perfect cutouts for products, portraits, and any image. No manual editing required.">
+    <style>
+        :root {
+            --primary: #00ff88;
+            --secondary: #00ccff;
+            --accent: #ff00ff;
+            --bg-dark: #0a0a1a;
+            --text-light: #ffffff;
+            --text-dim: #aaaaaa;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg-dark);
+            color: var(--text-light);
+            overflow-x: hidden;
+        }
+        
+        /* Matrix Rain Background */
+        .matrix-bg {
+            position: fixed;
+            inset: 0;
+            z-index: -1;
+            opacity: 0.1;
+        }
+        
+        .matrix-column {
+            position: absolute;
+            top: -100vh;
+            font-family: monospace;
+            font-size: 14px;
+            color: var(--primary);
+            text-shadow: 0 0 10px var(--primary);
+            animation: matrix-fall linear infinite;
+        }
+        
+        @keyframes matrix-fall {
+            to {
+                transform: translateY(200vh);
+            }
+        }
+        
+        /* Gradient Orbs */
+        .gradient-orbs {
+            position: fixed;
+            inset: 0;
+            z-index: -2;
+        }
+        
+        .orb {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(80px);
+            opacity: 0.4;
+            animation: orb-float 20s ease-in-out infinite;
+        }
+        
+        .orb:nth-child(1) {
+            width: 600px;
+            height: 600px;
+            background: var(--primary);
+            top: -300px;
+            left: -300px;
+        }
+        
+        .orb:nth-child(2) {
+            width: 400px;
+            height: 400px;
+            background: var(--secondary);
+            bottom: -200px;
+            right: -200px;
+            animation-delay: -10s;
+        }
+        
+        .orb:nth-child(3) {
+            width: 500px;
+            height: 500px;
+            background: var(--accent);
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            animation-delay: -5s;
+        }
+        
+        @keyframes orb-float {
+            0%, 100% {
+                transform: translate(0, 0) scale(1);
+            }
+            33% {
+                transform: translate(50px, -50px) scale(1.1);
+            }
+            66% {
+                transform: translate(-50px, 50px) scale(0.9);
+            }
+        }
+        
+        /* Hero Section */
+        .hero {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+        }
+        
+        .hero-content {
+            max-width: 1200px;
+            width: 100%;
+            text-align: center;
+        }
+        
+        .title {
+            font-size: 5rem;
+            font-weight: 900;
+            margin-bottom: 1rem;
+            background: linear-gradient(135deg, var(--primary), var(--secondary), var(--accent));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            animation: title-pulse 3s ease-in-out infinite;
+        }
+        
+        @keyframes title-pulse {
+            0%, 100% {
+                transform: scale(1);
+            }
+            50% {
+                transform: scale(1.02);
+            }
+        }
+        
+        .subtitle {
+            font-size: 1.5rem;
+            color: var(--text-dim);
+            margin-bottom: 3rem;
+        }
+        
+        /* Demo Section */
+        .demo-section {
+            margin: 4rem auto;
+            max-width: 1000px;
+        }
+        
+        .demo-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 2rem;
+            margin-bottom: 3rem;
+        }
+        
+        .demo-item {
+            position: relative;
+            overflow: hidden;
+            border-radius: 15px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        
+        .demo-item:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 20px 40px rgba(0, 255, 136, 0.3);
+        }
+        
+        .demo-image {
+            width: 100%;
+            height: 200px;
+            object-fit: cover;
+            transition: transform 0.3s ease;
+        }
+        
+        .demo-item:hover .demo-image {
+            transform: scale(1.1);
+        }
+        
+        .demo-overlay {
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(to top, rgba(0, 0, 0, 0.8), transparent);
+            display: flex;
+            align-items: flex-end;
+            padding: 1rem;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        
+        .demo-item:hover .demo-overlay {
+            opacity: 1;
+        }
+        
+        /* Process Steps */
+        .process-section {
+            padding: 4rem 2rem;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .process-title {
+            text-align: center;
+            font-size: 3rem;
+            margin-bottom: 3rem;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .process-steps {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 2rem;
+        }
+        
+        .step {
+            flex: 1;
+            min-width: 250px;
+            text-align: center;
+            position: relative;
+        }
+        
+        .step-number {
+            width: 80px;
+            height: 80px;
+            margin: 0 auto 1rem;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+            font-weight: bold;
+            color: var(--bg-dark);
+            position: relative;
+            z-index: 1;
+        }
+        
+        .step:not(:last-child)::after {
+            content: '';
+            position: absolute;
+            top: 40px;
+            left: calc(50% + 40px);
+            width: calc(100% - 80px);
+            height: 2px;
+            background: linear-gradient(90deg, var(--primary), var(--secondary));
+            opacity: 0.3;
+        }
+        
+        .step-title {
+            font-size: 1.5rem;
+            margin-bottom: 0.5rem;
+        }
+        
+        .step-desc {
+            color: var(--text-dim);
+        }
+        
+        /* Features */
+        .features-section {
+            padding: 4rem 2rem;
+            background: rgba(255, 255, 255, 0.02);
+        }
+        
+        .features-grid {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 2rem;
+        }
+        
+        .feature {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            padding: 2rem;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+        
+        .feature::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        
+        .feature:hover {
+            transform: translateY(-5px);
+            border-color: var(--primary);
+        }
+        
+        .feature:hover::before {
+            opacity: 0.05;
+        }
+        
+        .feature-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+        
+        .feature-title {
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+            position: relative;
+        }
+        
+        .feature-desc {
+            color: var(--text-dim);
+            position: relative;
+        }
+        
+        /* CTA */
+        .cta-section {
+            padding: 6rem 2rem;
+            text-align: center;
+        }
+        
+        .cta-button {
+            display: inline-block;
+            padding: 1.5rem 4rem;
+            font-size: 1.3rem;
+            font-weight: bold;
+            text-decoration: none;
+            color: var(--bg-dark);
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            border-radius: 50px;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+        
+        .cta-button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 20px 40px rgba(0, 255, 136, 0.4);
+        }
+        
+        .cta-button::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(135deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+            transform: translateX(-100%);
+            transition: transform 0.6s ease;
+        }
+        
+        .cta-button:hover::before {
+            transform: translateX(100%);
+        }
+        
+        @media (max-width: 768px) {
+            .title {
+                font-size: 3rem;
+            }
+            
+            .demo-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .step::after {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="gradient-orbs">
+        <div class="orb"></div>
+        <div class="orb"></div>
+        <div class="orb"></div>
+    </div>
+    
+    <div class="matrix-bg" id="matrix"></div>
+    
+    <section class="hero">
+        <div class="hero-content">
+            <h1 class="title">Background Remover</h1>
+            <p class="subtitle">AI-powered precision removal in seconds</p>
+            
+            <div class="demo-section">
+                <div class="demo-grid">
+                    <div class="demo-item">
+                        <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='200'%3E%3Cdefs%3E%3ClinearGradient id='g1'%3E%3Cstop offset='0%25' stop-color='%2300ff88'/%3E%3Cstop offset='100%25' stop-color='%2300ccff'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect fill='url(%23g1)' width='300' height='200'/%3E%3Ccircle cx='150' cy='100' r='50' fill='%23fff' opacity='0.3'/%3E%3Ctext x='150' y='110' text-anchor='middle' fill='%23fff' font-size='16' font-family='Arial'%3EProducts%3C/text%3E%3C/svg%3E" alt="Products" class="demo-image">
+                        <div class="demo-overlay">
+                            <span>Perfect for e-commerce</span>
+                        </div>
+                    </div>
+                    <div class="demo-item">
+                        <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='200'%3E%3Cdefs%3E%3ClinearGradient id='g2'%3E%3Cstop offset='0%25' stop-color='%2300ccff'/%3E%3Cstop offset='100%25' stop-color='%23ff00ff'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect fill='url(%23g2)' width='300' height='200'/%3E%3Cellipse cx='150' cy='100' rx='40' ry='60' fill='%23fff' opacity='0.3'/%3E%3Ctext x='150' y='110' text-anchor='middle' fill='%23fff' font-size='16' font-family='Arial'%3EPortraits%3C/text%3E%3C/svg%3E" alt="Portraits" class="demo-image">
+                        <div class="demo-overlay">
+                            <span>Clean portrait cutouts</span>
+                        </div>
+                    </div>
+                    <div class="demo-item">
+                        <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='200'%3E%3Cdefs%3E%3ClinearGradient id='g3'%3E%3Cstop offset='0%25' stop-color='%23ff00ff'/%3E%3Cstop offset='100%25' stop-color='%2300ff88'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect fill='url(%23g3)' width='300' height='200'/%3E%3Cpath d='M150 50 L180 120 L100 80 L200 80 L120 120 Z' fill='%23fff' opacity='0.3'/%3E%3Ctext x='150' y='110' text-anchor='middle' fill='%23fff' font-size='16' font-family='Arial'%3EAny Object%3C/text%3E%3C/svg%3E" alt="Objects" class="demo-image">
+                        <div class="demo-overlay">
+                            <span>Works with anything</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+    
+    <section class="process-section">
+        <h2 class="process-title">How It Works</h2>
+        <div class="process-steps">
+            <div class="step">
+                <div class="step-number">1</div>
+                <h3 class="step-title">Upload</h3>
+                <p class="step-desc">Drop your image or paste from clipboard</p>
+            </div>
+            <div class="step">
+                <div class="step-number">2</div>
+                <h3 class="step-title">AI Magic</h3>
+                <p class="step-desc">Neural network detects and removes background</p>
+            </div>
+            <div class="step">
+                <div class="step-number">3</div>
+                <h3 class="step-title">Download</h3>
+                <p class="step-desc">Get your transparent PNG instantly</p>
+            </div>
+        </div>
+    </section>
+    
+    <section class="features-section">
+        <div class="features-grid">
+            <div class="feature">
+                <div class="feature-icon">⚡</div>
+                <h3 class="feature-title">Lightning Fast</h3>
+                <p class="feature-desc">Process images in under 5 seconds with our optimized AI model running entirely in your browser</p>
+            </div>
+            <div class="feature">
+                <div class="feature-icon">🎯</div>
+                <h3 class="feature-title">Pixel Perfect</h3>
+                <p class="feature-desc">Advanced edge detection preserves fine details like hair, fur, and transparent objects</p>
+            </div>
+            <div class="feature">
+                <div class="feature-icon">🔒</div>
+                <h3 class="feature-title">100% Private</h3>
+                <p class="feature-desc">All processing happens locally. Your images never leave your device</p>
+            </div>
+            <div class="feature">
+                <div class="feature-icon">✨</div>
+                <h3 class="feature-title">Smart Detection</h3>
+                <p class="feature-desc">AI automatically identifies subjects and separates them from any background</p>
+            </div>
+            <div class="feature">
+                <div class="feature-icon">🎨</div>
+                <h3 class="feature-title">Edit & Refine</h3>
+                <p class="feature-desc">Fine-tune edges, adjust transparency, and perfect your cutouts with built-in tools</p>
+            </div>
+            <div class="feature">
+                <div class="feature-icon">📱</div>
+                <h3 class="feature-title">Works Everywhere</h3>
+                <p class="feature-desc">Optimized for all devices - desktop, tablet, and mobile browsers</p>
+            </div>
+        </div>
+    </section>
+    
+    <section class="cta-section">
+        <h2 style="font-size: 2.5rem; margin-bottom: 1rem;">Ready to Remove Backgrounds?</h2>
+        <p style="color: var(--text-dim); font-size: 1.2rem; margin-bottom: 2rem;">
+            Join thousands of users creating perfect cutouts every day
+        </p>
+        <a href="/pose" class="cta-button">
+            <span style="position: relative; z-index: 1;">Start Removing Backgrounds</span>
+        </a>
+    </section>
+    
+    <script>
+        // Matrix rain effect
+        const matrix = document.getElementById('matrix');
+        const columns = Math.floor(window.innerWidth / 20);
+        const chars = 'アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+        
+        for (let i = 0; i < columns; i++) {
+            const column = document.createElement('div');
+            column.className = 'matrix-column';
+            column.style.left = i * 20 + 'px';
+            column.style.animationDuration = (15 + Math.random() * 15) + 's';
+            column.style.animationDelay = Math.random() * 15 + 's';
+            
+            // Generate random characters
+            let text = '';
+            const length = Math.floor(Math.random() * 20) + 10;
+            for (let j = 0; j < length; j++) {
+                text += chars.charAt(Math.floor(Math.random() * chars.length)) + '\n';
+            }
+            column.textContent = text;
+            
+            matrix.appendChild(column);
+        }
+        
+        // Parallax effect on scroll
+        window.addEventListener('scroll', () => {
+            const scrolled = window.pageYOffset;
+            const orbs = document.querySelectorAll('.orb');
+            
+            orbs.forEach((orb, index) => {
+                const speed = (index + 1) * 0.5;
+                orb.style.transform = `translateY(${scrolled * speed}px)`;
+            });
+        });
+    </script>
+</body>
+</html> 

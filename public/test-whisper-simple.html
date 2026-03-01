@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple Whisper Test</title>
+</head>
+<body>
+    <h1>Simple Whisper Pipeline Test</h1>
+    <button id="testBtn">Test Pipeline Creation</button>
+    <div id="status"></div>
+    
+    <script type="module">
+        // Import directly from CDN
+        import { pipeline } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2';
+        
+        const statusDiv = document.getElementById('status');
+        const testBtn = document.getElementById('testBtn');
+        
+        testBtn.onclick = async () => {
+            try {
+                statusDiv.textContent = 'Creating pipeline...';
+                console.log('Starting pipeline creation...');
+                
+                // Simple pipeline creation like in the working test
+                const transcriber = await pipeline(
+                    'automatic-speech-recognition', 
+                    'Xenova/whisper-tiny'
+                );
+                
+                statusDiv.textContent = 'Pipeline created successfully!';
+                console.log('Pipeline created:', transcriber);
+                
+            } catch (error) {
+                statusDiv.textContent = 'Error: ' + error.message;
+                console.error('Pipeline creation failed:', error);
+            }
+        };
+    </script>
+</body>
+</html> 

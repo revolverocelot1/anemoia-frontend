@@ -1,0 +1,201 @@
+import api from './api';
+
+export type GeminiEditParams = {
+  prompt: string;
+  file?: File | null;
+  imageBase64?: string;
+  inputMimeType?: string;
+  outputMimeType?: string;
+  conversationId?: string;
+  isContinuation?: boolean;
+};
+
+export async function editImageWithGemini(params: GeminiEditParams): Promise<{ imageBase64: string; mimeType: string; conversationId?: string }> {
+  const form = new FormData();
+  
+  form.append('prompt', params.prompt);
+  form.append('input_mime_type', params.inputMimeType || (params.file ? params.file.type : 'image/png'));
+  form.append('output_mime_type', params.outputMimeType || 'image/png');
+  
+  // Add conversation parameters if provided
+  if (params.conversationId) {
+    console.log('Adding conversation_id to form:', params.conversationId);
+    form.append('conversation_id', params.conversationId);
+  }
+  if (params.isContinuation !== undefined) {
+    console.log('Adding is_continuation to form:', params.isContinuation);
+    form.append('is_continuation', params.isContinuation ? 'true' : 'false');
+  }
+
+  // Only append image for initial request, not continuations
+  if (!params.isContinuation) {
+    if (params.file) {
+      form.append('image', params.file);
+    } else if (params.imageBase64) {
+      form.append('image_base64', params.imageBase64);
+    } else {
+      throw new Error('Either file or imageBase64 must be provided for initial request');
+    }
+  }
+
+  try {
+    console.log(`[Gemini API] Calling with prompt:`, params.prompt.substring(0, 100) + '...');
+    console.log(`[Gemini API] Mode:`, params.isContinuation ? 'Chain continuation' : 'New request');
+    console.log(`[Gemini API] Has image:`, params.file ? 'Yes' : params.imageBase64 ? 'Base64' : 'No');
+    
+    const res = await api.upload('/api/google/image-edit', form, {
+      headers: {
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache'
+      },
+      timeout: 120000 // 2 minute timeout
+    });
+    
+    console.log(`[Gemini API] Response received, status:`, res.status);
+    const data = res.data as { image_base64: string; mime_type: string; conversation_id?: string };
+    
+    if (!data.image_base64) {
+      throw new Error('No image data in response');
+    }
+    
+    console.log(`[Gemini API] Image size:`, data.image_base64.length, 'Conv ID:', data.conversation_id);
+    
+    return { 
+      imageBase64: data.image_base64, 
+      mimeType: data.mime_type,
+      conversationId: data.conversation_id 
+    };
+  } catch (error: any) {
+    console.error(`[Gemini API] Error:`, error);
+    console.error('Error response:', error.response?.data);
+    console.error('Error status:', error.response?.status);
+    
+    // Provide more user-friendly error messages
+    if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+      throw new Error('Request timed out. The image generation is taking longer than expected.');
+    } else if (error.response?.status === 504) {
+      throw new Error('Server timeout. Please try again with a simpler prompt.');
+    } else if (error.response?.status === 503) {
+      throw new Error('AI service temporarily unavailable. Please try again.');
+    } else if (error.response?.status === 502) {
+      throw new Error('Failed to generate image. The AI service may be overloaded.');
+    } else if (error.response?.data?.detail) {
+      throw new Error(error.response.data.detail);
+    } else if (error.message) {
+      throw new Error(`Generation failed: ${error.message}`);
+    }
+    throw new Error('Unknown error occurred during image generation');
+  }
+}
+
+
+export type GeminiChatParams = {
+  prompt: string;
+  files?: File[];
+  imageBase64List?: string[];
+  inputMimeTypes?: string[];
+  outputMimeType?: string;
+  conversationId?: string;
+  isContinuation?: boolean;
+};
+
+export async function chatImageWithGemini(params: GeminiChatParams): Promise<{ imageBase64: string; mimeType: string; conversationId?: string }>{
+  const form = new FormData();
+  form.append('prompt', params.prompt);
+  form.append('output_mime_type', params.outputMimeType || 'image/png');
+
+  if (params.conversationId) {
+    form.append('conversation_id', params.conversationId);
+  }
+  form.append('is_continuation', params.isContinuation ? 'true' : 'false');
+
+  // Prefer files; else imageBase64List
+  if (!params.isContinuation) {
+    if (params.files && params.files.length > 0) {
+      // Optimize: compress large images before upload
+      for (const f of params.files) {
+        form.append('images', f);
+      }
+      if (params.inputMimeTypes && params.inputMimeTypes.length > 0) {
+        for (const mt of params.inputMimeTypes) {
+          form.append('input_mime_types', mt);
+        }
+      }
+    } else if (params.imageBase64List && params.imageBase64List.length > 0) {
+      form.append('image_base64_list', JSON.stringify(params.imageBase64List));
+      if (params.inputMimeTypes && params.inputMimeTypes.length > 0) {
+        for (const mt of params.inputMimeTypes) {
+          form.append('input_mime_types', mt);
+        }
+      }
+    }
+  }
+
+  // Retry logic with exponential backoff
+  const maxRetries = 3;
+  let lastError: any;
+  
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      console.log(`[Gemini Chat] Attempt ${attempt + 1}/${maxRetries}`);
+      
+      const res = await api.upload('/api/gemini/image-chat', form, {
+        headers: {
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache',
+        },
+        timeout: 120000, // 2 minute timeout
+        // Add request ID for tracking
+        params: {
+          request_id: `${Date.now()}-${Math.random().toString(36).substring(7)}`
+        }
+      });
+      
+      const data = res.data as { image_base64: string; mime_type: string; conversation_id?: string };
+      if (!data.image_base64) throw new Error('No image data in response');
+      
+      console.log('[Gemini Chat] Success on attempt', attempt + 1);
+      return { imageBase64: data.image_base64, mimeType: data.mime_type, conversationId: data.conversation_id };
+      
+    } catch (error: any) {
+      lastError = error;
+      console.error(`[Gemini Chat] Error on attempt ${attempt + 1}:`, error.message);
+      
+      // Don't retry on client errors (4xx)
+      if (error.response?.status >= 400 && error.response?.status < 500) {
+        break;
+      }
+      
+      // Exponential backoff before retry
+      if (attempt < maxRetries - 1) {
+        const delay = Math.min(1000 * Math.pow(2, attempt), 10000); // Max 10 seconds
+        console.log(`[Gemini Chat] Retrying in ${delay}ms...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+  }
+  
+  // Handle the final error after all retries
+  console.error('[Gemini Chat] All attempts failed:', lastError);
+  console.error('Error response:', lastError.response?.data);
+  console.error('Error status:', lastError.response?.status);
+  
+  if (lastError.code === 'ECONNABORTED' || lastError.message?.includes('timeout')) {
+    throw new Error('Request timed out after multiple attempts. Try reducing image size or simplifying the prompt.');
+  } else if (lastError.response?.status === 504) {
+    throw new Error('Server timeout. The AI service is experiencing high load. Please try again in a moment.');
+  } else if (lastError.response?.status === 503) {
+    throw new Error('AI service temporarily unavailable. Please try again in a few seconds.');
+  } else if (lastError.response?.status === 502) {
+    throw new Error('Connection issue with AI service. Please check your internet and try again.');
+  } else if (lastError.response?.status === 429) {
+    throw new Error('Rate limit exceeded. Please wait a moment before trying again.');
+  } else if (lastError.response?.data?.detail) {
+    throw new Error(lastError.response.data.detail);
+  } else if (lastError.message) {
+    throw new Error(`Generation failed: ${lastError.message}`);
+  }
+  throw new Error('Failed to generate image after multiple attempts. Please try again later.');
+}
+
+

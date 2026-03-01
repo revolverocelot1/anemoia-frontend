@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Subtitle Transcription Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #1a1a1a;
+            color: #fff;
+        }
+        .container {
+            background-color: #2a2a2a;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        button {
+            background-color: #3b82f6;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        button:hover {
+            background-color: #2563eb;
+        }
+        button:disabled {
+            background-color: #666;
+            cursor: not-allowed;
+        }
+        #status {
+            margin-top: 20px;
+            padding: 10px;
+            background-color: #333;
+            border-radius: 4px;
+        }
+        #segments {
+            margin-top: 20px;
+        }
+        .segment {
+            background-color: #333;
+            padding: 10px;
+            margin-bottom: 10px;
+            border-radius: 4px;
+        }
+        video {
+            width: 100%;
+            max-width: 600px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Subtitle Transcription Test</h1>
+    
+    <div class="container">
+        <h2>1. Select Video</h2>
+        <input type="file" id="videoFile" accept="video/*">
+        <video id="videoPlayer" controls></video>
+    </div>
+    
+    <div class="container">
+        <h2>2. Load Model & Transcribe</h2>
+        <button id="loadModelBtn">Load Whisper Model</button>
+        <button id="transcribeBtn" disabled>Transcribe</button>
+        <div id="status"></div>
+    </div>
+    
+    <div class="container">
+        <h2>3. Results</h2>
+        <div id="segments"></div>
+    </div>
+
+    <script type="module">
+        import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.6.0';
+        
+        // Configure environment
+        env.allowLocalModels = false;
+        env.useBrowserCache = true;
+        
+        let transcriber = null;
+        let audioBuffer = null;
+        
+        const videoFile = document.getElementById('videoFile');
+        const videoPlayer = document.getElementById('videoPlayer');
+        const loadModelBtn = document.getElementById('loadModelBtn');
+        const transcribeBtn = document.getElementById('transcribeBtn');
+        const statusDiv = document.getElementById('status');
+        const segmentsDiv = document.getElementById('segments');
+        
+        // Handle video selection
+        videoFile.addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const url = URL.createObjectURL(file);
+                videoPlayer.src = url;
+                
+                // Extract audio when video loads
+                videoPlayer.addEventListener('loadeddata', async () => {
+                    statusDiv.textContent = 'Extracting audio...';
+                    try {
+                        audioBuffer = await extractAudio(videoPlayer);
+                        statusDiv.textContent = 'Audio extracted successfully!';
+                    } catch (error) {
+                        statusDiv.textContent = 'Error extracting audio: ' + error.message;
+                    }
+                }, { once: true });
+            }
+        });
+        
+        // Extract audio from video
+        async function extractAudio(video) {
+            const audioContext = new AudioContext({ sampleRate: 16000 });
+            const response = await fetch(video.src);
+            const arrayBuffer = await response.arrayBuffer();
+            const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+            
+            // Convert to mono if needed
+            let audioData;
+            if (audioBuffer.numberOfChannels > 1) {
+                audioData = new Float32Array(audioBuffer.length);
+                for (let i = 0; i < audioBuffer.length; i++) {
+                    let sum = 0;
+                    for (let channel = 0; channel < audioBuffer.numberOfChannels; channel++) {
+                        sum += audioBuffer.getChannelData(channel)[i];
+                    }
+                    audioData[i] = sum / audioBuffer.numberOfChannels;
+                }
+            } else {
+                audioData = audioBuffer.getChannelData(0);
+            }
+            
+            return audioData;
+        }
+        
+        // Load model
+        loadModelBtn.addEventListener('click', async () => {
+            loadModelBtn.disabled = true;
+            statusDiv.textContent = 'Loading Whisper model...';
+            
+            try {
+                transcriber = await pipeline(
+                    'automatic-speech-recognition',
+                    'Xenova/whisper-tiny',
+                    {
+                        progress_callback: (progress) => {
+                            if (progress.status === 'downloading') {
+                                const percent = Math.round((progress.loaded / progress.total) * 100);
+                                statusDiv.textContent = `Downloading model: ${percent}%`;
+                            }
+                        }
+                    }
+                );
+                
+                statusDiv.textContent = 'Model loaded successfully!';
+                transcribeBtn.disabled = false;
+            } catch (error) {
+                statusDiv.textContent = 'Error loading model: ' + error.message;
+                loadModelBtn.disabled = false;
+            }
+        });
+        
+        // Transcribe
+        transcribeBtn.addEventListener('click', async () => {
+            if (!transcriber || !audioBuffer) {
+                statusDiv.textContent = 'Please load a video and model first!';
+                return;
+            }
+            
+            transcribeBtn.disabled = true;
+            statusDiv.textContent = 'Transcribing...';
+            segmentsDiv.innerHTML = '';
+            
+            try {
+                const result = await transcriber(audioBuffer, {
+                    return_timestamps: true,
+                    chunk_length_s: 30,
+                    stride_length_s: 5
+                });
+                
+                statusDiv.textContent = 'Transcription complete!';
+                
+                // Display results
+                if (result.chunks) {
+                    result.chunks.forEach((chunk, index) => {
+                        const segmentDiv = document.createElement('div');
+                        segmentDiv.className = 'segment';
+                        segmentDiv.innerHTML = `
+                            <strong>Segment ${index + 1}</strong><br>
+                            Time: ${chunk.timestamp[0]?.toFixed(2) || '0.00'}s - ${chunk.timestamp[1]?.toFixed(2) || '0.00'}s<br>
+                            Text: ${chunk.text}
+                        `;
+                        segmentsDiv.appendChild(segmentDiv);
+                    });
+                } else {
+                    segmentsDiv.innerHTML = `<div class="segment">${result.text}</div>`;
+                }
+            } catch (error) {
+                statusDiv.textContent = 'Error during transcription: ' + error.message;
+                console.error('Transcription error:', error);
+            } finally {
+                transcribeBtn.disabled = false;
+            }
+        });
+    </script>
+</body>
+</html> 

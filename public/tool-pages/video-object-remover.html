@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Video Object Remover - Remove Any Object from Videos | Anemoia</title>
+    <meta name="description" content="Remove unwanted objects, people, or logos from videos using advanced AI. Powered by Nano Banana and FILM interpolation for seamless results. Process videos up to 6 seconds at 25 FPS.">
+    <meta name="keywords" content="video object removal, AI video editor, remove person from video, nano banana, FILM interpolation, video inpainting, object eraser, video cleanup, AI video processing">
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://anemoias.me/video-object-remover">
+    <meta property="og:title" content="AI Video Object Remover - Remove Any Object from Videos">
+    <meta property="og:description" content="Revolutionary AI-powered video object removal. Remove people, objects, or logos from any video with zero-shot detection and seamless frame interpolation.">
+    <meta property="og:image" content="https://anemoias.me/tool-previews/video-object-remover.png">
+    
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:url" content="https://anemoias.me/video-object-remover">
+    <meta property="twitter:title" content="AI Video Object Remover - Remove Any Object from Videos">
+    <meta property="twitter:description" content="Revolutionary AI-powered video object removal. Remove people, objects, or logos from any video with zero-shot detection and seamless frame interpolation.">
+    
+    <!-- Canonical URL -->
+    <link rel="canonical" href="https://anemoias.me/video-object-remover">
+    
+    <!-- Structured Data -->
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        "name": "AI Video Object Remover",
+        "description": "Remove unwanted objects, people, or logos from videos using advanced AI with Nano Banana and FILM interpolation",
+        "url": "https://anemoias.me/video-object-remover",
+        "applicationCategory": "MultimediaApplication",
+        "operatingSystem": "Web Browser",
+        "offers": {
+            "@type": "Offer",
+            "price": "0",
+            "priceCurrency": "USD"
+        },
+        "creator": {
+            "@type": "Organization",
+            "name": "Anemoia",
+            "url": "https://anemoias.me"
+        },
+        "featureList": [
+            "Zero-shot object detection and removal",
+            "AI-powered frame processing with Nano Banana",
+            "FILM frame interpolation for smooth playback",
+            "Support for videos up to 6 seconds",
+            "25 FPS output quality",
+            "No manual masking required",
+            "Web-based processing"
+        ],
+        "screenshot": "https://anemoias.me/tool-previews/video-object-remover-screenshot.png"
+    }
+    </script>
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            line-height: 1.6;
+            color: #e4e4e7;
+            background: #000;
+            overflow-x: hidden;
+        }
+        
+        /* Animated background */
+        .bg-container {
+            position: fixed;
+            inset: 0;
+            background: linear-gradient(to bottom right, #0f0f23, #1a0f2e, #000);
+            z-index: -2;
+        }
+        
+        .bg-grid {
+            position: fixed;
+            inset: 0;
+            background-image: 
+                linear-gradient(rgba(139, 92, 246, 0.1) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(217, 70, 239, 0.1) 1px, transparent 1px);
+            background-size: 50px 50px;
+            z-index: -1;
+            animation: float 20s ease-in-out infinite;
+        }
+        
+        @keyframes float {
+            0%, 100% { transform: translate(0, 0); }
+            50% { transform: translate(-10px, -10px); }
+        }
+        
+        .orb {
+            position: fixed;
+            border-radius: 50%;
+            filter: blur(100px);
+            opacity: 0.3;
+            animation: pulse 8s ease-in-out infinite;
+        }
+        
+        .orb1 {
+            width: 400px;
+            height: 400px;
+            background: #8b5cf6;
+            top: -200px;
+            left: -200px;
+        }
+        
+        .orb2 {
+            width: 500px;
+            height: 500px;
+            background: #d946ef;
+            bottom: -250px;
+            right: -250px;
+            animation-delay: 4s;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); opacity: 0.3; }
+            50% { transform: scale(1.2); opacity: 0.5; }
+        }
+        
+        /* Content styles */
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+            position: relative;
+            z-index: 1;
+        }
+        
+        nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 4rem;
+        }
+        
+        .logo {
+            font-size: 1.5rem;
+            font-weight: bold;
+            background: linear-gradient(to right, #8b5cf6, #d946ef);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        .nav-links {
+            display: flex;
+            gap: 2rem;
+            list-style: none;
+        }
+        
+        .nav-links a {
+            color: #a1a1aa;
+            text-decoration: none;
+            transition: color 0.3s;
+        }
+        
+        .nav-links a:hover {
+            color: #d946ef;
+        }
+        
+        .hero {
+            text-align: center;
+            margin-bottom: 6rem;
+        }
+        
+        .hero h1 {
+            font-size: 3.5rem;
+            font-weight: 900;
+            margin-bottom: 1.5rem;
+            background: linear-gradient(to right, #a78bfa, #e879f9, #f0abfc);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: gradient 3s ease-in-out infinite;
+        }
+        
+        @keyframes gradient {
+            0%, 100% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+        }
+        
+        .hero p {
+            font-size: 1.25rem;
+            color: #a1a1aa;
+            max-width: 700px;
+            margin: 0 auto 2rem;
+        }
+        
+        .cta-button {
+            display: inline-block;
+            padding: 1rem 2.5rem;
+            background: linear-gradient(135deg, #8b5cf6, #d946ef);
+            color: white;
+            text-decoration: none;
+            border-radius: 9999px;
+            font-weight: 600;
+            transition: all 0.3s;
+            box-shadow: 0 4px 20px rgba(139, 92, 246, 0.3);
+        }
+        
+        .cta-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 30px rgba(217, 70, 239, 0.4);
+        }
+        
+        .features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 2rem;
+            margin-bottom: 6rem;
+        }
+        
+        .feature-card {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(139, 92, 246, 0.2);
+            border-radius: 1rem;
+            padding: 2rem;
+            transition: all 0.3s;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .feature-card::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(135deg, transparent, rgba(139, 92, 246, 0.1));
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        
+        .feature-card:hover::before {
+            opacity: 1;
+        }
+        
+        .feature-card:hover {
+            transform: translateY(-4px);
+            border-color: rgba(217, 70, 239, 0.4);
+        }
+        
+        .feature-icon {
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(135deg, #8b5cf6, #d946ef);
+            border-radius: 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 1.5rem;
+            font-size: 1.5rem;
+        }
+        
+        .feature-card h3 {
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+            color: #f4f4f5;
+        }
+        
+        .feature-card p {
+            color: #a1a1aa;
+        }
+        
+        .demo-section {
+            background: rgba(139, 92, 246, 0.05);
+            border-radius: 1.5rem;
+            padding: 4rem 2rem;
+            margin-bottom: 6rem;
+            text-align: center;
+            border: 1px solid rgba(139, 92, 246, 0.2);
+        }
+        
+        .demo-section h2 {
+            font-size: 2.5rem;
+            margin-bottom: 1.5rem;
+            background: linear-gradient(to right, #a78bfa, #e879f9);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        .demo-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 2rem;
+            margin-top: 3rem;
+        }
+        
+        .demo-item {
+            background: rgba(0, 0, 0, 0.4);
+            border-radius: 1rem;
+            padding: 1.5rem;
+            border: 1px solid rgba(217, 70, 239, 0.2);
+        }
+        
+        .faq-section {
+            margin-bottom: 6rem;
+        }
+        
+        .faq-section h2 {
+            font-size: 2.5rem;
+            text-align: center;
+            margin-bottom: 3rem;
+            background: linear-gradient(to right, #a78bfa, #e879f9);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        .faq-item {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(139, 92, 246, 0.2);
+            border-radius: 1rem;
+            padding: 2rem;
+            margin-bottom: 1.5rem;
+        }
+        
+        .faq-item h3 {
+            color: #f4f4f5;
+            margin-bottom: 1rem;
+            font-size: 1.25rem;
+        }
+        
+        .faq-item p {
+            color: #a1a1aa;
+        }
+        
+        footer {
+            text-align: center;
+            padding: 4rem 0 2rem;
+            color: #71717a;
+            border-top: 1px solid rgba(139, 92, 246, 0.2);
+        }
+        
+        @media (max-width: 768px) {
+            .hero h1 {
+                font-size: 2.5rem;
+            }
+            
+            .features {
+                grid-template-columns: 1fr;
+            }
+            
+            .nav-links {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="bg-container"></div>
+    <div class="bg-grid"></div>
+    <div class="orb orb1"></div>
+    <div class="orb orb2"></div>
+    
+    <div class="container">
+        <nav>
+            <div class="logo">Anemoia</div>
+            <ul class="nav-links">
+                <li><a href="/">Home</a></li>
+                <li><a href="/video-object-remover">Try Tool</a></li>
+                <li><a href="/t-poser">T-Pose Tool</a></li>
+                <li><a href="/image-chat">Image Chat</a></li>
+            </ul>
+        </nav>
+        
+        <section class="hero">
+            <h1>AI Video Object Remover</h1>
+            <p>Remove any object, person, or unwanted element from your videos with cutting-edge AI technology. Powered by Nano Banana and FILM interpolation for flawless results.</p>
+            <a href="/video-object-remover" class="cta-button">Launch Video Object Remover</a>
+        </section>
+        
+        <section class="features">
+            <div class="feature-card">
+                <div class="feature-icon">🎯</div>
+                <h3>Zero-Shot Object Detection</h3>
+                <p>Simply describe what you want to remove. No manual masking or complex selections needed - our AI understands natural language.</p>
+            </div>
+            
+            <div class="feature-card">
+                <div class="feature-icon">✨</div>
+                <h3>Nano Banana AI</h3>
+                <p>Powered by Google's Gemini 2.5 Flash model for instant, high-quality object removal with context-aware inpainting.</p>
+            </div>
+            
+            <div class="feature-card">
+                <div class="feature-icon">🎬</div>
+                <h3>FILM Interpolation</h3>
+                <p>Advanced frame interpolation ensures smooth, natural motion at 25 FPS, even with large object removals.</p>
+            </div>
+            
+            <div class="feature-card">
+                <div class="feature-icon">⚡</div>
+                <h3>Web-Based Processing</h3>
+                <p>No downloads or installations required. Process videos directly in your browser with GPU acceleration.</p>
+            </div>
+            
+            <div class="feature-card">
+                <div class="feature-icon">🔒</div>
+                <h3>Privacy First</h3>
+                <p>Your videos are processed securely and never stored. All processing happens in real-time.</p>
+            </div>
+            
+            <div class="feature-card">
+                <div class="feature-icon">🎨</div>
+                <h3>Smart Inpainting</h3>
+                <p>AI intelligently fills removed areas with contextually appropriate content, maintaining visual coherence.</p>
+            </div>
+        </section>
+        
+        <section class="demo-section">
+            <h2>Perfect For</h2>
+            <div class="demo-grid">
+                <div class="demo-item">
+                    <h3>Content Creators</h3>
+                    <p>Remove photobombers, unwanted objects, or mistakes from your videos</p>
+                </div>
+                <div class="demo-item">
+                    <h3>Marketing Teams</h3>
+                    <p>Clean up product videos, remove logos, or edit promotional content</p>
+                </div>
+                <div class="demo-item">
+                    <h3>Real Estate</h3>
+                    <p>Remove personal items or clutter from property tour videos</p>
+                </div>
+                <div class="demo-item">
+                    <h3>Social Media</h3>
+                    <p>Perfect your TikToks, Reels, and Stories by removing distractions</p>
+                </div>
+            </div>
+        </section>
+        
+        <section class="faq-section">
+            <h2>Frequently Asked Questions</h2>
+            
+            <div class="faq-item">
+                <h3>What video formats are supported?</h3>
+                <p>We support MP4, MOV, and WEBM formats. Videos should be under 6 seconds for optimal processing.</p>
+            </div>
+            
+            <div class="faq-item">
+                <h3>How accurate is the object removal?</h3>
+                <p>Our AI achieves professional-quality results in most cases. The Nano Banana model excels at understanding context and filling removed areas naturally.</p>
+            </div>
+            
+            <div class="faq-item">
+                <h3>Do I need to manually select objects?</h3>
+                <p>No! Simply describe what you want to remove in natural language, like "remove the person in red" or "remove the car".</p>
+            </div>
+            
+            <div class="faq-item">
+                <h3>What is FILM interpolation?</h3>
+                <p>FILM (Frame Interpolation for Large Motion) is Google's advanced algorithm that creates smooth transitions between edited frames, ensuring natural motion.</p>
+            </div>
+            
+            <div class="faq-item">
+                <h3>Is there a watermark on processed videos?</h3>
+                <p>No, all videos are exported without watermarks at full quality.</p>
+            </div>
+        </section>
+        
+        <footer>
+            <p>&copy; 2025 Anemoia. Advanced AI Tools for Creative Professionals.</p>
+        </footer>
+    </div>
+</body>
+</html>

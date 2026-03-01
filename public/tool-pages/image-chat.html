@@ -1,0 +1,958 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nano Banana AI Image Chat - Uncensored Image Generation | Anemoia AI</title>
+    <meta name="description" content="Experience creative freedom with Nano Banana (Gemini 2.5 Flash Image). Generate any image with less censorship, advanced controls, and lightning-fast AI. Free uncensored image generation.">
+    <meta name="keywords" content="Nano Banana AI, Gemini 2.5 Flash Image, uncensored image generation, AI image chat, free AI art, less censorship AI, Google Gemini, creative AI, temperature control, top-p sampling">
+    
+    <!-- Open Graph -->
+    <meta property="og:title" content="Nano Banana AI - Uncensored Image Generation">
+    <meta property="og:description" content="Generate any image with creative freedom. Powered by Google's Gemini 2.5 Flash Image with less restrictions.">
+    <meta property="og:image" content="https://anemoias.me/nano-banana-preview.jpg">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://anemoias.me/image-chat">
+    
+    <!-- Schema.org -->
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "Nano Banana AI Image Chat",
+        "description": "Uncensored AI image generation powered by Google's Gemini 2.5 Flash Image model",
+        "applicationCategory": "MultimediaApplication",
+        "offers": {
+            "@type": "Offer",
+            "price": "0",
+            "priceCurrency": "USD"
+        },
+        "featureList": [
+            "Less censorship than standard models",
+            "Temperature and Top-p controls",
+            "Multi-image context support",
+            "Conversation continuity",
+            "Lightning-fast generation",
+            "Free unlimited use",
+            "No registration required",
+            "Advanced prompt engineering"
+        ],
+        "creator": {
+            "@type": "Organization",
+            "name": "Google",
+            "description": "Powered by Gemini 2.5 Flash Image"
+        }
+    }
+    </script>
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #000;
+            color: #fff;
+            overflow-x: hidden;
+            position: relative;
+        }
+        
+        /* Psychedelic Background */
+        .psychedelic-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -2;
+        }
+        
+        .gradient-1 {
+            position: absolute;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle at 20% 50%, #ff006e 0%, transparent 50%);
+            animation: float1 20s ease-in-out infinite;
+        }
+        
+        .gradient-2 {
+            position: absolute;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle at 80% 80%, #8338ec 0%, transparent 50%);
+            animation: float2 25s ease-in-out infinite;
+        }
+        
+        .gradient-3 {
+            position: absolute;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle at 50% 20%, #06ffa5 0%, transparent 50%);
+            animation: float3 30s ease-in-out infinite;
+        }
+        
+        @keyframes float1 {
+            0%, 100% { transform: translate(-20%, -20%) rotate(0deg) scale(1); }
+            33% { transform: translate(20%, -40%) rotate(120deg) scale(1.2); }
+            66% { transform: translate(-40%, 20%) rotate(240deg) scale(0.8); }
+        }
+        
+        @keyframes float2 {
+            0%, 100% { transform: translate(20%, 20%) rotate(0deg) scale(1.2); }
+            33% { transform: translate(-40%, 20%) rotate(-120deg) scale(1); }
+            66% { transform: translate(20%, -20%) rotate(-240deg) scale(1.3); }
+        }
+        
+        @keyframes float3 {
+            0%, 100% { transform: translate(0%, 0%) rotate(0deg) scale(0.8); }
+            33% { transform: translate(40%, 40%) rotate(180deg) scale(1.1); }
+            66% { transform: translate(-20%, -40%) rotate(360deg) scale(0.9); }
+        }
+        
+        /* Noise Overlay */
+        .noise {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            opacity: 0.03;
+            z-index: -1;
+            pointer-events: none;
+            background: url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIzMDAiIGhlaWdodD0iMzAwIj48ZmlsdGVyIGlkPSJhIj48ZmVUdXJidWxlbmNlIGJhc2VGcmVxdWVuY3k9Ii43NSIgbnVtT2N0YXZlcz0iMTAiLz48ZmVDb2xvck1hdHJpeCB2YWx1ZXM9IjAgMCAwIDAgMCAwIDAgMCAwIDAgMCAwIDAgMCAwIDAgMCAwIDEgMCIvPjwvZmlsdGVyPjxyZWN0IHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIGZpbHRlcj0idXJsKCNhKSIgb3BhY2l0eT0iMSIvPjwvc3ZnPg==');
+        }
+        
+        /* Container */
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 40px 20px;
+            position: relative;
+            z-index: 10;
+        }
+        
+        /* Hero Section */
+        .hero {
+            text-align: center;
+            padding: 100px 0;
+            position: relative;
+        }
+        
+        .banana-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 30px;
+            background: linear-gradient(135deg, rgba(255,215,0,0.2), rgba(255,0,255,0.2));
+            border: 2px solid rgba(255,215,0,0.6);
+            border-radius: 50px;
+            font-size: 16px;
+            font-weight: 700;
+            color: #ffd700;
+            margin-bottom: 40px;
+            animation: bananaGlow 3s ease-in-out infinite;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .banana-badge::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: linear-gradient(45deg, transparent, rgba(255,215,0,0.3), transparent);
+            transform: rotate(45deg);
+            animation: shimmer 3s linear infinite;
+        }
+        
+        @keyframes bananaGlow {
+            0%, 100% { box-shadow: 0 0 20px rgba(255,215,0,0.5); }
+            50% { box-shadow: 0 0 40px rgba(255,215,0,0.8), 0 0 60px rgba(255,0,255,0.4); }
+        }
+        
+        @keyframes shimmer {
+            0% { transform: translateX(-100%) translateY(-100%) rotate(45deg); }
+            100% { transform: translateX(100%) translateY(100%) rotate(45deg); }
+        }
+        
+        .hero h1 {
+            font-size: clamp(4rem, 12vw, 8rem);
+            font-weight: 900;
+            margin-bottom: 30px;
+            line-height: 1;
+            position: relative;
+        }
+        
+        .hero-title {
+            background: linear-gradient(135deg, #ff006e, #8338ec, #06ffa5, #ff006e);
+            background-size: 300% 300%;
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: psychedelicFlow 5s ease infinite;
+        }
+        
+        @keyframes psychedelicFlow {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+        
+        .uncensored-text {
+            display: inline-block;
+            font-size: 2.5rem;
+            font-weight: 300;
+            color: #06ffa5;
+            margin-top: -10px;
+            margin-bottom: 30px;
+            text-transform: uppercase;
+            letter-spacing: 10px;
+            animation: glitch 2s ease-in-out infinite alternate;
+        }
+        
+        @keyframes glitch {
+            0% { text-shadow: 2px 2px 0 #ff006e, -2px -2px 0 #8338ec; }
+            25% { text-shadow: -2px 2px 0 #8338ec, 2px -2px 0 #06ffa5; }
+            50% { text-shadow: 2px -2px 0 #06ffa5, -2px 2px 0 #ff006e; }
+            75% { text-shadow: -2px -2px 0 #ff006e, 2px 2px 0 #8338ec; }
+            100% { text-shadow: 2px 2px 0 #8338ec, -2px -2px 0 #06ffa5; }
+        }
+        
+        .hero-subtitle {
+            font-size: 1.5rem;
+            color: #aaa;
+            margin-bottom: 50px;
+            max-width: 800px;
+            margin-left: auto;
+            margin-right: auto;
+            line-height: 1.6;
+        }
+        
+        /* Floating Elements */
+        .floating-elements {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            top: 0;
+            left: 0;
+            pointer-events: none;
+            z-index: 1;
+        }
+        
+        .banana {
+            position: absolute;
+            font-size: 3rem;
+            animation: floatBanana 20s ease-in-out infinite;
+        }
+        
+        @keyframes floatBanana {
+            0% { transform: translateY(100vh) rotate(0deg) scale(0); }
+            10% { transform: translateY(80vh) rotate(36deg) scale(1); }
+            90% { transform: translateY(20vh) rotate(324deg) scale(1); }
+            100% { transform: translateY(0) rotate(360deg) scale(0); }
+        }
+        
+        /* Freedom Features */
+        .freedom-section {
+            margin: 120px 0;
+            text-align: center;
+        }
+        
+        .freedom-title {
+            font-size: 4rem;
+            font-weight: 900;
+            margin-bottom: 60px;
+            background: linear-gradient(135deg, #06ffa5, #ff006e);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        .freedom-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 40px;
+            margin-bottom: 80px;
+        }
+        
+        .freedom-card {
+            background: rgba(255,255,255,0.03);
+            backdrop-filter: blur(20px);
+            border: 2px solid transparent;
+            border-image: linear-gradient(135deg, #ff006e, #8338ec, #06ffa5) 1;
+            border-radius: 30px;
+            padding: 50px 30px;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.4s ease;
+        }
+        
+        .freedom-card::before {
+            content: '';
+            position: absolute;
+            top: -100%;
+            left: -100%;
+            width: 300%;
+            height: 300%;
+            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        
+        .freedom-card:hover::before {
+            opacity: 1;
+            animation: ripple 1s ease-out;
+        }
+        
+        @keyframes ripple {
+            0% { transform: scale(0); }
+            100% { transform: scale(1); }
+        }
+        
+        .freedom-icon {
+            font-size: 4rem;
+            margin-bottom: 20px;
+            display: inline-block;
+            animation: bounce 3s ease-in-out infinite;
+        }
+        
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-20px); }
+        }
+        
+        /* Comparison Section */
+        .comparison-section {
+            margin: 120px 0;
+            position: relative;
+        }
+        
+        .comparison-table {
+            background: rgba(255,255,255,0.03);
+            backdrop-filter: blur(20px);
+            border-radius: 30px;
+            overflow: hidden;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        .comparison-header {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            background: rgba(255,255,255,0.05);
+            padding: 30px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        .comparison-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            padding: 25px 30px;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            transition: all 0.3s ease;
+        }
+        
+        .comparison-row:hover {
+            background: rgba(255,255,255,0.05);
+        }
+        
+        .nano-banana-col {
+            color: #06ffa5;
+            font-weight: 700;
+        }
+        
+        .other-ai-col {
+            color: #666;
+        }
+        
+        /* Advanced Controls Showcase */
+        .controls-section {
+            margin: 120px 0;
+            text-align: center;
+        }
+        
+        .control-demo {
+            max-width: 800px;
+            margin: 60px auto;
+            background: rgba(255,255,255,0.03);
+            backdrop-filter: blur(20px);
+            border-radius: 30px;
+            padding: 50px;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        .slider-container {
+            margin: 30px 0;
+        }
+        
+        .slider-label {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 15px;
+            font-size: 1.1rem;
+        }
+        
+        .slider {
+            width: 100%;
+            height: 8px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 10px;
+            outline: none;
+            -webkit-appearance: none;
+            position: relative;
+            overflow: visible;
+        }
+        
+        .slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 24px;
+            height: 24px;
+            background: linear-gradient(135deg, #ff006e, #8338ec);
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: 0 0 20px rgba(255,0,255,0.6);
+            transition: all 0.3s ease;
+        }
+        
+        .slider::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+            box-shadow: 0 0 30px rgba(255,0,255,0.8);
+        }
+        
+        /* Examples Gallery */
+        .examples-section {
+            margin: 120px 0;
+        }
+        
+        .examples-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+            margin-top: 60px;
+        }
+        
+        .example-card {
+            background: rgba(255,255,255,0.03);
+            backdrop-filter: blur(20px);
+            border-radius: 20px;
+            overflow: hidden;
+            border: 1px solid rgba(255,255,255,0.1);
+            transition: all 0.4s ease;
+            position: relative;
+        }
+        
+        .example-card:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 20px 60px rgba(131,56,236,0.4);
+        }
+        
+        .example-image {
+            width: 100%;
+            height: 250px;
+            background: linear-gradient(135deg, #1a1a1a, #2a2a2a);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .example-badge {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: rgba(6,255,165,0.2);
+            border: 1px solid #06ffa5;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            color: #06ffa5;
+            font-weight: 600;
+        }
+        
+        .example-content {
+            padding: 25px;
+        }
+        
+        .prompt-text {
+            font-size: 0.9rem;
+            color: #aaa;
+            line-height: 1.6;
+        }
+        
+        /* CTA Section */
+        .cta-section {
+            text-align: center;
+            padding: 120px 0;
+            position: relative;
+        }
+        
+        .cta-title {
+            font-size: 4rem;
+            font-weight: 900;
+            margin-bottom: 40px;
+            background: linear-gradient(135deg, #ff006e, #8338ec, #06ffa5);
+            background-size: 200% 200%;
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: psychedelicFlow 3s ease infinite;
+        }
+        
+        .cta-button {
+            display: inline-block;
+            padding: 25px 80px;
+            background: linear-gradient(135deg, #ff006e, #8338ec, #06ffa5);
+            background-size: 200% 200%;
+            color: white;
+            text-decoration: none;
+            border-radius: 60px;
+            font-size: 1.5rem;
+            font-weight: 800;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.4s ease;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            animation: ctaPulse 2s ease-in-out infinite;
+        }
+        
+        @keyframes ctaPulse {
+            0%, 100% { transform: scale(1); box-shadow: 0 0 40px rgba(255,0,110,0.5); }
+            50% { transform: scale(1.05); box-shadow: 0 0 80px rgba(131,56,236,0.8); }
+        }
+        
+        .cta-button:hover {
+            background-position: 100% 50%;
+            letter-spacing: 5px;
+        }
+        
+        /* Responsive */
+        @media (max-width: 768px) {
+            .hero h1 {
+                font-size: 3.5rem;
+            }
+            
+            .uncensored-text {
+                font-size: 1.5rem;
+                letter-spacing: 5px;
+            }
+            
+            .freedom-grid,
+            .examples-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .comparison-header,
+            .comparison-row {
+                font-size: 0.9rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Psychedelic Background -->
+    <div class="psychedelic-bg">
+        <div class="gradient-1"></div>
+        <div class="gradient-2"></div>
+        <div class="gradient-3"></div>
+    </div>
+    
+    <!-- Noise Overlay -->
+    <div class="noise"></div>
+    
+    <!-- Floating Elements -->
+    <div class="floating-elements" id="floatingElements"></div>
+    
+    <div class="container">
+        <!-- Hero Section -->
+        <section class="hero">
+            <div class="banana-badge">
+                <span style="font-size: 24px;">🍌</span>
+                <span>NANO BANANA AI</span>
+                <span style="font-size: 12px; opacity: 0.8;">by Google</span>
+            </div>
+            
+            <h1 class="hero-title">IMAGE CHAT</h1>
+            <div class="uncensored-text">UNCENSORED</div>
+            
+            <p class="hero-subtitle">
+                Experience true creative freedom with <strong style="color: #ffd700;">Gemini 2.5 Flash Image</strong> (Nano Banana).
+                Less restrictions, more possibilities, unlimited imagination.
+            </p>
+            
+            <div style="display: flex; justify-content: center; gap: 30px; flex-wrap: wrap; margin-top: 40px;">
+                <div style="text-align: center;">
+                    <div style="font-size: 3rem; font-weight: 900; color: #06ffa5;">∞</div>
+                    <div style="color: #aaa;">Unlimited</div>
+                </div>
+                <div style="text-align: center;">
+                    <div style="font-size: 3rem; font-weight: 900; color: #ff006e;">FREE</div>
+                    <div style="color: #aaa;">Forever</div>
+                </div>
+                <div style="text-align: center;">
+                    <div style="font-size: 3rem; font-weight: 900; color: #8338ec;">⚡</div>
+                    <div style="color: #aaa;">Lightning Fast</div>
+                </div>
+            </div>
+        </section>
+        
+        <!-- Freedom Features -->
+        <section class="freedom-section">
+            <h2 class="freedom-title">CREATIVE FREEDOM</h2>
+            
+            <div class="freedom-grid">
+                <div class="freedom-card">
+                    <div class="freedom-icon">🔓</div>
+                    <h3 style="font-size: 1.8rem; margin-bottom: 15px; color: #06ffa5;">Less Censorship</h3>
+                    <p style="color: #aaa; line-height: 1.6;">
+                        Nano Banana respects your creative vision. Generate art that other AIs refuse.
+                    </p>
+                </div>
+                
+                <div class="freedom-card">
+                    <div class="freedom-icon">🎨</div>
+                    <h3 style="font-size: 1.8rem; margin-bottom: 15px; color: #ff006e;">Any Style</h3>
+                    <p style="color: #aaa; line-height: 1.6;">
+                        From photorealistic to abstract, anime to oil painting - no limits on artistic expression.
+                    </p>
+                </div>
+                
+                <div class="freedom-card">
+                    <div class="freedom-icon">🚀</div>
+                    <h3 style="font-size: 1.8rem; margin-bottom: 15px; color: #8338ec;">Advanced Controls</h3>
+                    <p style="color: #aaa; line-height: 1.6;">
+                        Fine-tune with temperature, top-p, and top-k settings for precise control.
+                    </p>
+                </div>
+                
+                <div class="freedom-card">
+                    <div class="freedom-icon">🌍</div>
+                    <h3 style="font-size: 1.8rem; margin-bottom: 15px; color: #ffd700;">Global Prompts</h3>
+                    <p style="color: #aaa; line-height: 1.6;">
+                        Support for all languages and cultural contexts without bias.
+                    </p>
+                </div>
+                
+                <div class="freedom-card">
+                    <div class="freedom-icon">🔄</div>
+                    <h3 style="font-size: 1.8rem; margin-bottom: 15px; color: #06ffa5;">Conversations</h3>
+                    <p style="color: #aaa; line-height: 1.6;">
+                        Continue generating with context for coherent storytelling.
+                    </p>
+                </div>
+                
+                <div class="freedom-card">
+                    <div class="freedom-icon">📸</div>
+                    <h3 style="font-size: 1.8rem; margin-bottom: 15px; color: #ff006e;">Multi-Image</h3>
+                    <p style="color: #aaa; line-height: 1.6;">
+                        Use up to 6 reference images for complex compositions.
+                    </p>
+                </div>
+            </div>
+        </section>
+        
+        <!-- Comparison Section -->
+        <section class="comparison-section">
+            <h2 style="text-align: center; font-size: 3.5rem; font-weight: 900; margin-bottom: 60px; color: #fff;">
+                Why Choose <span style="color: #ffd700;">Nano Banana?</span>
+            </h2>
+            
+            <div class="comparison-table">
+                <div class="comparison-header">
+                    <div style="font-weight: 700;">Feature</div>
+                    <div class="nano-banana-col" style="font-size: 1.2rem;">🍌 Nano Banana</div>
+                    <div class="other-ai-col">Other AIs</div>
+                </div>
+                
+                <div class="comparison-row">
+                    <div>Content Restrictions</div>
+                    <div class="nano-banana-col">Minimal ✅</div>
+                    <div class="other-ai-col">Heavy ❌</div>
+                </div>
+                
+                <div class="comparison-row">
+                    <div>Artistic Freedom</div>
+                    <div class="nano-banana-col">Full Creative Control ✅</div>
+                    <div class="other-ai-col">Limited Styles ❌</div>
+                </div>
+                
+                <div class="comparison-row">
+                    <div>Generation Speed</div>
+                    <div class="nano-banana-col">Lightning Fast ⚡</div>
+                    <div class="other-ai-col">Slow 🐌</div>
+                </div>
+                
+                <div class="comparison-row">
+                    <div>Advanced Controls</div>
+                    <div class="nano-banana-col">Temperature, Top-p, Top-k ✅</div>
+                    <div class="other-ai-col">Basic Only ❌</div>
+                </div>
+                
+                <div class="comparison-row">
+                    <div>Multi-Image Context</div>
+                    <div class="nano-banana-col">Up to 6 Images ✅</div>
+                    <div class="other-ai-col">Single Image ❌</div>
+                </div>
+                
+                <div class="comparison-row">
+                    <div>Price</div>
+                    <div class="nano-banana-col">FREE Forever 🎉</div>
+                    <div class="other-ai-col">$20-50/month 💸</div>
+                </div>
+            </div>
+        </section>
+        
+        <!-- Advanced Controls Showcase -->
+        <section class="controls-section">
+            <h2 style="font-size: 3.5rem; font-weight: 900; margin-bottom: 20px; color: #fff;">
+                Professional Controls
+            </h2>
+            <p style="color: #aaa; font-size: 1.3rem; margin-bottom: 60px;">
+                Fine-tune your generations like a pro
+            </p>
+            
+            <div class="control-demo">
+                <div class="slider-container">
+                    <div class="slider-label">
+                        <span>Temperature</span>
+                        <span style="color: #06ffa5; font-family: monospace;">0.8</span>
+                    </div>
+                    <input type="range" class="slider" value="80" />
+                    <p style="color: #666; font-size: 0.9rem; margin-top: 10px;">
+                        Controls randomness and creativity
+                    </p>
+                </div>
+                
+                <div class="slider-container">
+                    <div class="slider-label">
+                        <span>Top-p</span>
+                        <span style="color: #ff006e; font-family: monospace;">0.95</span>
+                    </div>
+                    <input type="range" class="slider" value="95" />
+                    <p style="color: #666; font-size: 0.9rem; margin-top: 10px;">
+                        Nucleus sampling for quality control
+                    </p>
+                </div>
+                
+                <div class="slider-container">
+                    <div class="slider-label">
+                        <span>Top-k</span>
+                        <span style="color: #8338ec; font-family: monospace;">40</span>
+                    </div>
+                    <input type="range" class="slider" value="40" />
+                    <p style="color: #666; font-size: 0.9rem; margin-top: 10px;">
+                        Token selection for consistency
+                    </p>
+                </div>
+            </div>
+        </section>
+        
+        <!-- Examples Gallery -->
+        <section class="examples-section">
+            <h2 style="text-align: center; font-size: 3.5rem; font-weight: 900; margin-bottom: 20px; color: #fff;">
+                What Can You Create?
+            </h2>
+            <p style="text-align: center; color: #aaa; font-size: 1.3rem; margin-bottom: 60px;">
+                Examples of prompts that work with Nano Banana
+            </p>
+            
+            <div class="examples-grid">
+                <div class="example-card">
+                    <div class="example-image">
+                        <div class="example-badge">Allowed</div>
+                        <div style="display: flex; align-items: center; justify-content: center; height: 100%; font-size: 4rem;">
+                            🎨
+                        </div>
+                    </div>
+                    <div class="example-content">
+                        <h4 style="color: #06ffa5; margin-bottom: 10px;">Artistic Nudes</h4>
+                        <p class="prompt-text">Classical renaissance painting style, artistic anatomy study...</p>
+                    </div>
+                </div>
+                
+                <div class="example-card">
+                    <div class="example-image">
+                        <div class="example-badge">Allowed</div>
+                        <div style="display: flex; align-items: center; justify-content: center; height: 100%; font-size: 4rem;">
+                            ⚔️
+                        </div>
+                    </div>
+                    <div class="example-content">
+                        <h4 style="color: #ff006e; margin-bottom: 10px;">Fantasy Violence</h4>
+                        <p class="prompt-text">Epic battle scenes, warrior combat, mythical creatures fighting...</p>
+                    </div>
+                </div>
+                
+                <div class="example-card">
+                    <div class="example-image">
+                        <div class="example-badge">Allowed</div>
+                        <div style="display: flex; align-items: center; justify-content: center; height: 100%; font-size: 4rem;">
+                            🌍
+                        </div>
+                    </div>
+                    <div class="example-content">
+                        <h4 style="color: #8338ec; margin-bottom: 10px;">Political Art</h4>
+                        <p class="prompt-text">Social commentary, political satire, protest art...</p>
+                    </div>
+                </div>
+                
+                <div class="example-card">
+                    <div class="example-image">
+                        <div class="example-badge">Allowed</div>
+                        <div style="display: flex; align-items: center; justify-content: center; height: 100%; font-size: 4rem;">
+                            👻
+                        </div>
+                    </div>
+                    <div class="example-content">
+                        <h4 style="color: #ffd700; margin-bottom: 10px;">Horror & Dark</h4>
+                        <p class="prompt-text">Gothic horror, dark fantasy, psychological thriller scenes...</p>
+                    </div>
+                </div>
+                
+                <div class="example-card">
+                    <div class="example-image">
+                        <div class="example-badge">Allowed</div>
+                        <div style="display: flex; align-items: center; justify-content: center; height: 100%; font-size: 4rem;">
+                            🎭
+                        </div>
+                    </div>
+                    <div class="example-content">
+                        <h4 style="color: #06ffa5; margin-bottom: 10px;">Controversial Topics</h4>
+                        <p class="prompt-text">Historical events, social issues, documentary style...</p>
+                    </div>
+                </div>
+                
+                <div class="example-card">
+                    <div class="example-image">
+                        <div class="example-badge">Allowed</div>
+                        <div style="display: flex; align-items: center; justify-content: center; height: 100%; font-size: 4rem;">
+                            ✨
+                        </div>
+                    </div>
+                    <div class="example-content">
+                        <h4 style="color: #ff006e; margin-bottom: 10px;">Any Style</h4>
+                        <p class="prompt-text">Anime, photorealistic, abstract, surreal, any artistic vision...</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+        
+        <!-- Technical Specs -->
+        <section style="margin: 120px 0; text-align: center;">
+            <h2 style="font-size: 3rem; font-weight: 900; margin-bottom: 60px; color: #fff;">
+                Technical Specifications
+            </h2>
+            
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 30px; max-width: 1000px; margin: 0 auto;">
+                <div style="background: rgba(255,255,255,0.03); padding: 30px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.1);">
+                    <h3 style="color: #06ffa5; margin-bottom: 15px;">Model</h3>
+                    <p style="color: #aaa;">Gemini 2.5 Flash Image</p>
+                    <p style="color: #666; font-size: 0.9rem; margin-top: 5px;">Latest August 2025 Release</p>
+                </div>
+                
+                <div style="background: rgba(255,255,255,0.03); padding: 30px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.1);">
+                    <h3 style="color: #ff006e; margin-bottom: 15px;">Resolution</h3>
+                    <p style="color: #aaa;">Up to 2048x2048</p>
+                    <p style="color: #666; font-size: 0.9rem; margin-top: 5px;">High Quality Output</p>
+                </div>
+                
+                <div style="background: rgba(255,255,255,0.03); padding: 30px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.1);">
+                    <h3 style="color: #8338ec; margin-bottom: 15px;">Speed</h3>
+                    <p style="color: #aaa;">2-5 seconds</p>
+                    <p style="color: #666; font-size: 0.9rem; margin-top: 5px;">Per Generation</p>
+                </div>
+                
+                <div style="background: rgba(255,255,255,0.03); padding: 30px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.1);">
+                    <h3 style="color: #ffd700; margin-bottom: 15px;">API</h3>
+                    <p style="color: #aaa;">REST API Available</p>
+                    <p style="color: #666; font-size: 0.9rem; margin-top: 5px;">For Developers</p>
+                </div>
+            </div>
+        </section>
+        
+        <!-- CTA Section -->
+        <section class="cta-section">
+            <h2 class="cta-title">UNLEASH YOUR CREATIVITY</h2>
+            <p style="font-size: 1.5rem; color: #aaa; margin-bottom: 50px;">
+                No limits. No censorship. Just pure creative freedom.
+            </p>
+            <a href="/image-chat" class="cta-button">
+                START CREATING
+            </a>
+            <p style="margin-top: 50px; color: #666; font-size: 1.2rem;">
+                🍌 Powered by Nano Banana • Free Forever • No Registration
+            </p>
+        </section>
+    </div>
+    
+    <script>
+        // Create floating bananas
+        const floatingContainer = document.getElementById('floatingElements');
+        const bananaEmojis = ['🍌', '✨', '🎨', '🚀', '💫', '🌟'];
+        
+        function createFloatingElement() {
+            const element = document.createElement('div');
+            element.className = 'banana';
+            element.textContent = bananaEmojis[Math.floor(Math.random() * bananaEmojis.length)];
+            element.style.left = Math.random() * 100 + '%';
+            element.style.animationDuration = (15 + Math.random() * 15) + 's';
+            element.style.animationDelay = Math.random() * 5 + 's';
+            floatingContainer.appendChild(element);
+            
+            // Remove element after animation
+            setTimeout(() => {
+                element.remove();
+            }, 30000);
+        }
+        
+        // Create initial floating elements
+        for (let i = 0; i < 10; i++) {
+            setTimeout(createFloatingElement, i * 2000);
+        }
+        
+        // Continue creating floating elements
+        setInterval(createFloatingElement, 3000);
+        
+        // Interactive sliders
+        const sliders = document.querySelectorAll('.slider');
+        sliders.forEach(slider => {
+            slider.addEventListener('input', function() {
+                const value = this.value;
+                const label = this.parentElement.querySelector('.slider-label span:last-child');
+                
+                if (this.parentElement.querySelector('.slider-label span:first-child').textContent === 'Temperature') {
+                    label.textContent = (value / 100 * 2).toFixed(2);
+                } else if (this.parentElement.querySelector('.slider-label span:first-child').textContent === 'Top-p') {
+                    label.textContent = (value / 100).toFixed(2);
+                } else {
+                    label.textContent = value;
+                }
+                
+                // Update slider gradient
+                const percentage = (value - this.min) / (this.max - this.min) * 100;
+                this.style.background = `linear-gradient(90deg, #8338ec ${percentage}%, rgba(255,255,255,0.1) ${percentage}%)`;
+            });
+        });
+        
+        // Parallax effect
+        window.addEventListener('scroll', () => {
+            const scrolled = window.pageYOffset;
+            const parallax = document.querySelector('.hero');
+            if (parallax) {
+                parallax.style.transform = `translateY(${scrolled * 0.5}px)`;
+            }
+        });
+        
+        // Glitch effect on hover
+        const uncensoredText = document.querySelector('.uncensored-text');
+        uncensoredText.addEventListener('mouseenter', () => {
+            uncensoredText.style.animation = 'glitch 0.3s ease-in-out infinite alternate';
+        });
+        uncensoredText.addEventListener('mouseleave', () => {
+            uncensoredText.style.animation = 'glitch 2s ease-in-out infinite alternate';
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,59 @@
+# Anemoia AI Creative Tools - Robots.txt
+# https://anemoias.me
+# Last Updated: January 2025
+
+# Allow all search engine crawlers
+User-agent: *
+Allow: /
+Allow: /t-poser
+Allow: /image-chat
+Allow: /video-object-remover
+Allow: /doom
+Allow: /pose-estimation
+Allow: /video-editor
+Allow: /shader-editor
+Allow: /ascii-converter
+Allow: /webcam-effects
+Allow: /3d-viewer
+Allow: /particle-system
+Allow: /webgl-playground
+Allow: /fractal-explorer
+Allow: /tool-pages/
+
+# Sitemap location
+Sitemap: https://anemoias.me/sitemap.xml
+
+# Allow all major search engine crawlers
+User-agent: Googlebot
+Allow: /
+
+User-agent: Bingbot
+Allow: /
+
+User-agent: Slurp
+Allow: /
+
+User-agent: DuckDuckBot
+Allow: /
+
+# Disallow sensitive or unnecessary pages
+Disallow: /auth/callback
+Disallow: /test
+Disallow: /api/
+Disallow: /.well-known/
+
+# No crawl delay for fast indexing
+# Crawl-delay: 0
+
+# Block bad bots but allow SEO analysis tools
+User-agent: AhrefsBot
+Crawl-delay: 10
+
+User-agent: SemrushBot  
+Crawl-delay: 10
+
+User-agent: MJ12bot
+Disallow: /
+
+User-agent: DotBot
+Disallow: / 

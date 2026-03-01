@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Minimal Whisper Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #1a1a1a;
+            color: #ffffff;
+            padding: 20px;
+            margin: 0;
+        }
+        pre {
+            background-color: #2a2a2a;
+            padding: 10px;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+        button {
+            background-color: #06b6d4;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #0891b2;
+        }
+    </style>
+</head>
+<body>
+    <h1>Minimal Whisper Model Test</h1>
+    
+    <button id="testDirect">Test Direct Import</button>
+    <button id="testWorker">Test Worker Import</button>
+    <button id="testSimplified">Test Simplified Pipeline</button>
+    
+    <h2>Output:</h2>
+    <pre id="output"></pre>
+
+    <script type="module">
+        const log = (msg) => {
+            const output = document.getElementById('output');
+            output.textContent += msg + '\n';
+            console.log(msg);
+        };
+
+        // Test 1: Direct import
+        document.getElementById('testDirect').addEventListener('click', async () => {
+            try {
+                log('--- Test 1: Direct Import ---');
+                log('Importing @xenova/transformers...');
+                
+                const transformers = await import('/node_modules/@xenova/transformers/dist/transformers.min.js');
+                log('Import successful!');
+                log('Available exports: ' + Object.keys(transformers).join(', '));
+                
+                const { pipeline, env } = transformers;
+                
+                // Configure environment
+                env.allowLocalModels = false;
+                env.useBrowserCache = true;
+                env.backends.onnx.wasm.proxy = true;
+                
+                log('Environment configured');
+                log('Creating pipeline...');
+                
+                try {
+                    const transcriber = await pipeline('automatic-speech-recognition', 'Xenova/whisper-tiny');
+                    log('Pipeline created successfully!');
+                    log('Pipeline type: ' + transcriber.constructor.name);
+                    log('Model loaded: ' + transcriber.model.constructor.name);
+                } catch (pipelineError) {
+                    log('Pipeline error: ' + pipelineError.message);
+                    log('Error stack: ' + pipelineError.stack);
+                }
+                
+            } catch (error) {
+                log('Error: ' + error.message);
+                log('Stack: ' + error.stack);
+            }
+        });
+
+        // Test 2: Worker-based loading
+        document.getElementById('testWorker').addEventListener('click', async () => {
+            try {
+                log('--- Test 2: Worker Import ---');
+                
+                const workerCode = `
+                    import { pipeline, env } from '/node_modules/@xenova/transformers/dist/transformers.min.js';
+                    
+                    env.allowLocalModels = false;
+                    env.useBrowserCache = true;
+                    env.backends.onnx.wasm.proxy = true;
+                    
+                    self.addEventListener('message', async (e) => {
+                        try {
+                            const transcriber = await pipeline('automatic-speech-recognition', 'Xenova/whisper-tiny');
+                            self.postMessage({ success: true, type: transcriber.constructor.name });
+                        } catch (error) {
+                            self.postMessage({ success: false, error: error.message, stack: error.stack });
+                        }
+                    });
+                `;
+                
+                const blob = new Blob([workerCode], { type: 'application/javascript' });
+                const worker = new Worker(URL.createObjectURL(blob), { type: 'module' });
+                
+                worker.onmessage = (e) => {
+                    if (e.data.success) {
+                        log('Worker: Pipeline created successfully!');
+                        log('Worker: Pipeline type: ' + e.data.type);
+                    } else {
+                        log('Worker error: ' + e.data.error);
+                        log('Worker stack: ' + e.data.stack);
+                    }
+                };
+                
+                worker.postMessage('start');
+                
+            } catch (error) {
+                log('Error: ' + error.message);
+            }
+        });
+
+        // Test 3: Simplified approach
+        document.getElementById('testSimplified').addEventListener('click', async () => {
+            try {
+                log('--- Test 3: Simplified Pipeline ---');
+                
+                // Try using a script tag approach
+                const script = document.createElement('script');
+                script.type = 'module';
+                script.textContent = `
+                    import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.5.2';
+                    
+                    window.testPipeline = async () => {
+                        env.allowLocalModels = false;
+                        env.useBrowserCache = true;
+                        
+                        try {
+                            const transcriber = await pipeline('automatic-speech-recognition', 'Xenova/whisper-tiny');
+                            return { success: true, type: transcriber.constructor.name };
+                        } catch (error) {
+                            return { success: false, error: error.message };
+                        }
+                    };
+                `;
+                document.body.appendChild(script);
+                
+                // Wait a bit for script to load
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                
+                if (window.testPipeline) {
+                    const result = await window.testPipeline();
+                    if (result.success) {
+                        log('Pipeline created with @huggingface/transformers!');
+                        log('Type: ' + result.type);
+                    } else {
+                        log('Error with @huggingface/transformers: ' + result.error);
+                    }
+                } else {
+                    log('Failed to load test function');
+                }
+                
+            } catch (error) {
+                log('Error: ' + error.message);
+            }
+        });
+    </script>
+</body>
+</html> 

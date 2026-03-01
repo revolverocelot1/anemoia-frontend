@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Subtitle Functionality Test</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            background: #1a1a1a;
+            color: white;
+            font-family: Arial, sans-serif;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .test-status {
+            background: #2a2a2a;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .test-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid #444;
+        }
+        .test-item:last-child {
+            border-bottom: none;
+        }
+        .status {
+            font-weight: bold;
+        }
+        .status.pass {
+            color: #4ade80;
+        }
+        .status.fail {
+            color: #ef4444;
+        }
+        .status.pending {
+            color: #fbbf24;
+        }
+        .recommendations {
+            background: #1e293b;
+            border-radius: 8px;
+            padding: 20px;
+            margin-top: 20px;
+        }
+        .recommendation-item {
+            margin: 10px 0;
+            padding-left: 20px;
+            position: relative;
+        }
+        .recommendation-item:before {
+            content: "→";
+            position: absolute;
+            left: 0;
+            color: #60a5fa;
+        }
+        code {
+            background: #374151;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎬 Subtitle Functionality Test Results</h1>
+        
+        <div class="test-status">
+            <h2>Current Issues & Status</h2>
+            
+            <div class="test-item">
+                <span>1. Whisper Transcription (Real Mode)</span>
+                <span class="status pass">✅ FIXED</span>
+        </div>
+
+            <div class="test-item">
+                <span>2. FFmpeg Loading</span>
+                <span class="status pending">⚠️ IMPROVED</span>
+            </div>
+            
+            <div class="test-item">
+                <span>3. Subtitle Rendering on Video</span>
+                <span class="status pending">🔍 DEBUGGING</span>
+        </div>
+
+            <div class="test-item">
+                <span>4. MP4 Export with Burned Subtitles</span>
+                <span class="status pending">⏳ DEPENDS ON FFMPEG</span>
+            </div>
+        </div>
+
+        <div class="recommendations">
+            <h2>🔧 Troubleshooting Steps</h2>
+            
+            <h3>1. For Transcription Issues:</h3>
+            <div class="recommendation-item">
+                Open browser console and check for errors when clicking "Transcribe"
+            </div>
+            <div class="recommendation-item">
+                If transcription fails, it will fall back to demo subtitles instead of "example segments"
+            </div>
+            <div class="recommendation-item">
+                Make sure the Whisper model is downloaded (check Models panel)
+        </div>
+
+            <h3>2. For FFmpeg Loading:</h3>
+            <div class="recommendation-item">
+                Check browser console for: <code>[VideoExporter] FFmpeg loaded successfully</code>
+            </div>
+            <div class="recommendation-item">
+                If FFmpeg fails to load, check Network tab for 404 errors on ffmpeg files
+        </div>
+            <div class="recommendation-item">
+                Files should be served from: <code>/ffmpeg/ffmpeg-core.js</code> and <code>/ffmpeg/ffmpeg-core.wasm</code>
+    </div>
+            
+            <h3>3. For Subtitle Display:</h3>
+            <div class="recommendation-item">
+                Check console for: <code>[VideoPreview] Subtitle rendering check</code>
+            </div>
+            <div class="recommendation-item">
+                Verify: <code>segments > 0</code>, <code>videoDimensions.width > 0</code>, <code>showPositioner = false</code>
+            </div>
+            <div class="recommendation-item">
+                Play the video to see if subtitles appear at the correct timestamps
+            </div>
+            
+            <h3>4. Quick Test:</h3>
+            <div class="recommendation-item">
+                1. Load a video file
+            </div>
+            <div class="recommendation-item">
+                2. Click "Import Subtitles" and load an SRT file to bypass transcription
+            </div>
+            <div class="recommendation-item">
+                3. Check if imported subtitles display on the video
+            </div>
+            <div class="recommendation-item">
+                4. If they show, the rendering is working and the issue is with transcription
+            </div>
+        </div>
+
+        <div class="recommendations" style="background: #1f2937;">
+            <h2>📋 Expected Behavior</h2>
+            
+            <div class="recommendation-item">
+                <strong>Transcription:</strong> Should show actual words from the video, not "example segments"
+            </div>
+            <div class="recommendation-item">
+                <strong>Subtitle Display:</strong> Should appear over the video at the correct timestamps
+            </div>
+            <div class="recommendation-item">
+                <strong>Positioning:</strong> Should stay within video bounds (not in black bars)
+            </div>
+            <div class="recommendation-item">
+                <strong>Export:</strong> Should produce a single MP4 file with burned subtitles
+            </div>
+        </div>
+
+        <div class="recommendations" style="background: #064e3b;">
+            <h2>✅ What's Working</h2>
+            
+            <div class="recommendation-item">
+                Smart rendering logic for subtitle positioning
+            </div>
+            <div class="recommendation-item">
+                Video bounds detection and constraint system
+            </div>
+            <div class="recommendation-item">
+                Subtitle segment editor integration
+            </div>
+            <div class="recommendation-item">
+                Import/Export functionality for SRT/VTT files
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Log test information
+        console.log('[Subtitle Test] Page loaded');
+        console.log('[Subtitle Test] To debug issues:');
+        console.log('1. Check browser console for errors');
+        console.log('2. Look for [VideoPreview] and [VideoExporter] logs');
+        console.log('3. Verify network requests for FFmpeg files');
+        console.log('4. Test with imported SRT files first');
+    </script>
+</body>
+</html> 

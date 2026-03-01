@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Person Image</title>
+</head>
+<body>
+    <canvas id="canvas" width="400" height="600"></canvas>
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Background
+        ctx.fillStyle = '#f0f0f0';
+        ctx.fillRect(0, 0, 400, 600);
+        
+        // Draw a simple person figure
+        ctx.fillStyle = '#333';
+        ctx.strokeStyle = '#333';
+        ctx.lineWidth = 3;
+        
+        // Head
+        ctx.beginPath();
+        ctx.arc(200, 100, 30, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Body
+        ctx.beginPath();
+        ctx.moveTo(200, 130);
+        ctx.lineTo(200, 300);
+        ctx.stroke();
+        
+        // Arms (not in T-pose)
+        ctx.beginPath();
+        ctx.moveTo(200, 180);
+        ctx.lineTo(150, 250);
+        ctx.moveTo(200, 180);
+        ctx.lineTo(250, 250);
+        ctx.stroke();
+        
+        // Legs
+        ctx.beginPath();
+        ctx.moveTo(200, 300);
+        ctx.lineTo(170, 450);
+        ctx.moveTo(200, 300);
+        ctx.lineTo(230, 450);
+        ctx.stroke();
+        
+        // Feet
+        ctx.beginPath();
+        ctx.moveTo(170, 450);
+        ctx.lineTo(160, 470);
+        ctx.moveTo(230, 450);
+        ctx.lineTo(240, 470);
+        ctx.stroke();
+        
+        // Convert to data URL and download
+        canvas.toBlob(function(blob) {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'test-person.png';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        });
+    </script>
+</body>
+</html>

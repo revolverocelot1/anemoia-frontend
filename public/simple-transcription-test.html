@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple Transcription Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f0f0f0;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        #status {
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        .info { background: #d1ecf1; color: #0c5460; }
+        #output {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+            white-space: pre-wrap;
+            font-family: monospace;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>Simple Transcription Test</h1>
+    
+    <div class="container">
+        <h2>Step 1: Generate Test Audio</h2>
+        <button id="generateAudio">Generate 5-second Test Audio</button>
+        <audio id="audioPlayer" controls style="display: none; width: 100%; margin-top: 10px;"></audio>
+    </div>
+    
+    <div class="container">
+        <h2>Step 2: Load Whisper Model</h2>
+        <button id="loadModel" disabled>Load Whisper Tiny Model</button>
+    </div>
+    
+    <div class="container">
+        <h2>Step 3: Transcribe</h2>
+        <button id="transcribe" disabled>Transcribe Audio</button>
+    </div>
+    
+    <div class="container">
+        <div id="status" class="info">Ready to start</div>
+        <h3>Output:</h3>
+        <div id="output">No output yet...</div>
+    </div>
+    
+    <script type="module">
+        // UI elements
+        const generateBtn = document.getElementById('generateAudio');
+        const loadModelBtn = document.getElementById('loadModel');
+        const transcribeBtn = document.getElementById('transcribe');
+        const audioPlayer = document.getElementById('audioPlayer');
+        const status = document.getElementById('status');
+        const output = document.getElementById('output');
+        
+        let audioData = null;
+        let transcriber = null;
+        
+        // Update status
+        function updateStatus(message, type = 'info') {
+            status.textContent = message;
+            status.className = type;
+            console.log(`[${type}] ${message}`);
+        }
+        
+        // Log output
+        function logOutput(message) {
+            output.textContent += message + '\n';
+            output.scrollTop = output.scrollHeight;
+        }
+        
+        // Generate test audio (sine wave with frequency sweep)
+        generateBtn.onclick = () => {
+            updateStatus('Generating test audio...', 'info');
+            
+            try {
+                const sampleRate = 16000;
+                const duration = 5; // seconds
+                const numSamples = sampleRate * duration;
+                audioData = new Float32Array(numSamples);
+                
+                // Generate a simple sine wave that sweeps frequency
+                for (let i = 0; i < numSamples; i++) {
+                    const t = i / sampleRate;
+                    const freq = 200 + (800 * t / duration); // Sweep from 200Hz to 1000Hz
+                    audioData[i] = 0.3 * Math.sin(2 * Math.PI * freq * t);
+                }
+                
+                // Create audio buffer and blob for playback
+                const audioContext = new AudioContext({ sampleRate });
+                const buffer = audioContext.createBuffer(1, numSamples, sampleRate);
+                buffer.getChannelData(0).set(audioData);
+                
+                // Convert to WAV for playback
+                const wav = audioBufferToWav(buffer);
+                const blob = new Blob([wav], { type: 'audio/wav' });
+                audioPlayer.src = URL.createObjectURL(blob);
+                audioPlayer.style.display = 'block';
+                
+                updateStatus('Test audio generated successfully!', 'success');
+                loadModelBtn.disabled = false;
+                logOutput('Generated 5-second test audio (frequency sweep 200-1000Hz)');
+                
+            } catch (error) {
+                updateStatus(`Error generating audio: ${error.message}`, 'error');
+                logOutput(`Error: ${error.stack}`);
+            }
+        };
+        
+        // Load Whisper model
+        loadModelBtn.onclick = async () => {
+            updateStatus('Loading Whisper model...', 'info');
+            loadModelBtn.disabled = true;
+            
+            try {
+                logOutput('\n--- Loading Transformers.js ---');
+                const { pipeline, env } = await import('@huggingface/transformers');
+                logOutput('Transformers.js loaded successfully');
+                
+                // Configure environment
+                env.allowLocalModels = false;
+                env.remoteURL = 'https://huggingface.co/';
+                
+                logOutput('Creating automatic-speech-recognition pipeline...');
+                transcriber = await pipeline(
+                    'automatic-speech-recognition',
+                    'onnx-community/whisper-tiny',
+                    {
+                        quantized: false,
+                        progress_callback: (progress) => {
+                            if (progress.status) {
+                                logOutput(`Progress: ${progress.status}`);
+                            }
+                        }
+                    }
+                );
+                
+                updateStatus('Model loaded successfully!', 'success');
+                transcribeBtn.disabled = false;
+                logOutput('Whisper Tiny model ready for transcription');
+                
+            } catch (error) {
+                updateStatus(`Error loading model: ${error.message}`, 'error');
+                logOutput(`Error: ${error.stack}`);
+                loadModelBtn.disabled = false;
+            }
+        };
+        
+        // Transcribe audio
+        transcribeBtn.onclick = async () => {
+            if (!audioData || !transcriber) return;
+            
+            updateStatus('Transcribing...', 'info');
+            transcribeBtn.disabled = true;
+            
+            try {
+                logOutput('\n--- Starting Transcription ---');
+                logOutput('Audio data length: ' + audioData.length);
+                logOutput('Sample rate: 16000 Hz');
+                
+                const result = await transcriber(audioData, {
+                    return_timestamps: true,
+                    chunk_length_s: 30,
+                    stride_length_s: 5
+                });
+                
+                updateStatus('Transcription complete!', 'success');
+                logOutput('\n--- Transcription Result ---');
+                logOutput(JSON.stringify(result, null, 2));
+                
+                if (result.text) {
+                    logOutput(`\nTranscribed text: "${result.text}"`);
+                } else {
+                    logOutput('\nNo text was transcribed (this is expected for non-speech audio)');
+                }
+                
+            } catch (error) {
+                updateStatus(`Error during transcription: ${error.message}`, 'error');
+                logOutput(`Error: ${error.stack}`);
+            } finally {
+                transcribeBtn.disabled = false;
+            }
+        };
+        
+        // Helper function to convert AudioBuffer to WAV
+        function audioBufferToWav(buffer) {
+            const length = buffer.length * buffer.numberOfChannels * 2 + 44;
+            const arrayBuffer = new ArrayBuffer(length);
+            const view = new DataView(arrayBuffer);
+            const channels = [];
+            let offset = 0;
+            let pos = 0;
+            
+            // Write WAV header
+            const setUint16 = (data) => {
+                view.setUint16(pos, data, true);
+                pos += 2;
+            };
+            const setUint32 = (data) => {
+                view.setUint32(pos, data, true);
+                pos += 4;
+            };
+            
+            // RIFF identifier
+            setUint32(0x46464952);
+            setUint32(length - 8);
+            setUint32(0x45564157);
+            
+            // fmt sub-chunk
+            setUint32(0x20746d66);
+            setUint32(16);
+            setUint16(1);
+            setUint16(buffer.numberOfChannels);
+            setUint32(buffer.sampleRate);
+            setUint32(buffer.sampleRate * 2 * buffer.numberOfChannels);
+            setUint16(buffer.numberOfChannels * 2);
+            setUint16(16);
+            
+            // data sub-chunk
+            setUint32(0x61746164);
+            setUint32(length - pos - 4);
+            
+            // Write interleaved data
+            for (let i = 0; i < buffer.numberOfChannels; i++) {
+                channels.push(buffer.getChannelData(i));
+            }
+            
+            while (pos < length) {
+                for (let i = 0; i < buffer.numberOfChannels; i++) {
+                    let sample = Math.max(-1, Math.min(1, channels[i][offset]));
+                    sample = sample < 0 ? sample * 0x8000 : sample * 0x7FFF;
+                    view.setInt16(pos, sample, true);
+                    pos += 2;
+                }
+                offset++;
+            }
+            
+            return arrayBuffer;
+        }
+        
+        // Initialize
+        logOutput('Simple Transcription Test Ready');
+        logOutput('This test will:');
+        logOutput('1. Generate a test audio signal');
+        logOutput('2. Load the Whisper Tiny model');
+        logOutput('3. Attempt to transcribe the audio');
+        logOutput('\nNote: The test audio is just a frequency sweep,');
+        logOutput('so it won\'t produce meaningful text.');
+    </script>
+</body>
+</html> 

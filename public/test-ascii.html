@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ASCII Video Converter Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #0a0014;
+            color: #fff;
+        }
+        .container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        .panel {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 20px;
+            border-radius: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        pre {
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            line-height: 1;
+            white-space: pre;
+            overflow: auto;
+            max-height: 400px;
+            color: #00ff41;
+            text-shadow: 0 0 10px #00ff41;
+        }
+        button {
+            background: #ff00ff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #ff66ff;
+        }
+        input[type="file"] {
+            margin: 10px 0;
+        }
+        #status {
+            margin: 10px 0;
+            color: #00ffff;
+        }
+        canvas {
+            max-width: 100%;
+            height: auto;
+            border: 1px solid #333;
+        }
+        .controls {
+            margin: 20px 0;
+        }
+        label {
+            display: block;
+            margin: 10px 0;
+        }
+        input[type="range"] {
+            width: 100%;
+        }
+    </style>
+</head>
+<body>
+        <h1>ASCII Video Converter Test</h1>
+        
+    <div class="controls">
+            <input type="file" id="fileInput" accept="image/*,video/*">
+        <button onclick="processFile()">Process</button>
+        <div id="status"></div>
+            </div>
+
+    <div class="controls">
+        <label>
+            Characters: 
+            <select id="charSet">
+                <option value=" .:-=+*#%@">Classic</option>
+                <option value=" ░▒▓█">Blocks</option>
+                <option value=" 01">Binary</option>
+                <option value=" .·:;">Minimal</option>
+            </select>
+        </label>
+        <label>
+            Scale: <span id="scaleValue">0.15</span>
+            <input type="range" id="scale" min="0.05" max="0.5" step="0.05" value="0.15">
+        </label>
+        <label>
+            Font Size: <span id="fontSizeValue">10</span>px
+            <input type="range" id="fontSize" min="6" max="20" step="1" value="10">
+        </label>
+        </div>
+        
+    <div class="container">
+        <div class="panel">
+            <h2>Original</h2>
+            <canvas id="canvas"></canvas>
+            <img id="preview" style="max-width: 100%; display: none;">
+        </div>
+        <div class="panel">
+            <h2>ASCII Output</h2>
+            <pre id="output"></pre>
+        </div>
+    </div>
+
+    <script>
+        const fileInput = document.getElementById('fileInput');
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const output = document.getElementById('output');
+        const status = document.getElementById('status');
+        const scaleInput = document.getElementById('scale');
+        const fontSizeInput = document.getElementById('fontSize');
+        const charSetSelect = document.getElementById('charSet');
+
+        scaleInput.addEventListener('input', (e) => {
+            document.getElementById('scaleValue').textContent = e.target.value;
+        });
+
+        fontSizeInput.addEventListener('input', (e) => {
+            document.getElementById('fontSizeValue').textContent = e.target.value;
+            output.style.fontSize = e.target.value + 'px';
+        });
+
+        function processFile() {
+            const file = fileInput.files[0];
+            if (!file) {
+                status.textContent = 'Please select a file';
+                return;
+            }
+
+            status.textContent = 'Processing...';
+
+            if (file.type.startsWith('image/')) {
+                const img = new Image();
+                img.onload = () => {
+                    processImage(img);
+                    document.getElementById('preview').src = img.src;
+                    document.getElementById('preview').style.display = 'block';
+                    canvas.style.display = 'none';
+                };
+                img.src = URL.createObjectURL(file);
+            } else if (file.type.startsWith('video/')) {
+                const video = document.createElement('video');
+                video.onloadedmetadata = () => {
+                    video.currentTime = 0;
+                    video.onseeked = () => {
+                        processVideo(video);
+                    };
+                };
+                video.src = URL.createObjectURL(file);
+            }
+        }
+
+        function processImage(img) {
+            const scale = parseFloat(scaleInput.value);
+            canvas.width = img.width * scale;
+            canvas.height = img.height * scale;
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const ascii = convertToAscii(imageData);
+            output.textContent = ascii;
+            status.textContent = 'Done!';
+        }
+
+        function processVideo(video) {
+            const scale = parseFloat(scaleInput.value);
+            canvas.width = video.videoWidth * scale;
+            canvas.height = video.videoHeight * scale;
+            canvas.style.display = 'block';
+            document.getElementById('preview').style.display = 'none';
+            
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const ascii = convertToAscii(imageData);
+            output.textContent = ascii;
+            status.textContent = 'Done! (First frame)';
+        }
+
+        function convertToAscii(imageData) {
+            const { data, width, height } = imageData;
+            const asciiChars = charSetSelect.value;
+            let ascii = '';
+
+            for (let y = 0; y < height; y++) {
+                for (let x = 0; x < width; x++) {
+                    const idx = (y * width + x) * 4;
+                    const r = data[idx];
+                    const g = data[idx + 1];
+                    const b = data[idx + 2];
+                    
+                    const brightness = (r + g + b) / 765;
+                    const charIndex = Math.floor(brightness * (asciiChars.length - 1));
+                    ascii += asciiChars[charIndex];
+                }
+                ascii += '\n';
+            }
+
+            return ascii;
+        }
+
+        // Test with a simple canvas drawing
+        ctx.fillStyle = '#ff00ff';
+        ctx.fillRect(50, 50, 100, 100);
+        ctx.fillStyle = '#00ffff';
+        ctx.fillRect(150, 50, 100, 100);
+        canvas.width = 300;
+        canvas.height = 200;
+        
+        // Auto-convert the test drawing
+        setTimeout(() => {
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const ascii = convertToAscii(imageData);
+            output.textContent = ascii;
+            status.textContent = 'Test pattern ready';
+        }, 100);
+    </script>
+</body>
+</html>

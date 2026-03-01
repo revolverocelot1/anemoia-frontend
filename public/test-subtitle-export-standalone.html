@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Standalone Subtitle Export Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background: #1a1a1a;
+            color: #e0e0e0;
+        }
+        
+        .test-section {
+            background: #2a2a2a;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+        }
+        
+        button {
+            padding: 10px 20px;
+            background: #6366f1;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        
+        button:hover {
+            background: #4f46e5;
+        }
+        
+        .log {
+            background: #000;
+            padding: 10px;
+            border-radius: 4px;
+            max-height: 400px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+        }
+        
+        .success { color: #10b981; }
+        .error { color: #ef4444; }
+        .info { color: #3b82f6; }
+    </style>
+</head>
+<body>
+    <h1>🎬 Standalone Subtitle Export Test</h1>
+    
+    <div class="test-section">
+        <h2>Test Controls</h2>
+        <button onclick="testCanvas()">Test Canvas Export</button>
+        <button onclick="testFFmpeg()">Test FFmpeg Export</button>
+        <button onclick="clearLog()">Clear Log</button>
+    </div>
+    
+    <div class="test-section">
+        <h2>Console Output</h2>
+        <div id="log" class="log"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>Test Results</h2>
+        <div id="results"></div>
+    </div>
+
+    <script type="module">
+        function log(message, type = 'info') {
+            const logDiv = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            const entry = document.createElement('div');
+            entry.className = type;
+            entry.textContent = `[${timestamp}] ${message}`;
+            logDiv.appendChild(entry);
+            logDiv.scrollTop = logDiv.scrollHeight;
+            console.log(message);
+        }
+
+        window.log = log;
+        window.clearLog = () => {
+            document.getElementById('log').innerHTML = '';
+        };
+
+        // Test subtitles
+        const testSubtitles = [
+            {
+                id: '1',
+                startTime: 1,
+                endTime: 3,
+                text: 'First test subtitle',
+                style: { color: '#FFFFFF', fontSize: 32 },
+                position: { x: 50, y: 90 }
+            },
+            {
+                id: '2',
+                startTime: 4,
+                endTime: 6,
+                text: 'Second subtitle with longer text',
+                style: { color: '#FFFF00', fontSize: 32 },
+                position: { x: 50, y: 90 }
+            }
+        ];
+
+        // Test Canvas Export
+        window.testCanvas = async function() {
+            log('Starting Canvas Export Test...', 'info');
+            
+            try {
+                // Create a test video element
+                const video = document.createElement('video');
+                video.width = 640;
+                video.height = 360;
+                
+                // Create canvas
+                const canvas = document.createElement('canvas');
+                canvas.width = video.width;
+                canvas.height = video.height;
+                const ctx = canvas.getContext('2d');
+                
+                // Draw test frames
+                const frames = [];
+                for (let i = 0; i < 30; i++) { // 1 second at 30fps
+                    ctx.fillStyle = `hsl(${i * 12}, 50%, 20%)`;
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                    
+                    ctx.fillStyle = '#FFFFFF';
+                    ctx.font = '32px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(`Frame ${i}`, canvas.width / 2, canvas.height / 2);
+                    
+                    // Convert to blob
+                    const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/webp', 0.8));
+                    frames.push(blob);
+                }
+                
+                log(`Created ${frames.length} test frames`, 'success');
+                
+                // Test MediaRecorder
+                const stream = canvas.captureStream(30);
+                const recorder = new MediaRecorder(stream, {
+                    mimeType: 'video/webm',
+                    videoBitsPerSecond: 2500000
+                });
+                
+                const chunks = [];
+                recorder.ondataavailable = (e) => {
+                    if (e.data.size > 0) chunks.push(e.data);
+                };
+                
+                recorder.onstart = () => log('MediaRecorder started', 'info');
+                recorder.onstop = () => {
+                    const blob = new Blob(chunks, { type: 'video/webm' });
+                    log(`Canvas export complete: ${(blob.size / 1024).toFixed(2)}KB`, 'success');
+                    
+                    // Download
+                    const a = document.createElement('a');
+                    a.href = URL.createObjectURL(blob);
+                    a.download = 'canvas-test.webm';
+                    a.click();
+                };
+                
+                recorder.start();
+                
+                // Animate for 3 seconds
+                let frame = 0;
+                const animate = () => {
+                    if (frame < 90) { // 3 seconds at 30fps
+                        ctx.fillStyle = `hsl(${frame * 4}, 50%, 20%)`;
+                        ctx.fillRect(0, 0, canvas.width, canvas.height);
+                        
+                        ctx.fillStyle = '#FFFFFF';
+                        ctx.font = '32px Arial';
+                        ctx.textAlign = 'center';
+                        ctx.fillText(`Time: ${(frame / 30).toFixed(2)}s`, canvas.width / 2, canvas.height / 2);
+                        
+                        frame++;
+                        requestAnimationFrame(animate);
+                    } else {
+                        recorder.stop();
+                    }
+                };
+                
+                animate();
+                
+            } catch (error) {
+                log(`Canvas test failed: ${error.message}`, 'error');
+            }
+        };
+
+        // Test FFmpeg Export
+        window.testFFmpeg = async function() {
+            log('Starting FFmpeg Export Test...', 'info');
+            
+            try {
+                // Dynamic import FFmpeg
+                const { FFmpeg } = await import('https://unpkg.com/@ffmpeg/ffmpeg@0.12.10/dist/esm/index.js');
+                const { fetchFile, toBlobURL } = await import('https://unpkg.com/@ffmpeg/util@0.12.1/dist/esm/index.js');
+                
+                log('FFmpeg modules loaded', 'success');
+                
+                const ffmpeg = new FFmpeg();
+                
+                ffmpeg.on('log', ({ message }) => {
+                    log(`[FFmpeg] ${message}`, 'info');
+                });
+                
+                ffmpeg.on('progress', ({ progress }) => {
+                    log(`Progress: ${(progress * 100).toFixed(2)}%`, 'info');
+                });
+                
+                // Load FFmpeg
+                const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm';
+                await ffmpeg.load({
+                    coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
+                    wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
+                    workerURL: await toBlobURL(`${baseURL}/ffmpeg-core.worker.js`, 'text/javascript'),
+                });
+                
+                log('FFmpeg loaded successfully!', 'success');
+                
+                // Create test video data
+                const testVideoData = new Uint8Array([0x00, 0x00, 0x00, 0x20, 0x66, 0x74, 0x79, 0x70]); // Minimal MP4 header
+                await ffmpeg.writeFile('test.mp4', testVideoData);
+                
+                // Create VTT subtitle
+                const vttContent = `WEBVTT
+
+00:00:01.000 --> 00:00:03.000
+First test subtitle
+
+00:00:04.000 --> 00:00:06.000
+Second subtitle with longer text`;
+                
+                await ffmpeg.writeFile('subtitles.vtt', vttContent);
+                log('Created test subtitle file', 'success');
+                
+                // List files
+                const files = await ffmpeg.listDir('/');
+                log(`Files in FFmpeg: ${files.map(f => f.name).join(', ')}`, 'info');
+                
+                // Test FFmpeg command
+                try {
+                    await ffmpeg.exec(['-f', 'lavfi', '-i', 'testsrc=duration=5:size=320x240:rate=30', '-c:v', 'libx264', '-t', '5', 'output.mp4']);
+                    log('FFmpeg test video created', 'success');
+                    
+                    const data = await ffmpeg.readFile('output.mp4');
+                    const blob = new Blob([data], { type: 'video/mp4' });
+                    log(`FFmpeg export complete: ${(blob.size / 1024).toFixed(2)}KB`, 'success');
+                    
+                    // Download
+                    const a = document.createElement('a');
+                    a.href = URL.createObjectURL(blob);
+                    a.download = 'ffmpeg-test.mp4';
+                    a.click();
+                    
+                } catch (error) {
+                    log(`FFmpeg command failed: ${error.message}`, 'error');
+                }
+                
+            } catch (error) {
+                log(`FFmpeg test failed: ${error.message}`, 'error');
+                log('This might be due to CORS headers. Make sure SharedArrayBuffer is available.', 'error');
+            }
+        };
+
+        // Initialize
+        log('Standalone test page loaded', 'info');
+        log('Click buttons above to test Canvas or FFmpeg export', 'info');
+    </script>
+</body>
+</html> 

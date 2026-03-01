@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Final Subtitle Export Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #0a0a0a;
+            color: #e0e0e0;
+        }
+        
+        .test-section {
+            background: #1a1a1a;
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        
+        button {
+            padding: 10px 20px;
+            background: #6366f1;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+            font-size: 14px;
+        }
+        
+        button:hover {
+            background: #4f46e5;
+        }
+        
+        button:disabled {
+            background: #4a4a4a;
+            cursor: not-allowed;
+        }
+        
+        video {
+            width: 100%;
+            max-width: 600px;
+            margin: 20px 0;
+            border: 2px solid #333;
+            border-radius: 4px;
+        }
+        
+        .log {
+            background: #000;
+            padding: 10px;
+            border-radius: 4px;
+            max-height: 300px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+            margin: 10px 0;
+        }
+        
+        .success { color: #10b981; }
+        .error { color: #ef4444; }
+        .info { color: #3b82f6; }
+        .warning { color: #f59e0b; }
+        
+        .status-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 10px;
+        }
+        
+        .status-indicator.success { background: #10b981; }
+        .status-indicator.error { background: #ef4444; }
+        .status-indicator.pending { background: #f59e0b; }
+        
+        .test-result {
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 4px;
+            background: #2a2a2a;
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background: #333;
+            border-radius: 4px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: #6366f1;
+            transition: width 0.3s ease;
+        }
+    </style>
+</head>
+<body>
+    <h1>🎬 Final Subtitle Export Test</h1>
+    
+    <div class="test-section">
+        <h2>Step 1: Upload Video</h2>
+        <input type="file" id="videoInput" accept="video/*" />
+        <div id="videoInfo" style="margin-top: 10px;"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>Step 2: Preview</h2>
+        <video id="sourceVideo" controls></video>
+        <video id="resultVideo" controls style="display: none;"></video>
+    </div>
+    
+    <div class="test-section">
+        <h2>Step 3: Test Export</h2>
+        <button onclick="testBurnedSubtitles()" id="burnBtn" disabled>Test Burned Subtitles</button>
+        <button onclick="testEmbeddedSubtitles()" id="embedBtn" disabled>Test Embedded Subtitles</button>
+        <button onclick="clearLog()">Clear Log</button>
+        
+        <div class="progress-bar" id="progressBar" style="display: none;">
+            <div class="progress-fill" id="progressFill" style="width: 0%;"></div>
+        </div>
+        
+        <div class="log" id="log"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>Test Results</h2>
+        <div id="results"></div>
+    </div>
+
+    <script type="module">
+        // Logging utility
+        function log(message, type = 'info') {
+            const logDiv = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            const entry = document.createElement('div');
+            entry.className = type;
+            entry.textContent = `[${timestamp}] ${message}`;
+            logDiv.appendChild(entry);
+            logDiv.scrollTop = logDiv.scrollHeight;
+            console.log(message);
+        }
+
+        function updateProgress(percent) {
+            document.getElementById('progressBar').style.display = 'block';
+            document.getElementById('progressFill').style.width = `${percent}%`;
+        }
+
+        function hideProgress() {
+            document.getElementById('progressBar').style.display = 'none';
+        }
+
+        window.log = log;
+        window.clearLog = () => {
+            document.getElementById('log').innerHTML = '';
+            hideProgress();
+        };
+
+        // Test data
+        let currentVideo = null;
+        let currentVideoFile = null;
+        
+        const testSubtitles = [
+            {
+                id: '1',
+                startTime: 0,
+                endTime: 2,
+                text: 'Welcome to the subtitle test',
+                style: { 
+                    color: '#FFFFFF', 
+                    fontSize: 32,
+                    fontFamily: 'Arial',
+                    fontWeight: 'bold',
+                    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                    padding: 10
+                },
+                position: { x: 50, y: 90 }
+            },
+            {
+                id: '2',
+                startTime: 2,
+                endTime: 4,
+                text: 'This subtitle has a different color',
+                style: { 
+                    color: '#FFFF00', 
+                    fontSize: 32,
+                    fontFamily: 'Arial',
+                    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                    padding: 10
+                },
+                position: { x: 50, y: 90 }
+            },
+            {
+                id: '3',
+                startTime: 4,
+                endTime: 6,
+                text: 'Testing subtitle export functionality',
+                style: { 
+                    color: '#00FF00', 
+                    fontSize: 32,
+                    fontFamily: 'Arial',
+                    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                    padding: 10
+                },
+                position: { x: 50, y: 90 }
+            },
+            {
+                id: '4',
+                startTime: 6,
+                endTime: 8,
+                text: 'Final subtitle in the test',
+                style: { 
+                    color: '#FF00FF', 
+                    fontSize: 32,
+                    fontFamily: 'Arial',
+                    fontWeight: 'bold',
+                    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                    padding: 10
+                },
+                position: { x: 50, y: 90 }
+            }
+        ];
+
+        // Handle video upload
+        document.getElementById('videoInput').addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            currentVideoFile = file;
+            const video = document.getElementById('sourceVideo');
+            video.src = URL.createObjectURL(file);
+            
+            video.onloadedmetadata = () => {
+                currentVideo = video;
+                const info = document.getElementById('videoInfo');
+                info.innerHTML = `
+                    <div class="success">✓ Video loaded successfully</div>
+                    <div>Resolution: ${video.videoWidth}x${video.videoHeight}</div>
+                    <div>Duration: ${video.duration.toFixed(2)}s</div>
+                    <div>Format: ${file.type}</div>
+                    <div>Size: ${(file.size / 1024 / 1024).toFixed(2)}MB</div>
+                `;
+                
+                document.getElementById('burnBtn').disabled = false;
+                document.getElementById('embedBtn').disabled = false;
+                
+                log(`Video loaded: ${video.videoWidth}x${video.videoHeight}, ${video.duration.toFixed(2)}s`, 'success');
+            };
+        });
+
+        // Import services dynamically
+        async function loadServices() {
+            try {
+                const module = await import('/src/services/optimized-video-export.service.ts');
+                const verifyModule = await import('/src/services/video-verification.service.ts');
+                
+                window.optimizedVideoExportService = module.optimizedVideoExportService;
+                window.videoVerificationService = verifyModule.videoVerificationService;
+                
+                log('Services loaded successfully', 'success');
+            } catch (error) {
+                log(`Failed to load services: ${error.message}`, 'error');
+            }
+        }
+
+        // Test burned subtitles
+        window.testBurnedSubtitles = async function() {
+            if (!currentVideo || !window.optimizedVideoExportService) {
+                log('Please upload a video first', 'error');
+                return;
+            }
+            
+            log('Starting burned subtitle export test...', 'info');
+            hideProgress();
+            
+            try {
+                // Store video file reference on the element for the service to access
+                currentVideo.videoFile = currentVideoFile;
+                
+                const startTime = Date.now();
+                
+                const blob = await window.optimizedVideoExportService.exportVideo(
+                    currentVideo,
+                    testSubtitles,
+                    {
+                        format: 'mp4',
+                        quality: 'high',
+                        burnSubtitles: true,
+                        embedSubtitles: false,
+                        embedType: 'burn',
+                        fps: 30
+                    },
+                    (progress) => {
+                        updateProgress(progress);
+                        log(`Progress: ${progress}%`, 'info');
+                    }
+                );
+                
+                const exportTime = ((Date.now() - startTime) / 1000).toFixed(2);
+                log(`Export completed in ${exportTime}s`, 'success');
+                log(`Output size: ${(blob.size / 1024 / 1024).toFixed(2)}MB`, 'info');
+                
+                // Display result
+                const resultVideo = document.getElementById('resultVideo');
+                resultVideo.style.display = 'block';
+                resultVideo.src = URL.createObjectURL(blob);
+                
+                // Run verification tests
+                log('Running verification tests...', 'info');
+                const subtitleTimes = testSubtitles.map(s => ({ start: s.startTime, end: s.endTime }));
+                const results = await window.videoVerificationService.runComprehensiveTest(
+                    blob,
+                    subtitleTimes,
+                    currentVideo.duration,
+                    true,  // expect burned
+                    false  // don't expect embedded
+                );
+                
+                displayResults(results, 'burned');
+                
+                // Download
+                const a = document.createElement('a');
+                a.href = resultVideo.src;
+                a.download = `burned_subtitles_${Date.now()}.mp4`;
+                a.click();
+                
+                log('✅ Burned subtitle test complete! Check the downloaded video.', 'success');
+                
+            } catch (error) {
+                log(`❌ Burned export failed: ${error.message}`, 'error');
+                console.error(error);
+            } finally {
+                hideProgress();
+            }
+        };
+
+        // Test embedded subtitles
+        window.testEmbeddedSubtitles = async function() {
+            if (!currentVideo || !window.optimizedVideoExportService) {
+                log('Please upload a video first', 'error');
+                return;
+            }
+            
+            log('Starting embedded subtitle export test...', 'info');
+            hideProgress();
+            
+            try {
+                // Store video file reference on the element for the service to access
+                currentVideo.videoFile = currentVideoFile;
+                
+                const startTime = Date.now();
+                
+                const blob = await window.optimizedVideoExportService.exportVideo(
+                    currentVideo,
+                    testSubtitles,
+                    {
+                        format: 'mp4',
+                        quality: 'high',
+                        burnSubtitles: false,
+                        embedSubtitles: true,
+                        embedType: 'track',
+                        fps: 30
+                    },
+                    (progress) => {
+                        updateProgress(progress);
+                        log(`Progress: ${progress}%`, 'info');
+                    }
+                );
+                
+                const exportTime = ((Date.now() - startTime) / 1000).toFixed(2);
+                log(`Export completed in ${exportTime}s`, 'success');
+                log(`Output size: ${(blob.size / 1024 / 1024).toFixed(2)}MB`, 'info');
+                
+                // Note about separate files
+                log('📝 NOTE: Due to browser limitations, subtitle files are downloaded separately', 'warning');
+                log('To use: Open the video in VLC, then go to Subtitle > Add Subtitle File...', 'info');
+                
+                // Display result
+                const resultVideo = document.getElementById('resultVideo');
+                resultVideo.style.display = 'block';
+                resultVideo.src = URL.createObjectURL(blob);
+                
+                // Check for text tracks
+                resultVideo.onloadedmetadata = () => {
+                    if (resultVideo.textTracks && resultVideo.textTracks.length > 0) {
+                        log(`✅ Found ${resultVideo.textTracks.length} subtitle track(s) in video element`, 'success');
+                    } else {
+                        log('⚠️ No subtitle tracks detected in video element (expected with separate files)', 'warning');
+                    }
+                };
+                
+                log('✅ Embedded subtitle test complete! Check the downloaded files.', 'success');
+                
+            } catch (error) {
+                log(`❌ Embedded export failed: ${error.message}`, 'error');
+                console.error(error);
+            } finally {
+                hideProgress();
+            }
+        };
+
+        // Display test results
+        function displayResults(results, type) {
+            const resultsDiv = document.getElementById('results');
+            const resultHTML = `
+                <div class="test-result">
+                    <h3>${type === 'burned' ? 'Burned' : 'Embedded'} Subtitle Test Results</h3>
+                    <div>
+                        <span class="status-indicator ${results.passed ? 'success' : 'error'}"></span>
+                        Overall: ${results.passed ? 'PASSED' : 'FAILED'}
+                    </div>
+                    <div>Summary: ${results.summary}</div>
+                    <details>
+                        <summary>Detailed Results</summary>
+                        <div>Corruption Test: ${results.results.corruption.passed ? '✅' : '❌'} ${results.results.corruption.message}</div>
+                        <div>Choppiness Test: ${results.results.choppiness.passed ? '✅' : '❌'} ${results.results.choppiness.message}</div>
+                        <div>Burned Test: ${results.results.burned.passed ? '✅' : '❌'} ${results.results.burned.message}</div>
+                        <div>Embedded Test: ${results.results.embedded.passed ? '✅' : '❌'} ${results.results.embedded.message}</div>
+                    </details>
+                </div>
+            `;
+            resultsDiv.innerHTML = resultHTML;
+        }
+
+        // Initialize
+        loadServices().then(() => {
+            log('Test page ready. Upload a video to begin.', 'info');
+        });
+    </script>
+</body>
+</html> 

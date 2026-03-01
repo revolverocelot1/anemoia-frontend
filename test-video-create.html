@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Create Test Video</title>
+</head>
+<body>
+    <h1>Test Video Generator</h1>
+    <canvas id="canvas" width="640" height="480"></canvas>
+    <br>
+    <button onclick="generateVideo()">Generate Test Video</button>
+    <br>
+    <video id="output" controls style="display:none;"></video>
+    <a id="download" style="display:none;">Download Video</a>
+
+    <script>
+        // Generate a simple test video with a moving red square
+        function generateVideo() {
+            const canvas = document.getElementById('canvas');
+            const ctx = canvas.getContext('2d');
+            const frames = [];
+            const fps = 25;
+            const duration = 3; // 3 seconds
+            const totalFrames = fps * duration;
+
+            // Generate frames
+            for (let i = 0; i < totalFrames; i++) {
+                // Clear canvas
+                ctx.fillStyle = '#2a2a2a';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                // Draw background pattern
+                ctx.strokeStyle = '#444';
+                for (let x = 0; x < canvas.width; x += 40) {
+                    ctx.beginPath();
+                    ctx.moveTo(x, 0);
+                    ctx.lineTo(x, canvas.height);
+                    ctx.stroke();
+                }
+                for (let y = 0; y < canvas.height; y += 40) {
+                    ctx.beginPath();
+                    ctx.moveTo(0, y);
+                    ctx.lineTo(canvas.width, y);
+                    ctx.stroke();
+                }
+                
+                // Draw moving red square (object to remove)
+                const squareX = 100 + (i / totalFrames) * 300;
+                const squareY = 200 + Math.sin(i * 0.1) * 50;
+                ctx.fillStyle = '#ff0000';
+                ctx.fillRect(squareX, squareY, 60, 60);
+                
+                // Draw static blue circle
+                ctx.fillStyle = '#0066ff';
+                ctx.beginPath();
+                ctx.arc(500, 240, 40, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Draw text
+                ctx.fillStyle = '#ffffff';
+                ctx.font = '24px Arial';
+                ctx.fillText('Test Video - Remove Red Square', 150, 100);
+                ctx.font = '16px Arial';
+                ctx.fillText(`Frame ${i + 1}/${totalFrames}`, 10, 30);
+                
+                // Capture frame
+                canvas.toBlob(blob => {
+                    frames.push(blob);
+                    if (frames.length === totalFrames) {
+                        createVideo(frames);
+                    }
+                }, 'image/webp', 0.95);
+            }
+        }
+
+        async function createVideo(frames) {
+            // For simplicity, we'll create a WebM video using MediaRecorder
+            const canvas = document.getElementById('canvas');
+            const stream = canvas.captureStream(25);
+            const recorder = new MediaRecorder(stream, {
+                mimeType: 'video/webm;codecs=vp9',
+                videoBitsPerSecond: 5000000
+            });
+            
+            const chunks = [];
+            recorder.ondataavailable = e => chunks.push(e.data);
+            recorder.onstop = () => {
+                const blob = new Blob(chunks, { type: 'video/webm' });
+                const url = URL.createObjectURL(blob);
+                
+                // Show video
+                const video = document.getElementById('output');
+                video.src = url;
+                video.style.display = 'block';
+                
+                // Show download link
+                const download = document.getElementById('download');
+                download.href = url;
+                download.download = 'test-video-red-square.webm';
+                download.textContent = 'Download Test Video';
+                download.style.display = 'block';
+            };
+            
+            // Play frames and record
+            recorder.start();
+            const ctx = canvas.getContext('2d');
+            let frameIndex = 0;
+            
+            const playFrames = setInterval(() => {
+                if (frameIndex >= frames.length) {
+                    clearInterval(playFrames);
+                    recorder.stop();
+                    return;
+                }
+                
+                const img = new Image();
+                img.onload = () => {
+                    ctx.drawImage(img, 0, 0);
+                };
+                img.src = URL.createObjectURL(frames[frameIndex]);
+                frameIndex++;
+            }, 40); // 25 fps = 40ms per frame
+        }
+    </script>
+</body>
+</html>

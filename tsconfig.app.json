@@ -1,0 +1,33 @@
+{
+  "compilerOptions": {
+    "composite": true,
+    "target": "ES2020",
+    "useDefineForClassFields": true,
+    "lib": ["ES2020", "DOM", "DOM.Iterable", "WebWorker"],
+    "module": "ESNext",
+    "skipLibCheck": true,
+    "types": ["vite/client", "@types/pixelmatch", "@types/offscreencanvas"],
+
+    /* Bundler mode */
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "jsx": "react-jsx",
+
+    /* Linting */
+    "strict": true,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "noFallthroughCasesInSwitch": true
+  },
+  "include": ["src"],
+  "exclude": [
+    "src/opencut-z/opencut-core/**/*",
+    "src/opencut-z/OpenCutZApp.tsx",
+    "src/opencut-z/RealOpenCutZEditor.tsx",
+    "src/opencut-z/components/**/*",
+    "src/opencut-z/providers/**/*"
+  ]
+}

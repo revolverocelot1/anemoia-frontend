@@ -1,0 +1,808 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Anime Girl Holding Programming Book Archive - Kawaii Code Collection | Anemoia</title>
+    <meta name="description" content="Browse the ultimate collection of anime girls holding programming books. From JavaScript to Python, C++ to Rust - find your perfect coding waifu. Curated archive of programming memes and culture.">
+    <meta name="keywords" content="anime programming, coding waifu, programming books, anime memes, developer culture, kawaii code, anime girls coding, programming humor">
+    
+    <!-- Open Graph -->
+    <meta property="og:title" content="Anime Girl Holding Programming Book Archive">
+    <meta property="og:description" content="The internet's most comprehensive collection of anime girls with programming books. A celebration of coding culture.">
+    <meta property="og:image" content="https://anemoia.dev/anime-gallery-preview.jpg">
+    <meta property="og:type" content="website">
+    
+    <!-- Schema.org -->
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "ImageGallery",
+        "name": "Anime Programming Book Archive",
+        "description": "Curated collection of anime artwork featuring programming books and coding culture",
+        "url": "https://anemoia.dev/anime-gallery",
+        "creator": {
+            "@type": "Organization",
+            "name": "Anemoia"
+        },
+        "genre": ["Anime", "Programming", "Meme Culture"],
+        "keywords": "anime, programming, coding, developer culture, memes"
+    }
+    </script>
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Kaushan+Script&family=Quicksand:wght@400;600;700&display=swap');
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Quicksand', sans-serif;
+            background: linear-gradient(135deg, #ffeef8 0%, #e6f3ff 50%, #ffe6f7 100%);
+            color: #333;
+            overflow-x: hidden;
+            min-height: 100vh;
+        }
+        
+        /* Animated Background */
+        .kawaii-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            overflow: hidden;
+        }
+        
+        /* Floating Sakura Petals */
+        .sakura {
+            position: absolute;
+            width: 25px;
+            height: 20px;
+            background: #ffb7d5;
+            border-radius: 150% 0 150% 0;
+            animation: sakuraFall linear infinite;
+            opacity: 0.8;
+        }
+        
+        .sakura::after {
+            content: '';
+            position: absolute;
+            width: 25px;
+            height: 20px;
+            background: #ffb7d5;
+            border-radius: 150% 0 150% 0;
+            transform: rotate(-90deg);
+            top: -10px;
+            left: -10px;
+        }
+        
+        @keyframes sakuraFall {
+            0% {
+                transform: translateY(-100vh) rotate(0deg);
+                opacity: 0;
+            }
+            10% {
+                opacity: 0.8;
+            }
+            90% {
+                opacity: 0.8;
+            }
+            100% {
+                transform: translateY(100vh) rotate(720deg);
+                opacity: 0;
+            }
+        }
+        
+        /* Sparkles */
+        .sparkle {
+            position: absolute;
+            width: 4px;
+            height: 4px;
+            background: #fff;
+            border-radius: 50%;
+            animation: sparkleAnim 3s linear infinite;
+        }
+        
+        @keyframes sparkleAnim {
+            0%, 100% {
+                opacity: 0;
+                transform: scale(0);
+            }
+            50% {
+                opacity: 1;
+                transform: scale(1);
+                box-shadow: 0 0 10px #fff, 0 0 20px #ff69b4;
+            }
+        }
+        
+        /* Container */
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 40px 20px;
+            position: relative;
+            z-index: 10;
+        }
+        
+        /* Hero Section */
+        .hero {
+            text-align: center;
+            padding: 80px 0;
+            position: relative;
+        }
+        
+        .hero h1 {
+            font-family: 'Kaushan Script', cursive;
+            font-size: clamp(2.5rem, 8vw, 4.5rem);
+            background: linear-gradient(45deg, #ff69b4, #ff1493, #ff69b4);
+            background-size: 200% 200%;
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: gradientShift 3s ease infinite;
+            margin-bottom: 20px;
+            filter: drop-shadow(2px 2px 4px rgba(255,20,147,0.3));
+        }
+        
+        @keyframes gradientShift {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+        
+        .subtitle {
+            font-size: 1.5rem;
+            color: #ff69b4;
+            margin-bottom: 50px;
+            font-weight: 600;
+        }
+        
+        /* Anime Character Showcase */
+        .character-showcase {
+            position: relative;
+            max-width: 600px;
+            margin: 0 auto 80px;
+            height: 400px;
+        }
+        
+        .anime-girl {
+            position: absolute;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 300px;
+            height: 350px;
+            animation: girlBounce 3s ease-in-out infinite;
+        }
+        
+        @keyframes girlBounce {
+            0%, 100% { transform: translateX(-50%) translateY(0); }
+            50% { transform: translateX(-50%) translateY(-10px); }
+        }
+        
+        /* Simplified anime girl using CSS shapes */
+        .anime-girl-body {
+            position: relative;
+            width: 100%;
+            height: 100%;
+        }
+        
+        /* Head */
+        .head {
+            position: absolute;
+            top: 50px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 120px;
+            height: 120px;
+            background: #fdbcb4;
+            border-radius: 50% 50% 55% 45% / 60% 60% 40% 40%;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+        
+        /* Hair */
+        .hair {
+            position: absolute;
+            top: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 160px;
+            height: 180px;
+            background: #ff69b4;
+            border-radius: 50% 50% 60% 40% / 70% 70% 30% 30%;
+            z-index: -1;
+        }
+        
+        /* Eyes */
+        .eye {
+            position: absolute;
+            width: 30px;
+            height: 40px;
+            background: #333;
+            border-radius: 50%;
+            top: 80px;
+        }
+        
+        .eye.left { left: 35px; }
+        .eye.right { right: 35px; }
+        
+        .eye::before {
+            content: '';
+            position: absolute;
+            width: 10px;
+            height: 15px;
+            background: #fff;
+            border-radius: 50%;
+            top: 5px;
+            left: 5px;
+        }
+        
+        /* Blush */
+        .blush {
+            position: absolute;
+            width: 25px;
+            height: 15px;
+            background: rgba(255,182,193,0.8);
+            border-radius: 50%;
+            top: 100px;
+        }
+        
+        .blush.left { left: 20px; }
+        .blush.right { right: 20px; }
+        
+        /* Book */
+        .book {
+            position: absolute;
+            bottom: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 100px;
+            height: 130px;
+            background: linear-gradient(135deg, #4a90e2 0%, #357abd 100%);
+            border-radius: 5px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+            animation: bookFloat 3s ease-in-out infinite;
+        }
+        
+        @keyframes bookFloat {
+            0%, 100% { transform: translateX(-50%) rotate(-5deg); }
+            50% { transform: translateX(-50%) rotate(5deg); }
+        }
+        
+        .book::before {
+            content: 'JS';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 2rem;
+            font-weight: bold;
+            color: #fff;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        /* Programming Languages Carousel */
+        .languages-carousel {
+            overflow: hidden;
+            margin-bottom: 80px;
+            position: relative;
+            padding: 40px 0;
+        }
+        
+        .languages-track {
+            display: flex;
+            animation: scroll 20s linear infinite;
+        }
+        
+        @keyframes scroll {
+            0% { transform: translateX(0); }
+            100% { transform: translateX(-50%); }
+        }
+        
+        .language-card {
+            flex: 0 0 200px;
+            margin: 0 20px;
+            background: rgba(255,255,255,0.9);
+            border-radius: 20px;
+            padding: 30px;
+            text-align: center;
+            box-shadow: 0 10px 30px rgba(255,105,180,0.2);
+            transition: transform 0.3s ease;
+        }
+        
+        .language-card:hover {
+            transform: translateY(-10px) scale(1.05);
+        }
+        
+        .lang-icon {
+            font-size: 3rem;
+            margin-bottom: 15px;
+        }
+        
+        /* Features */
+        .features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+            margin-bottom: 80px;
+        }
+        
+        .feature-card {
+            background: rgba(255,255,255,0.95);
+            border-radius: 25px;
+            padding: 40px 30px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 15px 35px rgba(255,105,180,0.15);
+            transition: all 0.3s ease;
+        }
+        
+        .feature-card::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,105,180,0.1) 0%, transparent 70%);
+            animation: featureGlow 3s ease-in-out infinite;
+        }
+        
+        @keyframes featureGlow {
+            0%, 100% { transform: rotate(0deg); }
+            50% { transform: rotate(180deg); }
+        }
+        
+        .feature-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 40px rgba(255,105,180,0.25);
+        }
+        
+        .feature-emoji {
+            font-size: 3rem;
+            margin-bottom: 20px;
+            animation: emojiPulse 2s ease-in-out infinite;
+        }
+        
+        @keyframes emojiPulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+        
+        /* Gallery Preview */
+        .gallery-preview {
+            margin-bottom: 80px;
+            text-align: center;
+        }
+        
+        .preview-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 20px;
+            margin-top: 40px;
+        }
+        
+        .preview-item {
+            aspect-ratio: 1;
+            background: linear-gradient(45deg, #ffb6c1, #ffc0cb);
+            border-radius: 20px;
+            position: relative;
+            overflow: hidden;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .preview-item::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 2rem;
+            opacity: 0.7;
+        }
+        
+        .preview-item:nth-child(1)::before { content: '📘'; }
+        .preview-item:nth-child(2)::before { content: '📕'; }
+        .preview-item:nth-child(3)::before { content: '📗'; }
+        .preview-item:nth-child(4)::before { content: '📙'; }
+        .preview-item:nth-child(5)::before { content: '📓'; }
+        .preview-item:nth-child(6)::before { content: '📔'; }
+        
+        .preview-item:hover {
+            transform: scale(1.1) rotate(5deg);
+            box-shadow: 0 15px 30px rgba(255,105,180,0.4);
+        }
+        
+        /* CTA Section */
+        .cta-section {
+            text-align: center;
+            padding: 80px 0;
+            position: relative;
+        }
+        
+        .cta-button {
+            display: inline-block;
+            padding: 20px 60px;
+            background: linear-gradient(45deg, #ff69b4, #ff1493);
+            color: white;
+            text-decoration: none;
+            border-radius: 50px;
+            font-size: 1.25rem;
+            font-weight: bold;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s ease;
+            box-shadow: 0 10px 30px rgba(255,20,147,0.3);
+        }
+        
+        .cta-button::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            background: rgba(255,255,255,0.3);
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            transition: width 0.6s, height 0.6s;
+        }
+        
+        .cta-button:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 15px 40px rgba(255,20,147,0.4);
+        }
+        
+        .cta-button:hover::before {
+            width: 300px;
+            height: 300px;
+        }
+        
+        /* Kawaii Decorations */
+        .deco-star {
+            position: absolute;
+            color: #ffeb3b;
+            animation: starTwinkle 2s ease-in-out infinite;
+        }
+        
+        @keyframes starTwinkle {
+            0%, 100% { opacity: 0.5; transform: scale(1) rotate(0deg); }
+            50% { opacity: 1; transform: scale(1.2) rotate(180deg); }
+        }
+        
+        /* Heart Animation */
+        .heart {
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            background: #ff69b4;
+            transform: rotate(45deg);
+            animation: heartFloat 4s ease-in-out infinite;
+        }
+        
+        .heart::before,
+        .heart::after {
+            content: '';
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            background: #ff69b4;
+            border-radius: 50%;
+        }
+        
+        .heart::before {
+            top: -10px;
+            left: 0;
+        }
+        
+        .heart::after {
+            left: -10px;
+            top: 0;
+        }
+        
+        @keyframes heartFloat {
+            0%, 100% { transform: rotate(45deg) translateY(0); }
+            50% { transform: rotate(45deg) translateY(-20px); }
+        }
+        
+        /* Responsive */
+        @media (max-width: 768px) {
+            .hero h1 {
+                font-size: 2.5rem;
+            }
+            
+            .subtitle {
+                font-size: 1.2rem;
+            }
+            
+            .anime-girl {
+                width: 250px;
+                height: 300px;
+            }
+            
+            .features {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Kawaii Background -->
+    <div class="kawaii-bg">
+        <!-- Sakura Petals -->
+        <div class="sakura" style="left: 10%; animation-duration: 8s; animation-delay: 0s;"></div>
+        <div class="sakura" style="left: 20%; animation-duration: 10s; animation-delay: 1s;"></div>
+        <div class="sakura" style="left: 30%; animation-duration: 9s; animation-delay: 2s;"></div>
+        <div class="sakura" style="left: 40%; animation-duration: 11s; animation-delay: 0.5s;"></div>
+        <div class="sakura" style="left: 50%; animation-duration: 8s; animation-delay: 3s;"></div>
+        <div class="sakura" style="left: 60%; animation-duration: 12s; animation-delay: 1.5s;"></div>
+        <div class="sakura" style="left: 70%; animation-duration: 9s; animation-delay: 4s;"></div>
+        <div class="sakura" style="left: 80%; animation-duration: 10s; animation-delay: 2.5s;"></div>
+        <div class="sakura" style="left: 90%; animation-duration: 11s; animation-delay: 0s;"></div>
+        
+        <!-- Sparkles -->
+        <div class="sparkle" style="top: 20%; left: 15%; animation-delay: 0s;"></div>
+        <div class="sparkle" style="top: 30%; left: 85%; animation-delay: 1s;"></div>
+        <div class="sparkle" style="top: 50%; left: 25%; animation-delay: 2s;"></div>
+        <div class="sparkle" style="top: 70%; left: 75%; animation-delay: 1.5s;"></div>
+        
+        <!-- Decorative Stars -->
+        <div class="deco-star" style="top: 10%; left: 20%; font-size: 2rem;">✨</div>
+        <div class="deco-star" style="top: 15%; right: 25%; font-size: 1.5rem; animation-delay: 1s;">⭐</div>
+        <div class="deco-star" style="bottom: 20%; left: 15%; font-size: 1.8rem; animation-delay: 2s;">✨</div>
+        
+        <!-- Floating Hearts -->
+        <div class="heart" style="top: 40%; right: 10%; animation-delay: 0s;"></div>
+        <div class="heart" style="top: 60%; left: 5%; animation-delay: 2s;"></div>
+    </div>
+    
+    <div class="container">
+        <!-- Hero Section -->
+        <section class="hero">
+            <h1>Anime Programming Archive</h1>
+            <p class="subtitle">Where Waifus Meet Code 💝</p>
+            
+            <!-- Animated Character -->
+            <div class="character-showcase">
+                <div class="anime-girl">
+                    <div class="anime-girl-body">
+                        <div class="hair"></div>
+                        <div class="head">
+                            <div class="eye left"></div>
+                            <div class="eye right"></div>
+                            <div class="blush left"></div>
+                            <div class="blush right"></div>
+                        </div>
+                        <div class="book"></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+        
+        <!-- Programming Languages Carousel -->
+        <section class="languages-carousel">
+            <h2 style="text-align: center; font-size: 2rem; color: #ff69b4; margin-bottom: 30px;">
+                Every Language, Every Waifu 📚
+            </h2>
+            <div class="languages-track">
+                <!-- Duplicated for seamless loop -->
+                <div class="language-card">
+                    <div class="lang-icon">🟨</div>
+                    <h3>JavaScript</h3>
+                    <p>Console.log(kawaii)</p>
+                </div>
+                <div class="language-card">
+                    <div class="lang-icon">🐍</div>
+                    <h3>Python</h3>
+                    <p>import anime_girl</p>
+                </div>
+                <div class="language-card">
+                    <div class="lang-icon">☕</div>
+                    <h3>Java</h3>
+                    <p>public class Waifu</p>
+                </div>
+                <div class="language-card">
+                    <div class="lang-icon">🦀</div>
+                    <h3>Rust</h3>
+                    <p>fn main() {}</p>
+                </div>
+                <div class="language-card">
+                    <div class="lang-icon">💎</div>
+                    <h3>Ruby</h3>
+                    <p>puts "kawaii"</p>
+                </div>
+                <div class="language-card">
+                    <div class="lang-icon">🐹</div>
+                    <h3>Go</h3>
+                    <p>package main</p>
+                </div>
+                <!-- Duplicate set for seamless loop -->
+                <div class="language-card">
+                    <div class="lang-icon">🟨</div>
+                    <h3>JavaScript</h3>
+                    <p>Console.log(kawaii)</p>
+                </div>
+                <div class="language-card">
+                    <div class="lang-icon">🐍</div>
+                    <h3>Python</h3>
+                    <p>import anime_girl</p>
+                </div>
+                <div class="language-card">
+                    <div class="lang-icon">☕</div>
+                    <h3>Java</h3>
+                    <p>public class Waifu</p>
+                </div>
+                <div class="language-card">
+                    <div class="lang-icon">🦀</div>
+                    <h3>Rust</h3>
+                    <p>fn main() {}</p>
+                </div>
+            </div>
+        </section>
+        
+        <!-- Features -->
+        <section class="features">
+            <div class="feature-card">
+                <div class="feature-emoji">📖</div>
+                <h3>1000+ Images</h3>
+                <p>The largest collection of anime girls with programming books on the internet!</p>
+            </div>
+            
+            <div class="feature-card">
+                <div class="feature-emoji">🎨</div>
+                <h3>All Art Styles</h3>
+                <p>From chibi to realistic, pixel art to high-res illustrations</p>
+            </div>
+            
+            <div class="feature-card">
+                <div class="feature-emoji">💻</div>
+                <h3>Every Language</h3>
+                <p>JavaScript to Assembly, if it compiles, we have a waifu for it</p>
+            </div>
+            
+            <div class="feature-card">
+                <div class="feature-emoji">🔍</div>
+                <h3>Smart Search</h3>
+                <p>Find by programming language, art style, or book color</p>
+            </div>
+            
+            <div class="feature-card">
+                <div class="feature-emoji">💕</div>
+                <h3>Community Driven</h3>
+                <p>Submit your own finds and vote for favorites</p>
+            </div>
+            
+            <div class="feature-card">
+                <div class="feature-emoji">⚡</div>
+                <h3>Fast Loading</h3>
+                <p>Optimized images with lazy loading for smooth browsing</p>
+            </div>
+        </section>
+        
+        <!-- Gallery Preview -->
+        <section class="gallery-preview">
+            <h2 style="font-size: 2.5rem; color: #ff69b4; margin-bottom: 20px;">
+                Gallery Preview ✨
+            </h2>
+            <p style="font-size: 1.2rem; color: #666; margin-bottom: 40px;">
+                A taste of what awaits you inside...
+            </p>
+            
+            <div class="preview-grid">
+                <div class="preview-item"></div>
+                <div class="preview-item"></div>
+                <div class="preview-item"></div>
+                <div class="preview-item"></div>
+                <div class="preview-item"></div>
+                <div class="preview-item"></div>
+            </div>
+        </section>
+        
+        <!-- CTA Section -->
+        <section class="cta-section">
+            <h2 style="font-size: 3rem; color: #ff69b4; margin-bottom: 30px;">
+                Ready to Meet Your Code Waifu? 💖
+            </h2>
+            <p style="font-size: 1.3rem; color: #666; margin-bottom: 40px;">
+                Discover the perfect anime girl for your favorite programming language
+            </p>
+            <a href="/anime-gallery" class="cta-button">
+                Enter Gallery
+            </a>
+            <p style="margin-top: 30px; color: #999;">
+                🌸 Updated daily with new submissions 🌸
+            </p>
+        </section>
+    </div>
+    
+    <script>
+        // Create more sakura petals dynamically
+        function createSakura() {
+            const sakura = document.createElement('div');
+            sakura.className = 'sakura';
+            sakura.style.left = Math.random() * 100 + '%';
+            sakura.style.animationDuration = (8 + Math.random() * 4) + 's';
+            sakura.style.animationDelay = Math.random() * 5 + 's';
+            sakura.style.opacity = 0.5 + Math.random() * 0.5;
+            document.querySelector('.kawaii-bg').appendChild(sakura);
+            
+            // Remove after animation
+            setTimeout(() => sakura.remove(), 12000);
+        }
+        
+        // Create sakura petals periodically
+        setInterval(createSakura, 3000);
+        
+        // Animate book text change
+        const bookTexts = ['JS', 'PY', 'C++', 'GO', 'RS', 'RB', 'TS', 'PHP'];
+        let currentBookIndex = 0;
+        
+        setInterval(() => {
+            const book = document.querySelector('.book');
+            if (book) {
+                currentBookIndex = (currentBookIndex + 1) % bookTexts.length;
+                book.style.transform = 'translateX(-50%) rotateY(360deg)';
+                setTimeout(() => {
+                    book.style.transform = 'translateX(-50%) rotateY(0deg)';
+                }, 300);
+            }
+        }, 3000);
+        
+        // Eye blink animation
+        const eyes = document.querySelectorAll('.eye');
+        setInterval(() => {
+            eyes.forEach(eye => {
+                eye.style.height = '5px';
+                setTimeout(() => {
+                    eye.style.height = '40px';
+                }, 150);
+            });
+        }, 4000);
+        
+        // Parallax effect on scroll
+        window.addEventListener('scroll', () => {
+            const scrolled = window.pageYOffset;
+            const parallax = document.querySelector('.kawaii-bg');
+            parallax.style.transform = `translateY(${scrolled * 0.5}px)`;
+        });
+        
+        // Interactive preview items
+        const previewItems = document.querySelectorAll('.preview-item');
+        previewItems.forEach((item, index) => {
+            item.addEventListener('mouseenter', () => {
+                item.style.background = `linear-gradient(45deg, 
+                    hsl(${330 + index * 30}, 70%, 80%), 
+                    hsl(${330 + index * 30 + 20}, 70%, 85%))`;
+            });
+            
+            item.addEventListener('mouseleave', () => {
+                item.style.background = 'linear-gradient(45deg, #ffb6c1, #ffc0cb)';
+            });
+        });
+        
+        // Create floating hearts on button hover
+        const ctaButton = document.querySelector('.cta-button');
+        ctaButton.addEventListener('mouseenter', () => {
+            for (let i = 0; i < 5; i++) {
+                setTimeout(() => {
+                    const heart = document.createElement('div');
+                    heart.className = 'heart';
+                    heart.style.left = (ctaButton.offsetLeft + Math.random() * ctaButton.offsetWidth) + 'px';
+                    heart.style.top = (ctaButton.offsetTop + ctaButton.offsetHeight) + 'px';
+                    heart.style.animation = 'heartFloat 2s ease-out forwards';
+                    document.body.appendChild(heart);
+                    
+                    setTimeout(() => heart.remove(), 2000);
+                }, i * 100);
+            }
+        });
+    </script>
+</body>
+</html> 

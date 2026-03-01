@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Comparison Tool - Split-Screen Visual Analysis | Anemoia WebGL</title>
+    <meta name="description" content="Compare images side-by-side with GPU-accelerated rendering. Features split-screen slider, difference detection, blend modes, and pixel-perfect analysis. Free online tool, no uploads required.">
+    <meta name="keywords" content="image comparison, side by side comparison, before after slider, visual diff, image analysis, GPU comparison, split screen tool, compare photos online">
+    <link rel="canonical" href="https://anemoias.me/compare">
+    
+    <!-- Open Graph -->
+    <meta property="og:title" content="Image Comparison Tool - Split-Screen Visual Analysis">
+    <meta property="og:description" content="Compare images instantly with GPU-accelerated split-screen technology. Perfect for before/after, A/B testing, and visual quality analysis.">
+    <meta property="og:image" content="https://anemoias.me/comparison-preview.jpg">
+    <meta property="og:url" content="https://anemoias.me/compare">
+    <meta property="og:type" content="website">
+    
+    <!-- Structured Data -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      "name": "Image Comparison Tool",
+      "url": "https://anemoias.me/compare",
+      "description": "GPU-accelerated image comparison with split-screen slider and difference detection",
+      "applicationCategory": "DesignApplication",
+      "operatingSystem": "Any",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "USD"
+      },
+      "featureList": [
+        "Split-screen slider comparison",
+        "Difference detection algorithms",
+        "Multiple blend modes",
+        "GPU-accelerated rendering",
+        "Pixel-perfect analysis",
+        "Export comparison results"
+      ]
+    }
+    </script>
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0a0a0a;
+            color: #fff;
+            overflow-x: hidden;
+            line-height: 1.6;
+        }
+        
+        /* Animated Background */
+        .bg-animation {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            background: radial-gradient(circle at 20% 50%, #1a237e 0%, transparent 50%),
+                        radial-gradient(circle at 80% 80%, #e91e63 0%, transparent 50%),
+                        radial-gradient(circle at 40% 20%, #00bcd4 0%, transparent 50%);
+            animation: bgShift 20s ease infinite;
+        }
+        
+        @keyframes bgShift {
+            0%, 100% { transform: scale(1) rotate(0deg); }
+            25% { transform: scale(1.1) rotate(90deg); }
+            50% { transform: scale(0.9) rotate(180deg); }
+            75% { transform: scale(1.05) rotate(270deg); }
+        }
+        
+        /* Container */
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+        
+        /* Hero Section */
+        .hero {
+            text-align: center;
+            padding: 100px 0;
+            position: relative;
+        }
+        
+        .hero h1 {
+            font-size: clamp(3rem, 8vw, 5rem);
+            font-weight: 900;
+            margin-bottom: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 25%, #f093fb 50%, #4facfe 75%, #667eea 100%);
+            background-size: 200% 200%;
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: gradient 5s ease infinite;
+        }
+        
+        @keyframes gradient {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+        
+        .subtitle {
+            font-size: 1.5rem;
+            color: #aaa;
+            margin-bottom: 50px;
+        }
+        
+        /* Split Screen Demo */
+        .split-demo {
+            position: relative;
+            max-width: 800px;
+            height: 400px;
+            margin: 0 auto 80px;
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+        }
+        
+        .split-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+        }
+        
+        .split-image {
+            position: absolute;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 4rem;
+            font-weight: bold;
+        }
+        
+        .split-left {
+            left: 0;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            clip-path: inset(0 50% 0 0);
+        }
+        
+        .split-right {
+            right: 0;
+            background: linear-gradient(135deg, #f093fb, #4facfe);
+            clip-path: inset(0 0 0 50%);
+        }
+        
+        .split-slider {
+            position: absolute;
+            top: 0;
+            left: 50%;
+            width: 4px;
+            height: 100%;
+            background: #fff;
+            cursor: ew-resize;
+            transform: translateX(-50%);
+            box-shadow: 0 0 20px rgba(255,255,255,0.5);
+            animation: slideDemo 4s ease-in-out infinite;
+        }
+        
+        @keyframes slideDemo {
+            0%, 100% { left: 50%; }
+            25% { left: 30%; }
+            75% { left: 70%; }
+        }
+        
+        .split-handle {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 40px;
+            height: 40px;
+            background: #fff;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 0 20px rgba(0,0,0,0.3);
+        }
+        
+        .split-handle::before,
+        .split-handle::after {
+            content: '';
+            position: absolute;
+            width: 0;
+            height: 0;
+            border-style: solid;
+            border-width: 8px 6px;
+        }
+        
+        .split-handle::before {
+            left: 8px;
+            border-color: transparent #333 transparent transparent;
+        }
+        
+        .split-handle::after {
+            right: 8px;
+            border-color: transparent transparent transparent #333;
+        }
+        
+        /* Features Grid */
+        .features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+            margin-bottom: 80px;
+        }
+        
+        .feature-card {
+            background: rgba(255,255,255,0.05);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 15px;
+            padding: 30px;
+            text-align: center;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .feature-card::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+            transform: rotate(45deg);
+            transition: all 0.5s ease;
+            opacity: 0;
+        }
+        
+        .feature-card:hover::before {
+            opacity: 1;
+        }
+        
+        .feature-card:hover {
+            transform: translateY(-5px);
+            border-color: rgba(255,255,255,0.3);
+        }
+        
+        .feature-icon {
+            width: 80px;
+            height: 80px;
+            margin: 0 auto 20px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+        }
+        
+        /* Comparison Modes */
+        .modes-section {
+            text-align: center;
+            margin-bottom: 80px;
+        }
+        
+        .modes-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 20px;
+            margin-top: 40px;
+        }
+        
+        .mode-card {
+            aspect-ratio: 1;
+            background: rgba(255,255,255,0.05);
+            border: 2px solid transparent;
+            border-radius: 15px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .mode-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg, var(--color-1), var(--color-2));
+            opacity: 0.2;
+            transition: opacity 0.3s ease;
+        }
+        
+        .mode-card:hover {
+            transform: scale(1.05);
+            border-color: currentColor;
+        }
+        
+        .mode-card:hover::before {
+            opacity: 0.4;
+        }
+        
+        .mode-slider { --color-1: #667eea; --color-2: #764ba2; }
+        .mode-difference { --color-1: #f093fb; --color-2: #4facfe; }
+        .mode-blend { --color-1: #fa709a; --color-2: #fee140; }
+        .mode-onion { --color-1: #30cfd0; --color-2: #330867; }
+        
+        /* CTA Section */
+        .cta-section {
+            text-align: center;
+            padding: 80px 0;
+            position: relative;
+        }
+        
+        .cta-button {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            padding: 20px 50px;
+            font-size: 1.25rem;
+            font-weight: bold;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            text-decoration: none;
+            border-radius: 50px;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .cta-button::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            background: rgba(255,255,255,0.2);
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            transition: width 0.6s, height 0.6s;
+        }
+        
+        .cta-button:hover::before {
+            width: 300px;
+            height: 300px;
+        }
+        
+        .cta-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 40px rgba(102,126,234,0.4);
+        }
+        
+        /* Use Cases */
+        .use-cases {
+            margin-bottom: 80px;
+        }
+        
+        .use-case-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-top: 40px;
+        }
+        
+        .use-case {
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 10px;
+            padding: 20px;
+            transition: all 0.3s ease;
+        }
+        
+        .use-case:hover {
+            background: rgba(255,255,255,0.05);
+            transform: translateX(5px);
+        }
+        
+        .use-case h4 {
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+        
+        /* Responsive */
+        @media (max-width: 768px) {
+            .hero h1 {
+                font-size: 3rem;
+            }
+            
+            .split-demo {
+                height: 250px;
+            }
+            
+            .features {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Animated Background -->
+    <div class="bg-animation"></div>
+    
+    <div class="container">
+        <!-- Hero Section -->
+        <section class="hero">
+            <h1>Image Comparison Studio</h1>
+            <p class="subtitle">Split, Compare, Analyze with GPU Precision</p>
+            
+            <!-- Interactive Split Screen Demo -->
+            <div class="split-demo">
+                <div class="split-container">
+                    <div class="split-image split-left">
+                        <span style="color: rgba(255,255,255,0.9);">BEFORE</span>
+                    </div>
+                    <div class="split-image split-right">
+                        <span style="color: rgba(255,255,255,0.9);">AFTER</span>
+                    </div>
+                    <div class="split-slider">
+                        <div class="split-handle"></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+        
+        <!-- Features Grid -->
+        <section class="features">
+            <div class="feature-card">
+                <div class="feature-icon">🔀</div>
+                <h3>Interactive Slider</h3>
+                <p>Drag to reveal differences with smooth GPU-accelerated transitions</p>
+            </div>
+            
+            <div class="feature-card">
+                <div class="feature-icon">🎯</div>
+                <h3>Pixel-Perfect Analysis</h3>
+                <p>Detect the smallest changes with advanced difference algorithms</p>
+            </div>
+            
+            <div class="feature-card">
+                <div class="feature-icon">🎨</div>
+                <h3>Multiple Blend Modes</h3>
+                <p>Various comparison modes including difference, overlay, and exclusion</p>
+            </div>
+            
+            <div class="feature-card">
+                <div class="feature-icon">⚡</div>
+                <h3>Real-Time Processing</h3>
+                <p>Instant comparisons powered by WebGL GPU acceleration</p>
+            </div>
+            
+            <div class="feature-card">
+                <div class="feature-icon">📊</div>
+                <h3>Detailed Metrics</h3>
+                <p>Get similarity scores, difference maps, and statistical analysis</p>
+            </div>
+            
+            <div class="feature-card">
+                <div class="feature-icon">💾</div>
+                <h3>Export Results</h3>
+                <p>Save comparison results as images or detailed reports</p>
+            </div>
+        </section>
+        
+        <!-- Comparison Modes -->
+        <section class="modes-section">
+            <h2 style="font-size: 2.5rem; margin-bottom: 20px;">Comparison Modes</h2>
+            <p style="color: #aaa; font-size: 1.2rem;">Choose the perfect mode for your analysis</p>
+            
+            <div class="modes-grid">
+                <div class="mode-card mode-slider">
+                    <div style="font-size: 2rem; margin-bottom: 10px;">↔️</div>
+                    <h4>Slider</h4>
+                    <p style="font-size: 0.9rem; opacity: 0.8;">Classic split view</p>
+                </div>
+                
+                <div class="mode-card mode-difference">
+                    <div style="font-size: 2rem; margin-bottom: 10px;">🔍</div>
+                    <h4>Difference</h4>
+                    <p style="font-size: 0.9rem; opacity: 0.8;">Highlight changes</p>
+                </div>
+                
+                <div class="mode-card mode-blend">
+                    <div style="font-size: 2rem; margin-bottom: 10px;">🌈</div>
+                    <h4>Blend</h4>
+                    <p style="font-size: 0.9rem; opacity: 0.8;">Overlay modes</p>
+                </div>
+                
+                <div class="mode-card mode-onion">
+                    <div style="font-size: 2rem; margin-bottom: 10px;">🧅</div>
+                    <h4>Onion Skin</h4>
+                    <p style="font-size: 0.9rem; opacity: 0.8;">Transparency blend</p>
+                </div>
+            </div>
+        </section>
+        
+        <!-- Use Cases -->
+        <section class="use-cases">
+            <h2 style="font-size: 2.5rem; text-align: center; margin-bottom: 20px;">Perfect For</h2>
+            
+            <div class="use-case-grid">
+                <div class="use-case">
+                    <h4>📸 Photography</h4>
+                    <p>Compare edits, filters, and retouching results</p>
+                </div>
+                
+                <div class="use-case">
+                    <h4>🎨 Design Work</h4>
+                    <p>Review design iterations and client revisions</p>
+                </div>
+                
+                <div class="use-case">
+                    <h4>🏗️ Construction</h4>
+                    <p>Track progress with before/after documentation</p>
+                </div>
+                
+                <div class="use-case">
+                    <h4>🔬 Scientific Analysis</h4>
+                    <p>Compare experimental results and data visualization</p>
+                </div>
+                
+                <div class="use-case">
+                    <h4>🏥 Medical Imaging</h4>
+                    <p>Analyze treatment progress and diagnostic images</p>
+                </div>
+                
+                <div class="use-case">
+                    <h4>🎮 Game Development</h4>
+                    <p>Compare graphics settings and visual improvements</p>
+                </div>
+            </div>
+        </section>
+        
+        <!-- CTA Section -->
+        <section class="cta-section">
+            <h2 style="font-size: 3rem; margin-bottom: 30px;">Ready to Compare?</h2>
+            <p style="font-size: 1.3rem; color: #aaa; margin-bottom: 40px;">
+                Start analyzing images with our powerful comparison tools
+            </p>
+            <a href="/compare" class="cta-button">
+                <span>Launch Comparison Tool</span>
+                <span style="font-size: 1.5rem;">→</span>
+            </a>
+        </section>
+    </div>
+    
+    <script>
+        // Floating particles effect
+        function createParticle() {
+            const particle = document.createElement('div');
+            particle.style.position = 'fixed';
+            particle.style.width = '4px';
+            particle.style.height = '4px';
+            particle.style.background = 'rgba(255,255,255,0.5)';
+            particle.style.borderRadius = '50%';
+            particle.style.pointerEvents = 'none';
+            particle.style.left = Math.random() * window.innerWidth + 'px';
+            particle.style.top = window.innerHeight + 'px';
+            particle.style.zIndex = '0';
+            
+            document.body.appendChild(particle);
+            
+            const duration = 5000 + Math.random() * 5000;
+            const horizontalMovement = (Math.random() - 0.5) * 100;
+            
+            particle.animate([
+                { transform: 'translate(0, 0) scale(1)', opacity: 0 },
+                { transform: `translate(${horizontalMovement}px, -${window.innerHeight}px) scale(0)`, opacity: 1 },
+                { transform: `translate(${horizontalMovement * 2}px, -${window.innerHeight * 2}px) scale(0)`, opacity: 0 }
+            ], {
+                duration: duration,
+                easing: 'ease-out'
+            }).onfinish = () => particle.remove();
+        }
+        
+        // Create particles periodically
+        setInterval(createParticle, 300);
+        
+        // Interactive demo enhancement
+        const splitDemo = document.querySelector('.split-demo');
+        const slider = document.querySelector('.split-slider');
+        let isDragging = false;
+        
+        splitDemo.addEventListener('mouseenter', () => {
+            slider.style.animation = 'none';
+        });
+        
+        splitDemo.addEventListener('mouseleave', () => {
+            if (!isDragging) {
+                slider.style.animation = 'slideDemo 4s ease-in-out infinite';
+            }
+        });
+        
+        // Smooth scroll for anchors
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({ behavior: 'smooth' });
+                }
+            });
+        });
+    </script>
+</body>
+</html> 

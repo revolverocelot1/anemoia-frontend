@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Face Swap Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #0a0a0a;
+            color: #fff;
+        }
+        .container {
+            background: #1a1a1a;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+        }
+        h1 {
+            text-align: center;
+            color: #6366f1;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            background: #2a2a2a;
+            border-radius: 8px;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        .success {
+            background: rgba(16, 185, 129, 0.2);
+            border: 1px solid #10b981;
+            color: #10b981;
+        }
+        .error {
+            background: rgba(239, 68, 68, 0.2);
+            border: 1px solid #ef4444;
+            color: #ef4444;
+        }
+        .warning {
+            background: rgba(245, 158, 11, 0.2);
+            border: 1px solid #f59e0b;
+            color: #f59e0b;
+        }
+        button {
+            background: #6366f1;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 5px;
+        }
+        button:hover {
+            background: #7c3aed;
+        }
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .test-images {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+        .test-image {
+            text-align: center;
+        }
+        .test-image img {
+            max-width: 100%;
+            border-radius: 8px;
+            border: 2px solid #333;
+        }
+        code {
+            background: #333;
+            padding: 2px 5px;
+            border-radius: 3px;
+            font-family: monospace;
+        }
+        .log {
+            background: #1a1a1a;
+            padding: 10px;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 14px;
+            max-height: 200px;
+            overflow-y: auto;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔄 Face Swap Test Page</h1>
+        
+        <div class="test-section">
+            <h2>1. Environment Check</h2>
+            <div id="env-status"></div>
+            <button onclick="checkEnvironment()">Run Environment Check</button>
+        </div>
+
+        <div class="test-section">
+            <h2>2. ONNX Runtime Test</h2>
+            <div id="onnx-status"></div>
+            <button onclick="testONNXRuntime()">Test ONNX Runtime</button>
+        </div>
+
+        <div class="test-section">
+            <h2>3. Model Loading Test</h2>
+            <div id="model-status"></div>
+            <button onclick="testModelLoading()">Test Model Loading</button>
+        </div>
+
+        <div class="test-section">
+            <h2>4. Generate Test Images</h2>
+            <p>Click to generate test images with faces for testing:</p>
+            <button onclick="generateTestImages()">Generate Test Images</button>
+            <div class="test-images" id="test-images"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>5. Console Log</h2>
+            <div class="log" id="console-log"></div>
+        </div>
+    </div>
+
+    <script>
+        // Custom console log display
+        const logDiv = document.getElementById('console-log');
+        const originalLog = console.log;
+        const originalError = console.error;
+        
+        console.log = function(...args) {
+            originalLog.apply(console, args);
+            logToDiv('[LOG] ' + args.join(' '), 'log');
+        };
+        
+        console.error = function(...args) {
+            originalError.apply(console, args);
+            logToDiv('[ERROR] ' + args.join(' '), 'error');
+        };
+        
+        function logToDiv(message, type = 'log') {
+            const timestamp = new Date().toLocaleTimeString();
+            const color = type === 'error' ? '#ef4444' : '#b0b0b0';
+            logDiv.innerHTML += `<div style="color: ${color}">${timestamp} - ${message}</div>`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        function setStatus(elementId, message, type = 'success') {
+            const element = document.getElementById(elementId);
+            element.innerHTML = `<div class="status ${type}">${message}</div>`;
+        }
+
+        async function checkEnvironment() {
+            console.log('Starting environment check...');
+            
+            let html = '';
+            
+            // Check browser
+            const userAgent = navigator.userAgent;
+            const browserInfo = `Browser: ${userAgent.substring(0, 50)}...`;
+            html += `<div class="status success">✓ ${browserInfo}</div>`;
+            
+            // Check WebGL
+            const canvas = document.createElement('canvas');
+            const gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
+            if (gl) {
+                const renderer = gl.getParameter(gl.RENDERER);
+                html += `<div class="status success">✓ WebGL Available: ${renderer}</div>`;
+            } else {
+                html += `<div class="status error">✗ WebGL Not Available</div>`;
+            }
+            
+            // Check WebAssembly
+            if (typeof WebAssembly !== 'undefined') {
+                html += `<div class="status success">✓ WebAssembly Supported</div>`;
+            } else {
+                html += `<div class="status error">✗ WebAssembly Not Supported</div>`;
+            }
+            
+            // Check hardware concurrency
+            const cores = navigator.hardwareConcurrency || 'Unknown';
+            html += `<div class="status success">✓ CPU Cores: ${cores}</div>`;
+            
+            // Check memory (if available)
+            if (navigator.deviceMemory) {
+                html += `<div class="status success">✓ Device Memory: ${navigator.deviceMemory}GB</div>`;
+            }
+            
+            document.getElementById('env-status').innerHTML = html;
+            console.log('Environment check complete');
+        }
+
+        async function testONNXRuntime() {
+            console.log('Testing ONNX Runtime Web...');
+            
+            try {
+                // Check if running from file:// protocol
+                if (window.location.protocol === 'file:') {
+                    setStatus('onnx-status', 
+                        'Warning: Running from file:// protocol. Please use a local server (e.g., npm run dev)', 
+                        'warning'
+                    );
+                    return;
+                }
+                
+                // Try to load ONNX Runtime
+                const script = document.createElement('script');
+                script.src = '/ort-wasm/ort.min.js';
+                
+                script.onload = () => {
+                    if (typeof ort !== 'undefined') {
+                        console.log('ONNX Runtime loaded successfully');
+                        console.log('ONNX Runtime version:', ort.env.versions.ort);
+                        
+                        // Test WebGL backend
+                        const backends = ort.env.wasm.proxy ? ['wasm'] : ['webgl', 'wasm'];
+                        setStatus('onnx-status', 
+                            `✓ ONNX Runtime loaded<br>✓ Available backends: ${backends.join(', ')}`, 
+                            'success'
+                        );
+                    } else {
+                        setStatus('onnx-status', 'ONNX Runtime loaded but ort is undefined', 'error');
+                    }
+                };
+                
+                script.onerror = () => {
+                    setStatus('onnx-status', 
+                        'Failed to load ONNX Runtime. Make sure /ort-wasm/ files are available', 
+                        'error'
+                    );
+                };
+                
+                document.head.appendChild(script);
+                
+            } catch (error) {
+                console.error('ONNX Runtime test failed:', error);
+                setStatus('onnx-status', `Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function testModelLoading() {
+            console.log('Testing model loading...');
+            
+            const models = [
+                { name: 'BlazeFace', path: '/models/face-swap/blazeface.onnx', size: '0.78MB' },
+                { name: 'Face Landmarks', path: '/models/face-swap/face_landmarks_68.onnx', size: '5-10MB' },
+                { name: 'SimSwap 256', path: '/models/face-swap/simswap_256.onnx', size: '100MB' },
+                { name: 'InSwapper', path: '/models/face-swap/inswapper_128_fp16.onnx', size: '280MB' }
+            ];
+            
+            let html = '';
+            
+            for (const model of models) {
+                try {
+                    console.log(`Checking ${model.name}...`);
+                    const response = await fetch(model.path, { method: 'HEAD' });
+                    
+                    if (response.ok) {
+                        const size = response.headers.get('content-length');
+                        const sizeMB = size ? (parseInt(size) / 1024 / 1024).toFixed(2) : 'Unknown';
+                        html += `<div class="status success">✓ ${model.name} (${sizeMB}MB) - Available</div>`;
+                    } else {
+                        html += `<div class="status warning">⚠ ${model.name} (${model.size}) - Not found (${response.status})</div>`;
+                    }
+                } catch (error) {
+                    html += `<div class="status error">✗ ${model.name} - Error: ${error.message}</div>`;
+                }
+            }
+            
+            document.getElementById('model-status').innerHTML = html;
+            console.log('Model check complete');
+        }
+
+        function generateTestImages() {
+            console.log('Generating test images...');
+            
+            // Create canvases with simple face drawings
+            const images = [
+                { name: 'Source Face', color: '#6366f1' },
+                { name: 'Target Face', color: '#10b981' }
+            ];
+            
+            let html = '';
+            
+            images.forEach((img, index) => {
+                const canvas = document.createElement('canvas');
+                canvas.width = 200;
+                canvas.height = 200;
+                const ctx = canvas.getContext('2d');
+                
+                // Background
+                ctx.fillStyle = '#2a2a2a';
+                ctx.fillRect(0, 0, 200, 200);
+                
+                // Simple face
+                ctx.fillStyle = img.color;
+                ctx.beginPath();
+                ctx.arc(100, 100, 60, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Eyes
+                ctx.fillStyle = '#fff';
+                ctx.beginPath();
+                ctx.arc(80, 90, 8, 0, Math.PI * 2);
+                ctx.arc(120, 90, 8, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Mouth
+                ctx.strokeStyle = '#fff';
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.arc(100, 110, 20, 0, Math.PI);
+                ctx.stroke();
+                
+                html += `
+                    <div class="test-image">
+                        <h4>${img.name}</h4>
+                        <img src="${canvas.toDataURL()}" alt="${img.name}">
+                        <br>
+                        <small>Right-click to save</small>
+                    </div>
+                `;
+            });
+            
+            document.getElementById('test-images').innerHTML = html;
+            console.log('Test images generated');
+        }
+
+        // Auto-run environment check on load
+        window.addEventListener('load', () => {
+            checkEnvironment();
+        });
+    </script>
+</body>
+</html> 

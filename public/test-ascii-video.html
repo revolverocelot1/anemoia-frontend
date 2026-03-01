@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ASCII Video Test</title>
+    <style>
+        body {
+            background: #000;
+            color: #0f0;
+            font-family: 'Consolas', 'Monaco', monospace;
+            margin: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .controls {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #0f0;
+            border-radius: 5px;
+        }
+        button {
+            background: #0f0;
+            color: #000;
+            border: none;
+            padding: 10px 20px;
+            margin: 5px;
+            cursor: pointer;
+            font-family: inherit;
+            border-radius: 3px;
+        }
+        button:hover {
+            background: #0a0;
+        }
+        #preview {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #0f0;
+            border-radius: 5px;
+            font-size: 10px;
+            line-height: 1;
+            white-space: pre;
+            overflow: auto;
+            max-height: 600px;
+        }
+        #status {
+            margin: 10px 0;
+            padding: 10px;
+            background: #001100;
+            border-radius: 3px;
+        }
+        input[type="file"] {
+            margin: 10px 0;
+        }
+        .progress {
+            width: 100%;
+            height: 20px;
+            background: #001100;
+            border-radius: 3px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        .progress-bar {
+            height: 100%;
+            background: #0f0;
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>ASCII Video Converter Test</h1>
+        
+        <div class="controls">
+            <h2>Upload Video</h2>
+            <input type="file" id="videoInput" accept="video/*">
+            
+            <h3>Settings</h3>
+            <label>
+                ASCII Characters: 
+                <input type="text" id="asciiChars" value=" .:-=+*#%@" style="background: #001100; color: #0f0; border: 1px solid #0f0; padding: 5px;">
+            </label>
+            <br>
+            <label>
+                Frame Rate: 
+                <select id="frameRate" style="background: #001100; color: #0f0; border: 1px solid #0f0; padding: 5px;">
+                    <option value="5">5 FPS</option>
+                    <option value="10" selected>10 FPS</option>
+                    <option value="15">15 FPS</option>
+                    <option value="30">30 FPS</option>
+                </select>
+            </label>
+            <br>
+            <label>
+                Scale: 
+                <input type="range" id="scale" min="0.1" max="1" step="0.1" value="0.3">
+                <span id="scaleValue">0.3</span>
+            </label>
+            
+            <div>
+                <button id="processBtn">Process Video</button>
+                <button id="playBtn" disabled>Play Animation</button>
+                <button id="stopBtn" disabled>Stop</button>
+                <button id="exportGifBtn" disabled>Export as GIF</button>
+            </div>
+            
+            <div id="status">Ready</div>
+            <div class="progress">
+                <div class="progress-bar" id="progressBar"></div>
+            </div>
+        </div>
+        
+        <div id="preview"></div>
+    </div>
+
+    <script>
+        // Simple ASCII video processor for testing
+        class SimpleASCIIProcessor {
+            constructor() {
+                this.frames = [];
+                this.isPlaying = false;
+                this.currentFrame = 0;
+            }
+            
+            processVideo(video, config, onProgress) {
+                return new Promise((resolve) => {
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+                    
+                    const fps = config.frameRate;
+                    const totalFrames = Math.floor(video.duration * fps);
+                    const processedFrames = [];
+                    
+                    let currentFrame = 0;
+                    
+                    const processFrame = () => {
+                        if (currentFrame >= totalFrames) {
+                            this.frames = processedFrames;
+                            resolve(processedFrames);
+                            return;
+                        }
+                        
+                        const time = currentFrame / fps;
+                        video.currentTime = time;
+                        
+                        video.onseeked = () => {
+                            // Set canvas size
+                            canvas.width = video.videoWidth * config.scale;
+                            canvas.height = video.videoHeight * config.scale;
+                            
+                            // Draw video frame
+                            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                            
+                            // Convert to ASCII
+                            const ascii = this.imageToASCII(imageData, config.asciiChars);
+                            processedFrames.push(ascii);
+                            
+                            // Update progress
+                            const progress = (currentFrame / totalFrames) * 100;
+                            onProgress(progress);
+                            
+                            currentFrame++;
+                            setTimeout(processFrame, 10); // Small delay between frames
+                        };
+                    };
+                    
+                    processFrame();
+                });
+            }
+            
+            imageToASCII(imageData, chars) {
+                const { width, height, data } = imageData;
+                const charWidth = Math.max(40, Math.floor(width / 2));
+                const charHeight = Math.floor((height / width) * charWidth * 0.5);
+                
+                const blockWidth = width / charWidth;
+                const blockHeight = height / charHeight;
+                
+                let ascii = '';
+                
+                for (let y = 0; y < charHeight; y++) {
+                    for (let x = 0; x < charWidth; x++) {
+                        let totalBrightness = 0;
+                        let samples = 0;
+                        
+                        // Sample pixels in block
+                        for (let by = 0; by < blockHeight; by++) {
+                            for (let bx = 0; bx < blockWidth; bx++) {
+                                const px = Math.floor(x * blockWidth + bx);
+                                const py = Math.floor(y * blockHeight + by);
+                                
+                                if (px < width && py < height) {
+                                    const idx = (py * width + px) * 4;
+                                    const r = data[idx];
+                                    const g = data[idx + 1];
+                                    const b = data[idx + 2];
+                                    
+                                    const brightness = (r + g + b) / 3 / 255;
+                                    totalBrightness += brightness;
+                                    samples++;
+                                }
+                            }
+                        }
+                        
+                        const avgBrightness = totalBrightness / samples;
+                        const charIndex = Math.floor(avgBrightness * (chars.length - 1));
+                        ascii += chars[charIndex];
+                    }
+                    ascii += '\n';
+                }
+                
+                return ascii;
+            }
+            
+            play(frameRate, onFrame) {
+                if (this.frames.length === 0) return;
+                
+                this.isPlaying = true;
+                this.currentFrame = 0;
+                
+                const interval = 1000 / frameRate;
+                
+                const playFrame = () => {
+                    if (!this.isPlaying) return;
+                    
+                    onFrame(this.frames[this.currentFrame]);
+                    this.currentFrame = (this.currentFrame + 1) % this.frames.length;
+                    
+                    setTimeout(playFrame, interval);
+                };
+                
+                playFrame();
+            }
+            
+            stop() {
+                this.isPlaying = false;
+            }
+        }
+        
+        // Initialize
+        const processor = new SimpleASCIIProcessor();
+        const videoInput = document.getElementById('videoInput');
+        const processBtn = document.getElementById('processBtn');
+        const playBtn = document.getElementById('playBtn');
+        const stopBtn = document.getElementById('stopBtn');
+        const exportGifBtn = document.getElementById('exportGifBtn');
+        const preview = document.getElementById('preview');
+        const status = document.getElementById('status');
+        const progressBar = document.getElementById('progressBar');
+        const scaleInput = document.getElementById('scale');
+        const scaleValue = document.getElementById('scaleValue');
+        
+        let currentVideo = null;
+        
+        scaleInput.addEventListener('input', () => {
+            scaleValue.textContent = scaleInput.value;
+        });
+        
+        videoInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const video = document.createElement('video');
+                video.src = URL.createObjectURL(file);
+                video.onloadedmetadata = () => {
+                    currentVideo = video;
+                    status.textContent = `Video loaded: ${video.duration.toFixed(1)}s`;
+                    processBtn.disabled = false;
+                };
+            }
+        });
+        
+        processBtn.addEventListener('click', async () => {
+            if (!currentVideo) return;
+            
+            const config = {
+                asciiChars: document.getElementById('asciiChars').value,
+                frameRate: parseInt(document.getElementById('frameRate').value),
+                scale: parseFloat(document.getElementById('scale').value)
+            };
+            
+            processBtn.disabled = true;
+            playBtn.disabled = true;
+            exportGifBtn.disabled = true;
+            status.textContent = 'Processing video...';
+            
+            await processor.processVideo(currentVideo, config, (progress) => {
+                progressBar.style.width = progress + '%';
+                status.textContent = `Processing: ${progress.toFixed(1)}%`;
+            });
+            
+            status.textContent = `Processing complete! ${processor.frames.length} frames`;
+            processBtn.disabled = false;
+            playBtn.disabled = false;
+            exportGifBtn.disabled = false;
+            progressBar.style.width = '100%';
+            
+            // Show first frame
+            preview.textContent = processor.frames[0];
+        });
+        
+        playBtn.addEventListener('click', () => {
+            const frameRate = parseInt(document.getElementById('frameRate').value);
+            processor.play(frameRate, (frame) => {
+                preview.textContent = frame;
+            });
+            playBtn.disabled = true;
+            stopBtn.disabled = false;
+        });
+        
+        stopBtn.addEventListener('click', () => {
+            processor.stop();
+            playBtn.disabled = false;
+            stopBtn.disabled = true;
+        });
+        
+        exportGifBtn.addEventListener('click', () => {
+            status.textContent = 'GIF export requires gif.js library';
+        });
+    </script>
+</body>
+</html> 

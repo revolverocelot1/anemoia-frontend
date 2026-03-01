@@ -1,0 +1,13 @@
+{
+  "test_name": "test",
+  "timestamp": "20250728_120356",
+  "baseline_image_path": "uploads\\baseline_20250728_120356_WhatsApp_Image_2025-07-28_at_00.41.28_5abe3c4b.jpg",
+  "comparison_image_path": "uploads\\comparison_20250728_120356_WhatsApp_Image_2025-07-28_at_00.41.28_639c01a8.jpg",
+  "image_comparison": {
+    "error": "'annotation_color'"
+  },
+  "text_comparison": {
+    "error": "'psm_mode'"
+  },
+  "report_path": "results\\test_20250728_120356\\report.html"
+}

@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Inline Whisper Test</title>
+    <style>
+        body { 
+            background: #000; 
+            color: #0f0; 
+            font-family: monospace; 
+            padding: 20px; 
+        }
+        .success-modal {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: #00ff00;
+            color: #000;
+            padding: 40px;
+            border-radius: 20px;
+            font-size: 24px;
+            font-weight: bold;
+            display: none;
+            box-shadow: 0 0 50px #00ff00;
+        }
+        .success-modal.show {
+            display: block;
+            animation: pulse 0.5s ease;
+        }
+        @keyframes pulse {
+            0% { transform: translate(-50%, -50%) scale(0.8); }
+            50% { transform: translate(-50%, -50%) scale(1.1); }
+            100% { transform: translate(-50%, -50%) scale(1); }
+        }
+    </style>
+</head>
+<body>
+    <h1>Inline Whisper Model Loading Test</h1>
+    <div id="status">Initializing...</div>
+    <div id="progress"></div>
+    <div id="log"></div>
+    
+    <div class="success-modal" id="success">
+        ✅ MODEL LOADED SUCCESSFULLY! ✅
+        <br><br>
+        VISUAL CONFIRMATION ACHIEVED!
+    </div>
+    
+    <script type="module">
+        const log = (msg) => {
+            const div = document.createElement('div');
+            div.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+            document.getElementById('log').appendChild(div);
+            console.log(msg);
+        };
+        
+        log('Starting inline test...');
+        
+        // Import transformers directly
+        import('https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.0.0-alpha.8').then(async (transformers) => {
+            log('Transformers.js loaded from CDN');
+            
+            const { pipeline, env } = transformers;
+            
+            // Configure environment
+            env.allowLocalModels = false;
+            env.allowRemoteModels = true;
+            env.useBrowserCache = true;
+            
+            log('Creating pipeline...');
+            
+            try {
+                const transcriber = await pipeline(
+                    'automatic-speech-recognition',
+                    'onnx-community/whisper-tiny',
+                    {
+                        progress_callback: (progress) => {
+                            if (progress.status === 'progress' && progress.total) {
+                                const percent = Math.round((progress.loaded / progress.total) * 100);
+                                document.getElementById('progress').textContent = `Progress: ${percent}%`;
+                                log(`Download progress: ${percent}%`);
+                            }
+                        }
+                    }
+                );
+                
+                log('✅ MODEL LOADED SUCCESSFULLY!');
+                document.getElementById('status').textContent = '✅ MODEL LOADED!';
+                document.getElementById('success').classList.add('show');
+                
+                // Keep the success modal visible
+                log('VISUAL CONFIRMATION DISPLAYED');
+                
+            } catch (error) {
+                log(`❌ Error: ${error.message}`);
+                document.getElementById('status').textContent = `❌ Error: ${error.message}`;
+            }
+        }).catch(error => {
+            log(`Failed to load transformers.js: ${error}`);
+        });
+    </script>
+</body>
+</html> 
