@@ -588,11 +588,13 @@ const GaussianSplatRenderer = ({
     cameraObjRef.current = camera;
     rendererRef.current = renderer;
 
+    // Default orbit distance — 3 keeps SHARP-generated models nicely framed
+    const DEFAULT_RADIUS = 3;
+
     // Track current spherical coordinates so we can do auto-rotate
-    const spherical = { alpha: 0, beta: 0.15, radius: 5 };
+    const spherical = { alpha: 0, beta: 0.15, radius: DEFAULT_RADIUS };
 
     const createControls = (alpha: number, beta: number, radius: number) => {
-      // console.log('[GaussianSplat] createControls:', { alpha, beta, radius });
       controlsObjRef.current?.dispose();
 
       // Store the new spherical coords
@@ -600,8 +602,6 @@ const GaussianSplatRenderer = ({
       spherical.beta = beta;
       spherical.radius = radius;
 
-      // Disable keyboard controls (true → false) to avoid gsplat intercepting
-      // global keyboard events (WASD/QERF) that conflict with React UI
       const controls = new SPLAT.OrbitControls(
         camera, canvas,
         alpha, beta, radius,
@@ -611,8 +611,8 @@ const GaussianSplatRenderer = ({
       controls.panSpeed = 1.0;
       controls.zoomSpeed = 2.0;
       controls.dampening = 0.12;
-      controls.minZoom = 0.5;
-      controls.maxZoom = 20;
+      controls.minZoom = 0.3;
+      controls.maxZoom = 15;
       controlsObjRef.current = controls;
 
       // Force several immediate updates so the camera position converges
@@ -620,19 +620,18 @@ const GaussianSplatRenderer = ({
       controls.update();
       controls.update();
 
-      // console.log('[GaussianSplat] Camera pos:', camera.position);
       return controls;
     };
 
     // Front view: alpha=0, beta=0.15 (slight downward tilt avoids axis-aligned sorting edge case)
-    createControls(0, 0.15, 5);
+    createControls(0, 0.15, DEFAULT_RADIUS);
 
     if (cameraAPIRef) {
       cameraAPIRef.current = {
-        resetView: () => { createControls(0, 0.15, 5); },
-        frontView: () => { createControls(0, 0.15, 5); },
-        sideView: () => { createControls(-Math.PI / 2, 0.15, 5); },
-        topView: () => { createControls(0, -(Math.PI / 2 - 0.01), 7); },
+        resetView: () => { createControls(0, 0.15, DEFAULT_RADIUS); },
+        frontView: () => { createControls(0, 0.15, DEFAULT_RADIUS); },
+        sideView: () => { createControls(-Math.PI / 2, 0.15, DEFAULT_RADIUS); },
+        topView: () => { createControls(0, -(Math.PI / 2 - 0.01), DEFAULT_RADIUS + 2); },
         setAutoRotate: (enabled: boolean) => {
           autoRotateRef.current = enabled;
           // If enabling, start auto-rotate state
@@ -757,13 +756,14 @@ const GaussianSplatRenderer = ({
     }
   }, [settings.backgroundColor]);
 
-  // Reactive FOV changes from settings (only after initial render)
-  const initialRenderDone = useRef(false);
+  // Reactive FOV changes from user interaction only.
+  // We track the previous FOV so we only apply when the user actually drags
+  // the slider — not on initial mount (which would override gsplat's
+  // well-calibrated defaults of fx=1132 → ~56° natural look).
+  const prevFovRef = useRef(settings.fov);
   useEffect(() => {
-    if (!initialRenderDone.current) {
-      initialRenderDone.current = true;
-      return;
-    }
+    if (prevFovRef.current === settings.fov) return; // skip identical value
+    prevFovRef.current = settings.fov;
     applyFov(settings.fov);
   }, [settings.fov, applyFov]);
 
@@ -1343,11 +1343,13 @@ const UnifiedRenderer = ({
     });
   }, []);
 
-  // FOV sync — update camera when focal length / FOV changes in settings
+  // FOV sync — only forward to camera when user actually changes the slider
+  // (skip the initial mount to preserve gsplat's native projection)
+  const unifiedFovRef = useRef(settings.fov);
   useEffect(() => {
-    if (settings.fov && cameraAPIRef.current) {
-      cameraAPIRef.current.setFov(settings.fov);
-    }
+    if (unifiedFovRef.current === settings.fov) return;
+    unifiedFovRef.current = settings.fov;
+    cameraAPIRef.current?.setFov(settings.fov);
   }, [settings.fov]);
 
   // Annotation handlers
