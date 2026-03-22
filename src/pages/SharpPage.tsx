@@ -7,13 +7,22 @@ import Footer from '../components/Footer';
 import NavigationBreadcrumb from '../components/NavigationBreadcrumb';
 import CardGlass from '../components/CardGlass';
 import { sharpService, type GenerationResult, type GenerationMode } from '../services/sharp.service';
+import { sharpEnhancedService, type EnhancedGenerationResult } from '../services/sharp-enhanced.service';
 import { sharpFileStore, createBlobUrl, revokeBlobUrl } from '../utils/sharpFileStore';
 import { detectGPU, type GPUInfo } from '../utils/gpuUtils';
+import {
+  type SplatLensMetadata,
+  computeIntrinsicFov,
+  computeCameraSpaceTarget,
+  computeFitRadius,
+  getCalibrationCenter,
+  getFrontBeta,
+} from '../utils/splatLens';
 import {
   Upload, Sparkles, Download, Eye, Settings2, Zap,
   Image, Camera, Box, Loader2, AlertCircle, CheckCircle2,
   Info, ChevronDown, ExternalLink, RefreshCw, RotateCcw, Maximize2,
-  FlaskConical
+  FlaskConical, Wand2
 } from 'lucide-react';
 
 // Custom animated background component
@@ -94,7 +103,11 @@ const SharpBackground: React.FC = () => {
 };
 
 // Actual 3D Gaussian Splat Viewer Component
-const SplatPreview3D: React.FC<{ blob: Blob | null; onFullscreen?: () => void }> = ({ blob, onFullscreen }) => {
+const SplatPreview3D: React.FC<{
+  blob: Blob | null;
+  metadata?: SplatLensMetadata;
+  onFullscreen?: () => void;
+}> = ({ blob, metadata, onFullscreen }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rendererRef = useRef<SPLAT.WebGLRenderer | null>(null);
   const sceneRef = useRef<SPLAT.Scene | null>(null);
@@ -102,11 +115,16 @@ const SplatPreview3D: React.FC<{ blob: Blob | null; onFullscreen?: () => void }>
   const controlsRef = useRef<SPLAT.OrbitControls | null>(null);
   const animationRef = useRef<number | null>(null);
   const blobUrlRef = useRef<string | null>(null);
+  const defaultViewFov = useMemo(
+    () => (metadata ? computeIntrinsicFov(metadata, 800, 600, 60) : 60),
+    [metadata],
+  );
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!blob || !canvasRef.current) return;
+    let disposed = false;
 
     // Cleanup previous resources
     if (animationRef.current) {
@@ -151,26 +169,35 @@ const SplatPreview3D: React.FC<{ blob: Blob | null; onFullscreen?: () => void }>
       const scene = new SPLAT.Scene();
       const camera = new SPLAT.Camera();
       const renderer = new SPLAT.WebGLRenderer(canvas);
-      
-      // Configure OrbitControls for frontal viewing
-      // gsplat convention: alpha=0, beta=0 places camera at (0, 0, -radius)
-      // Small beta offset (0.15 rad ≈ 8.6°) avoids axis-aligned degenerate sorting
+
+      const isCameraSpace = metadata?.viewerCalibration?.cameraSpace === true;
+      const frontBeta = getFrontBeta(metadata);
+      const targetCenter = getCalibrationCenter(metadata);
+      const initialCameraSpaceConfig = computeCameraSpaceTarget(metadata, frontBeta);
+      const initialRadius = isCameraSpace
+        ? initialCameraSpaceConfig.radius
+        : computeFitRadius(metadata, defaultViewFov, frontBeta, canvas.width, canvas.height, 5);
+      const initialTarget = isCameraSpace
+        ? initialCameraSpaceConfig.target
+        : targetCenter;
+
       const controls = new SPLAT.OrbitControls(
-        camera, 
+        camera,
         canvas,
-        0,              // alpha: 0° - camera on -Z axis (front view)
-        0.15,           // beta: slight downward tilt to avoid degenerate axis alignment
-        5,              // radius: viewing distance (wider to fit full model)
-        true,           // enable keyboard
-        new SPLAT.Vector3(0, 0, 0) // target: scene center
+        0,
+        frontBeta,
+        initialRadius,
+        true,
+        new SPLAT.Vector3(initialTarget[0], initialTarget[1], initialTarget[2])
       );
+      controls.setCameraTarget?.(new SPLAT.Vector3(initialTarget[0], initialTarget[1], initialTarget[2]));
       
       controls.orbitSpeed = 1.5;
       controls.panSpeed = 1.0;
       controls.zoomSpeed = 2.0;
-      controls.dampening = 0.12;
-      controls.minZoom = 1;
-      controls.maxZoom = 15;
+      controls.dampening = 0.08;
+      controls.minZoom = Math.max(0.3, initialRadius * 0.12);
+      controls.maxZoom = Math.max(15, initialRadius * 3);
 
       sceneRef.current = scene;
       cameraRef.current = camera;
@@ -180,8 +207,13 @@ const SplatPreview3D: React.FC<{ blob: Blob | null; onFullscreen?: () => void }>
       // Force an immediate update so the camera position is set right away
       controls.update();
 
-      // Set camera size
+      // Set camera size — use metadata-driven FOV for lens intrinsics
       camera.data.setSize(canvas.width, canvas.height);
+      const previewFov = defaultViewFov;
+      const fovRad = (previewFov * Math.PI) / 180;
+      const previewFocalPx = (canvas.width / 2) / Math.tan(fovRad / 2);
+      camera.data.fx = previewFocalPx;
+      camera.data.fy = previewFocalPx;
 
       // Kick-start dampening: tiny synthetic drag so update() detects a delta
       const syntheticNudge = () => {
@@ -198,6 +230,21 @@ const SplatPreview3D: React.FC<{ blob: Blob | null; onFullscreen?: () => void }>
       const animate = () => {
         if (!rendererRef.current || !sceneRef.current || !cameraRef.current || !controlsRef.current) return;
 
+        // FOV guard — enforce metadata-derived FOV if gsplat overwrites fx/fy
+        if (canvas.width > 0 && cameraRef.current.data) {
+          const desiredFovRad = (previewFov * Math.PI) / 180;
+          const expectedFx = (canvas.width / 2) / Math.tan(desiredFovRad / 2);
+          if (Math.abs(cameraRef.current.data.fx - expectedFx) > 0.5) {
+            cameraRef.current.data.fx = expectedFx;
+            cameraRef.current.data.fy = expectedFx;
+          }
+          if (cameraRef.current.data.width !== canvas.width || cameraRef.current.data.height !== canvas.height) {
+            cameraRef.current.data.setSize(canvas.width, canvas.height);
+            cameraRef.current.data.fx = expectedFx;
+            cameraRef.current.data.fy = expectedFx;
+          }
+        }
+
         // First 5 frames: nudge controls to ensure dampening converges
         if (frameCount < 5) {
           syntheticNudge();
@@ -213,10 +260,12 @@ const SplatPreview3D: React.FC<{ blob: Blob | null; onFullscreen?: () => void }>
       SPLAT.PLYLoader.LoadAsync(url, scene, (progress) => {
         console.log('[SplatPreview3D] Loading progress:', (progress * 100).toFixed(0) + '%');
       }).then(() => {
+        if (disposed) return;
         console.log('[SplatPreview3D] PLY loaded successfully, starting animation');
         setIsLoading(false);
         animate();
       }).catch((err) => {
+        if (disposed) return;
         console.error('[SplatPreview3D] Failed to load PLY:', err);
         setError('Failed to load 3D preview');
         setIsLoading(false);
@@ -230,6 +279,7 @@ const SplatPreview3D: React.FC<{ blob: Blob | null; onFullscreen?: () => void }>
 
     // Cleanup on unmount
     return () => {
+      disposed = true;
       if (animationRef.current) {
         cancelAnimationFrame(animationRef.current);
         animationRef.current = null;
@@ -249,7 +299,7 @@ const SplatPreview3D: React.FC<{ blob: Blob | null; onFullscreen?: () => void }>
       sceneRef.current = null;
       cameraRef.current = null;
     };
-  }, [blob]);
+  }, [blob, defaultViewFov, metadata]);
 
   // Handle resize
   useEffect(() => {
@@ -257,6 +307,10 @@ const SplatPreview3D: React.FC<{ blob: Blob | null; onFullscreen?: () => void }>
       if (!canvasRef.current || !cameraRef.current || !rendererRef.current) return;
       const canvas = canvasRef.current;
       cameraRef.current.data.setSize(canvas.clientWidth, canvas.clientHeight);
+      const resizeFovRad = (defaultViewFov * Math.PI) / 180;
+      const resizeFocalPx = (canvas.clientWidth / 2) / Math.tan(resizeFovRad / 2);
+      cameraRef.current.data.fx = resizeFocalPx;
+      cameraRef.current.data.fy = resizeFocalPx;
     };
 
     window.addEventListener('resize', handleResize);
@@ -380,6 +434,12 @@ const SharpPage: React.FC = () => {
   const [horizontalFov, setHorizontalFov] = useState(60);
   const [quality, setQuality] = useState<'low' | 'medium' | 'high' | 'ultra' | 'extreme2m' | 'extreme3m'>('high');
   
+  // Enhanced Mode settings
+  const [enhancedMode, setEnhancedMode] = useState(false);
+  const [normalHdDepth, setNormalHdDepth] = useState(false);
+  const [enhancedHdDepth, setEnhancedHdDepth] = useState(true);
+  const hdDepth = enhancedMode ? enhancedHdDepth : normalHdDepth;
+  
   // Quality presets: gridSize determines splat count (gridSize²)
   const qualityPresets = {
     low: { gridSize: 256, label: 'Low (65K)', description: 'Faster generation, lower detail', experimental: false },
@@ -472,7 +532,7 @@ const SharpPage: React.FC = () => {
     setIsDragging(false);
   }, []);
 
-  // Generation
+  // Generation — routes to standard or enhanced pipeline based on toggle
   const handleGenerate = useCallback(async () => {
     if (!selectedFile) return;
 
@@ -483,16 +543,44 @@ const SharpPage: React.FC = () => {
     setResult(null);
 
     try {
-      const genResult = await sharpService.generate(selectedFile, {
-        mode,
-        focalLengthMm: focalLengthMode === 'mm' ? focalLengthMm : undefined,
-        horizontalFovDeg: focalLengthMode === 'fov' ? horizontalFov : undefined,
-        gridSize: qualityPresets[quality].gridSize,
-        onProgress: (prog, msg) => {
-          setProgress(prog);
-          setProgressMessage(msg);
-        }
-      });
+      let genResult: GenerationResult;
+
+      if (enhancedMode) {
+        // ─── Enhanced Pipeline (same splat count, better quality) ─────
+        const enhancedResult = await sharpEnhancedService.generate(selectedFile, {
+          focalLengthMm: focalLengthMode === 'mm' ? focalLengthMm : undefined,
+          horizontalFovDeg: focalLengthMode === 'fov' ? horizontalFov : undefined,
+          gridSize: qualityPresets[quality].gridSize, // Same grid as standard
+          depthScale: 2.5,
+          useBaseModel: hdDepth,
+          onProgress: (prog, msg) => {
+            setProgress(prog);
+            setProgressMessage(msg);
+          },
+        });
+
+        genResult = {
+          success: enhancedResult.success,
+          fileId: enhancedResult.fileId,
+          filename: enhancedResult.filename,
+          blob: enhancedResult.blob,
+          metadata: enhancedResult.metadata,
+          error: enhancedResult.error,
+        };
+      } else {
+        // ─── Standard Pipeline (unchanged) ─────────────────────────────
+        genResult = await sharpService.generate(selectedFile, {
+          mode,
+          focalLengthMm: focalLengthMode === 'mm' ? focalLengthMm : undefined,
+          horizontalFovDeg: focalLengthMode === 'fov' ? horizontalFov : undefined,
+          gridSize: qualityPresets[quality].gridSize,
+          useBaseModel: hdDepth,
+          onProgress: (prog, msg) => {
+            setProgress(prog);
+            setProgressMessage(msg);
+          },
+        });
+      }
 
       if (genResult.success) {
         setResult(genResult);
@@ -504,7 +592,7 @@ const SharpPage: React.FC = () => {
     } finally {
       setIsGenerating(false);
     }
-  }, [selectedFile, mode, focalLengthMode, focalLengthMm, horizontalFov, quality, qualityPresets]);
+  }, [selectedFile, mode, focalLengthMode, focalLengthMm, horizontalFov, quality, qualityPresets, enhancedMode, hdDepth]);
 
   // Download
   const handleDownload = useCallback(() => {
@@ -675,6 +763,110 @@ const SharpPage: React.FC = () => {
                           className="overflow-hidden"
                         >
                           <div className="pt-4 space-y-4">
+                            {/* Enhanced Quality Card */}
+                            <div className={`rounded-2xl border overflow-hidden transition-all duration-300 ${
+                              enhancedMode
+                                ? 'border-indigo-400/40 bg-gradient-to-br from-indigo-950/70 via-slate-900/95 to-fuchsia-950/50 shadow-lg shadow-indigo-900/20'
+                                : 'border-slate-700/50 bg-gradient-to-br from-slate-900/80 to-slate-800/70'
+                            }`}>
+                              <button
+                                onClick={() => setEnhancedMode(!enhancedMode)}
+                                className="w-full p-4 text-left"
+                              >
+                                <div className="flex items-start justify-between gap-4">
+                                  <div className="flex gap-3">
+                                    <div className={`mt-0.5 flex h-10 w-10 items-center justify-center rounded-xl transition-all ${
+                                      enhancedMode
+                                        ? 'bg-gradient-to-br from-indigo-500/25 to-fuchsia-500/25 text-indigo-200 ring-1 ring-indigo-400/30'
+                                        : 'bg-slate-800 text-slate-500'
+                                    }`}>
+                                      <Wand2 className="w-5 h-5" />
+                                    </div>
+                                    <div>
+                                      <div className="flex items-center gap-2">
+                                        <span className={`text-sm font-semibold ${enhancedMode ? 'text-white' : 'text-gray-300'}`}>
+                                          Enhanced Quality
+                                        </span>
+                                        <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${
+                                          enhancedMode
+                                            ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-400/20'
+                                            : 'bg-slate-800 text-slate-500 border border-slate-700'
+                                        }`}>
+                                          {enhancedMode ? 'Active' : 'Optional'}
+                                        </span>
+                                      </div>
+                                      <p className={`mt-1 text-xs leading-relaxed ${enhancedMode ? 'text-indigo-100/80' : 'text-gray-500'}`}>
+                                        Enhanced adds viewer-aware calibration and alternate camera logic. The HD depth switch below can also be used with normal mode.
+                                      </p>
+                                    </div>
+                                  </div>
+                                  <div className={`relative mt-1 h-6 w-12 rounded-full transition-all duration-300 ${
+                                    enhancedMode ? 'bg-gradient-to-r from-indigo-500 to-fuchsia-500' : 'bg-slate-700'
+                                  }`}>
+                                    <div className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow-lg transition-all duration-300 ${
+                                      enhancedMode ? 'left-[26px]' : 'left-[2px]'
+                                    }`} />
+                                  </div>
+                                </div>
+                              </button>
+
+                              <div className="px-4 pb-4">
+                                <div className="flex flex-wrap gap-2">
+                                  {[
+                                    'Original-lens aware',
+                                    'Edge-aware depth',
+                                    'Gamma-preserved color',
+                                    'Viewer calibration',
+                                  ].map((tag) => (
+                                    <span
+                                      key={tag}
+                                      className={`rounded-full px-2.5 py-1 text-[10px] font-medium ${
+                                        enhancedMode
+                                          ? 'bg-white/5 text-indigo-100/80 border border-white/10'
+                                          : 'bg-slate-800 text-slate-500 border border-slate-700'
+                                      }`}
+                                    >
+                                      {tag}
+                                    </span>
+                                  ))}
+                                </div>
+
+                                <div className={`mt-4 rounded-xl border p-3 transition-all ${
+                                  hdDepth
+                                    ? 'border-amber-400/20 bg-amber-500/8'
+                                    : 'border-slate-700/60 bg-slate-900/40'
+                                }`}>
+                                  <div className="flex items-center justify-between gap-3">
+                                    <div>
+                                      <div className="flex items-center gap-2">
+                                        <span className={`rounded-md px-1.5 py-0.5 text-[10px] font-bold ${
+                                          hdDepth ? 'bg-amber-400/15 text-amber-300' : 'bg-slate-800 text-slate-400'
+                                        }`}>HD</span>
+                                        <span className={`text-xs font-semibold ${hdDepth ? 'text-amber-100' : 'text-gray-300'}`}>
+                                          Depth Anything V2 Base
+                                        </span>
+                                      </div>
+                                      <p className={`mt-1 text-xs ${hdDepth ? 'text-amber-200/70' : 'text-gray-500'}`}>
+                                        Works for both normal and enhanced generation. Better edges and placement, slower first run.
+                                      </p>
+                                    </div>
+                                    <button
+                                      onClick={() => enhancedMode ? setEnhancedHdDepth(!enhancedHdDepth) : setNormalHdDepth(!normalHdDepth)}
+                                      className={`relative flex-shrink-0 h-6 w-11 rounded-full transition-all duration-200 ${
+                                        hdDepth ? 'bg-amber-500' : 'bg-slate-700'
+                                      }`}
+                                    >
+                                      <div
+                                        className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all duration-200 ${
+                                          hdDepth ? 'left-[22px]' : 'left-[2px]'
+                                        }`}
+                                      />
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                            
                             {/* Quality Setting */}
                             <div>
                               <label className="text-sm text-gray-400 block mb-2">Output Quality</label>
@@ -840,7 +1032,8 @@ const SharpPage: React.FC = () => {
                   {/* Show actual 3D viewer when result is available, otherwise show placeholder */}
                   {result?.success && result.blob ? (
                     <SplatPreview3D 
-                      blob={result.blob} 
+                      blob={result.blob}
+                      metadata={result.metadata as any}
                       onFullscreen={handleOpenInViewer}
                     />
                   ) : (
@@ -925,6 +1118,16 @@ const SharpPage: React.FC = () => {
                           </p>
                         </div>
                       </div>
+                      
+                      {/* Enhanced Quality indicator */}
+                      {enhancedMode && (
+                        <div className="p-2.5 rounded-lg bg-indigo-500/10 border border-indigo-500/20 flex items-center gap-2">
+                          <Wand2 className="w-3.5 h-3.5 text-indigo-400" />
+                          <span className="text-xs text-indigo-300">
+                            Enhanced Quality · perspective-correct 3D · gamma-accurate colors
+                          </span>
+                        </div>
+                      )}
 
                       {/* Action Buttons */}
                       <div className="flex gap-3">

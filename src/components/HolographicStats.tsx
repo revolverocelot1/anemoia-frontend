@@ -34,10 +34,16 @@ const usePerformanceStats = () => {
   return stats;
 };
 
-const HolographicStats = () => {
+const HolographicStats = ({
+  visible = true,
+  extraLines = [],
+}: {
+  visible?: boolean;
+  extraLines?: string[];
+}) => {
   const stats = usePerformanceStats();
 
-  if (!stats) return null;
+  if (!stats || !visible) return null;
 
   const { fps, ms } = stats;
 
@@ -97,6 +103,20 @@ const HolographicStats = () => {
         }}>
           PERF-MONITOR
         </div>
+        {extraLines.length > 0 && (
+          <>
+            <div style={{
+              height: '1px',
+              background: 'linear-gradient(to right, transparent, rgba(0, 217, 255, 0.3), transparent)',
+              margin: '8px 0'
+            }}></div>
+            <div style={{ fontSize: '10px', lineHeight: '1.35', opacity: 0.85 }}>
+              {extraLines.map((line) => (
+                <div key={line}>{line}</div>
+              ))}
+            </div>
+          </>
+        )}
       </motion.div>
     </div>
   );

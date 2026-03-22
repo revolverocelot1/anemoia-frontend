@@ -5,75 +5,58 @@ import Header from '../../components/Header';
 import Footer from '../../components/Footer';
 
 /* ─────────────────────────────────────────────────────────
-   Animated stat counter
+   Animated Scroll-Reveal Text Component
    ───────────────────────────────────────────────────────── */
-const AnimatedCounter = ({ target, suffix = '', duration = 2 }: { target: number; suffix?: string; duration?: number }) => {
-  const [count, setCount] = useState(0);
-  const ref = useRef<HTMLSpanElement>(null);
-  const inView = useInView(ref, { once: true });
-
-  useEffect(() => {
-    if (!inView) return;
-    let start = 0;
-    const step = target / (duration * 60);
-    const timer = setInterval(() => {
-      start += step;
-      if (start >= target) { setCount(target); clearInterval(timer); }
-      else setCount(Math.floor(start));
-    }, 1000 / 60);
-    return () => clearInterval(timer);
-  }, [inView, target, duration]);
-
-  return <span ref={ref}>{count.toLocaleString()}{suffix}</span>;
+const FadeUpText: React.FC<{ children: React.ReactNode; className?: string; delay?: number }> = ({ children, className = '', delay = 0 }) => {
+  const ref = useRef(null);
+  const inView = useInView(ref, { once: false, margin: "0px 0px -10% 0px" });
+  
+  return (
+    <motion.div
+      ref={ref}
+      initial={{ opacity: 0, y: 40 }}
+      animate={inView ? { opacity: 1, y: 0 } : { opacity: 0, y: 40 }}
+      transition={{ duration: 0.8, delay, ease: [0.16, 1, 0.3, 1] }}
+      className={className}
+    >
+      {children}
+    </motion.div>
+  );
 };
 
 /* ─────────────────────────────────────────────────────────
-   Floating particle layer (pure CSS, no heavy JS)
-   ───────────────────────────────────────────────────────── */
-const Particles = () => (
-  <div className="absolute inset-0 overflow-hidden pointer-events-none">
-    {Array.from({ length: 40 }, (_, i) => {
-      const size = 2 + Math.random() * 3;
-      const left = Math.random() * 100;
-      const delay = Math.random() * 8;
-      const dur = 12 + Math.random() * 18;
-      return (
-        <div
-          key={i}
-          className="absolute rounded-full bg-cyan-400/20"
-          style={{
-            width: size,
-            height: size,
-            left: `${left}%`,
-            bottom: '-4px',
-            animation: `floatUp ${dur}s ${delay}s linear infinite`,
-          }}
-        />
-      );
-    })}
-    <style>{`
-      @keyframes floatUp {
-        0%   { transform: translateY(0) scale(1); opacity: 0; }
-        10%  { opacity: 0.6; }
-        90%  { opacity: 0.2; }
-        100% { transform: translateY(-105vh) scale(0.4); opacity: 0; }
-      }
-    `}</style>
-  </div>
-);
-
-/* ─────────────────────────────────────────────────────────
-   Main Landing Page
+   Main Component
    ───────────────────────────────────────────────────────── */
 const SharpLanding: React.FC = () => {
+  // ── Scroll Management ──
   const containerRef = useRef<HTMLDivElement>(null);
+  
+  // Hero Section
   const heroRef = useRef<HTMLElement>(null);
-  const { scrollYProgress } = useScroll({ target: containerRef, offset: ['start start', 'end end'] });
-  const heroScale = useTransform(scrollYProgress, [0, 0.25], [1, 0.92]);
-  const heroOpacity = useTransform(scrollYProgress, [0, 0.2], [1, 0]);
-  const [videoReady, setVideoReady] = useState(false);
+  const { scrollYProgress: heroScroll } = useScroll({ target: heroRef, offset: ['start start', 'end start'] });
+  const heroTextY = useTransform(heroScroll, [0, 1], ["0%", "40%"]);
 
-  // ── SEO Metadata ──
+  // Intro Slide-up (The CRFTD specific sticky intro mechanic)
+  const introRef = useRef<HTMLElement>(null);
+
+  // Horizontal Scroll Hijack Area
+  const horizontalRef = useRef<HTMLElement>(null);
+  const { scrollYProgress: hzScroll } = useScroll({ target: horizontalRef });
+  // Map vertical scroll (0 to 1) to horizontal movement (-0% to -66.66% for 3 items)
+  const xTransform = useTransform(hzScroll, [0, 1], ["0%", "-66.666%"]);
+  // Track active index for background/UI sync
+  const [activeIndex, setActiveIndex] = useState(0);
+
+  useEffect(() => {
+    const unsub = hzScroll.on("change", (v) => {
+      if (v < 0.33) setActiveIndex(0);
+      else if (v < 0.66) setActiveIndex(1);
+      else setActiveIndex(2);
+    });
+    return () => unsub();
+  }, [hzScroll]);
+
+  // ── SEO Metadata Setup ──
   useEffect(() => {
     document.title = 'SHARP 3D Generator — Free Image to 3D Gaussian Splat | Anemoia';
 
@@ -83,10 +66,8 @@ const SharpLanding: React.FC = () => {
       el.setAttribute('content', content);
     };
 
-    setMeta('description',
-      'Convert any photo into a 3D Gaussian Splat for free — directly in your browser. Powered by Apple\'s SHARP neural network and Depth Anything V2. No sign-up, no install.');
-    setMeta('keywords',
-      'SHARP 3D, gaussian splat, image to 3D, neural radiance field, 3D reconstruction, free 3D generator, gaussian splatting, apple SHARP, depth estimation, PLY export, webgl 3D viewer');
+    setMeta('description', 'Convert any photo into a 3D Gaussian Splat for free — directly in your browser. Powered by Apple\'s SHARP neural network and Depth Anything V2. No sign-up, no install.');
+    setMeta('keywords', 'SHARP 3D, ml-sharp, apple ml sharp, gaussian splat, 3d gaussian splatting, image to 3D, 2D to 3D, monocular view synthesis, neural radiance field, NeRF alternative, 3D reconstruction, free 3D generator, apple machine learning 3D, depth anything v2, depth estimation, PLY export, webgl 3D viewer, point cloud generation, AI 3D model, Mescheder et al 2025, browser based 3D, webgpu 3D, client side AI');
     setMeta('og:title', 'SHARP 3D Generator — Image to 3D Gaussian Splat in Seconds', 'property');
     setMeta('og:description', 'The only free browser-based tool that converts a single photo into a 3D Gaussian Splat using Apple\'s SHARP neural network. No install required.', 'property');
     setMeta('og:type', 'website', 'property');
@@ -116,399 +97,239 @@ const SharpLanding: React.FC = () => {
   }, []);
 
   return (
-    <div ref={containerRef} className="relative min-h-screen bg-gray-950 overflow-x-hidden text-white">
+    <div ref={containerRef} className="relative min-h-screen bg-[#050505] text-[#f4f4f4] overflow-x-hidden selection:bg-cyan-500/30 font-sans">
       <Header />
 
-      {/* ═══════════════════════════════════════════
-          HERO — full-viewport, looping video bg
-          ═══════════════════════════════════════════ */}
-      <section ref={heroRef} className="relative min-h-screen flex items-center justify-center overflow-hidden">
-        {/* Video background — two layers cross-faded */}
-        <div className="absolute inset-0 z-0">
-          <video
-            autoPlay muted loop playsInline
-            className="absolute inset-0 w-full h-full object-cover"
-            style={{ filter: 'blur(6px) brightness(0.35) saturate(1.2)' }}
-            onCanPlayThrough={() => setVideoReady(true)}
+      {/* 
+        ═══════════════════════════════════════════
+        HERO SECTION (SCROLL SCRUBBED VIDEO)
+        ═══════════════════════════════════════════ 
+      */}
+      <section ref={heroRef} className="relative h-[200vh] w-full">
+        {/* Sticky viewport container */}
+        <div className="sticky top-0 h-screen w-full flex flex-col items-center justify-center overflow-hidden z-0">
+          
+          {/* Massive Background Typography */}
+          <motion.div 
+            style={{ y: heroTextY }}
+            className="absolute inset-0 flex items-center justify-center pointer-events-none z-0"
           >
-            <source src="/videos/sharp-demo-1.mp4" type="video/mp4" />
-          </video>
-
-          {/* Secondary video, offset blend */}
-          <video
-            autoPlay muted loop playsInline
-            className="absolute inset-0 w-full h-full object-cover mix-blend-screen opacity-20"
-            style={{ filter: 'blur(10px) hue-rotate(20deg)' }}
-          >
-            <source src="/videos/sharp-demo-2.mp4" type="video/mp4" />
-          </video>
-
-          {/* Gradient overlay for depth */}
-          <div className="absolute inset-0 bg-gradient-to-b from-gray-950/60 via-gray-950/30 to-gray-950" />
-          <div className="absolute inset-0 bg-gradient-to-r from-gray-950/50 via-transparent to-gray-950/50" />
-        </div>
-
-        <Particles />
-
-        {/* Scanline / grid texture */}
-        <div
-          className="absolute inset-0 pointer-events-none z-[1] opacity-[0.04]"
-          style={{
-            backgroundImage:
-              'linear-gradient(rgba(255,255,255,0.06) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.06) 1px, transparent 1px)',
-            backgroundSize: '64px 64px',
-          }}
-        />
-
-        {/* Hero content */}
-        <motion.div
-          className="relative z-10 text-center px-6 max-w-5xl mx-auto"
-          style={{ scale: heroScale, opacity: heroOpacity }}
-        >
-          {/* Status badge */}
-          <motion.div
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 }}
-            className="inline-flex items-center gap-2.5 px-5 py-2 rounded-full bg-cyan-500/10 border border-cyan-500/20 backdrop-blur-md mb-8"
-          >
-            <span className="relative flex h-2.5 w-2.5">
-              <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75 animate-ping" />
-              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-400" />
-            </span>
-            <span className="text-sm font-medium text-cyan-200 tracking-wide">Only free browser-based SHARP implementation</span>
+            <h1 className="text-[20vw] leading-none font-black tracking-tighter text-white/[0.04] whitespace-nowrap select-none">
+              ML-SHARP
+            </h1>
           </motion.div>
 
-          {/* Title */}
-          <motion.h1
-            initial={{ opacity: 0, y: 28 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.45 }}
-            className="text-6xl sm:text-7xl md:text-[5.5rem] font-extrabold leading-[0.95] tracking-tight mb-6"
-          >
-            <span className="bg-gradient-to-r from-white via-cyan-100 to-white bg-clip-text text-transparent drop-shadow-lg">
-              SHARP
-            </span>
-            <br className="md:hidden" />
-            <span className="ml-2 md:ml-5 text-cyan-400 drop-shadow-[0_0_30px_rgba(34,211,238,0.35)]">3D</span>
-          </motion.h1>
-
-          <motion.p
-            initial={{ opacity: 0, y: 24 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.6 }}
-            className="text-xl md:text-2xl text-gray-300 font-light max-w-3xl mx-auto mb-4 leading-relaxed"
-          >
-            Turn any photograph into a <strong className="text-white font-semibold">3D Gaussian Splat</strong> —
-            right in your browser, under 10 seconds.
-          </motion.p>
-
-          <motion.p
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.75 }}
-            className="text-base text-gray-500 mb-10 max-w-2xl mx-auto"
-          >
-            Powered by Apple's SHARP neural network &amp; Depth&nbsp;Anything&nbsp;V2.
-            No uploads, no servers, no sign-up.
-          </motion.p>
-
-          {/* CTA row */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.9 }}
-            className="flex flex-col sm:flex-row gap-4 justify-center items-center"
-          >
-            <Link
-              to="/sharp"
-              className="group relative px-10 py-4 rounded-xl text-lg font-bold overflow-hidden transition-transform hover:scale-[1.04] active:scale-[0.97]"
+          {/* Single High-Fidelity Video Layer (Scrubbed via Scroll) */}
+          <div className="relative z-10 w-[90vw] h-[60vh] md:w-[70vw] md:h-[75vh] rounded-3xl overflow-hidden shadow-[0_0_120px_rgba(6,182,212,0.15)] border border-white/10 bg-[#0a0a0a]">
+            <video 
+              autoPlay
+              loop
+              muted 
+              playsInline 
+              className="absolute inset-0 w-full h-full object-cover opacity-90 mix-blend-screen"
+              style={{ filter: 'brightness(0.6) contrast(1.1)' }}
             >
-              <div className="absolute inset-0 bg-gradient-to-r from-cyan-500 to-teal-500 group-hover:from-cyan-400 group-hover:to-teal-400 transition-all" />
-              <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.15),transparent_70%)]" />
-              <span className="relative flex items-center gap-2 text-gray-950">
-                <span className="material-symbols-outlined text-xl">auto_awesome</span>
-                Generate 3D Now
-              </span>
-            </Link>
-            <a
-              href="https://apple.github.io/ml-sharp/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="px-8 py-4 rounded-xl text-lg font-semibold bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 backdrop-blur-sm transition-all text-gray-300 hover:text-white"
-            >
-              Read the Research →
-            </a>
-          </motion.div>
-        </motion.div>
-
-        {/* Scroll cue */}
-        <motion.div
-          className="absolute bottom-8 left-1/2 -translate-x-1/2 z-10"
-          animate={{ y: [0, 10, 0] }}
-          transition={{ duration: 2.4, repeat: Infinity, ease: 'easeInOut' }}
-        >
-          <div className="w-6 h-10 rounded-full border-2 border-gray-500/50 flex justify-center pt-2">
-            <div className="w-1 h-2 bg-gray-400 rounded-full" />
-          </div>
-        </motion.div>
-      </section>
-
-      {/* ═══════════════════════════════════════════
-          STATS BAR
-          ═══════════════════════════════════════════ */}
-      <section className="relative z-10 -mt-20 px-6">
-        <div className="max-w-5xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-px rounded-2xl overflow-hidden border border-white/[0.06] bg-white/[0.03] backdrop-blur-xl shadow-2xl shadow-black/40">
-          {[
-            { value: 1180000, suffix: '', label: 'Gaussian Splats', extra: 'per generation' },
-            { value: 10, suffix: 's', label: 'Average Time', extra: 'on modern GPU' },
-            { value: 0, suffix: '', label: 'Server Uploads', extra: '100% client-side' },
-            { value: 100, suffix: '%', label: 'Free Forever', extra: 'no account needed' },
-          ].map((s, i) => (
-            <div key={i} className="px-6 py-7 text-center bg-gray-950/60 border-r border-b border-white/[0.04] last:border-r-0">
-              <p className="text-2xl md:text-3xl font-bold text-white tabular-nums">
-                {s.value === 0 ? '0' : <AnimatedCounter target={s.value} suffix={s.suffix} />}
-              </p>
-              <p className="text-sm font-medium text-gray-400 mt-1">{s.label}</p>
-              <p className="text-[11px] text-gray-600 mt-0.5">{s.extra}</p>
+              <source src="/videos/sharp-demo-1.mp4" type="video/mp4" />
+            </video>
+            
+            {/* Vignette overlay */}
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_30%,rgba(0,0,0,0.9)_100%)] pointer-events-none" />
+            
+            {/* Call to action inside video frame */}
+            <div className="absolute inset-0 flex flex-col items-center justify-center pb-24 pointer-events-none">
+               <h2 className="text-4xl md:text-7xl font-bold tracking-tight mb-2 text-white text-center drop-shadow-[0_4px_30px_rgba(0,0,0,0.9)]">
+                  Upload. <span className="font-serif italic font-normal text-cyan-200">Generate.</span>
+               </h2>
+               <p className="text-lg md:text-xl text-gray-300 font-light drop-shadow-xl mt-4 max-w-lg text-center">
+                 Convert any single photograph into a perfect 3D Gaussian Splat in seconds.
+               </p>
             </div>
-          ))}
+          </div>
+          
+          <div className="absolute bottom-32 left-1/2 -translate-x-1/2 z-30 pointer-events-auto">
+             <Link
+                to="/sharp"
+                className="group relative inline-flex items-center justify-center px-10 py-5 rounded-full bg-white text-black font-extrabold uppercase tracking-widest text-sm overflow-hidden shadow-[0_0_40px_rgba(6,182,212,0.4)] hover:shadow-[0_0_80px_rgba(6,182,212,0.8)] transition-all duration-500 transform hover:scale-105"
+              >
+                <div className="absolute inset-0 bg-gradient-to-r from-cyan-400 to-teal-400 translate-y-[100%] group-hover:translate-y-0 transition-transform duration-500 ease-[0.16,1,0.3,1]" />
+                <span className="relative z-10 flex items-center gap-3 group-hover:text-white transition-colors duration-500">
+                  Generate 3D Now
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                  </svg>
+                </span>
+              </Link>
+          </div>
+
+          {/* Scroll Indicator */}
+          <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center gap-3 opacity-50 pointer-events-none">
+            <span className="text-[9px] uppercase tracking-[0.3em] font-mono">Scroll to explore</span>
+            <motion.div 
+              animate={{ height: ["0%", "100%", "0%"], y: ["-100%", "0%", "100%"] }}
+              transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+              className="w-px h-16 bg-white overflow-hidden origin-top"
+            />
+          </div>
+
         </div>
       </section>
 
-      {/* ═══════════════════════════════════════════
-          HOW IT WORKS
-          ═══════════════════════════════════════════ */}
-      <section className="py-28 px-6 relative">
-        <div className="max-w-6xl mx-auto">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            className="text-center mb-20"
-          >
-            <p className="text-sm font-bold tracking-[0.2em] uppercase text-cyan-400 mb-3">Workflow</p>
-            <h2 className="text-4xl md:text-5xl font-bold text-white">
-              Three Steps to 3D
-            </h2>
-          </motion.div>
+      {/* 
+        ═══════════════════════════════════════════
+        INTRO REVEAL AREA (VISION SECTION)
+        ═══════════════════════════════════════════ 
+      */}
+      <section ref={introRef} className="relative z-10 bg-[#050505] min-h-screen flex items-center border-t border-white/5 overflow-hidden">
+        
+        {/* Second Video prominent background */}
+        <div className="absolute inset-0 z-0 pointer-events-none opacity-40">
+           <video 
+             autoPlay
+             loop
+             muted 
+             playsInline 
+             className="absolute inset-0 w-full h-full object-cover grayscale-[20%]"
+           >
+             <source src="/videos/sharp-demo-2.mp4" type="video/mp4" />
+           </video>
+           <div className="absolute inset-0 bg-gradient-to-r from-black via-black/80 to-transparent" />
+        </div>
 
-          <div className="grid md:grid-cols-3 gap-8 relative">
-            {/* Connector line */}
-            <div className="hidden md:block absolute top-24 left-[16.6%] right-[16.6%] h-px bg-gradient-to-r from-transparent via-cyan-500/30 to-transparent" />
-
-            {[
-              { num: '01', title: 'Upload a Photo', desc: 'Any photograph — landscape, object, building, face. Drop it in and SHARP reads the geometry from a single view.', icon: 'upload_file', accent: 'cyan' },
-              { num: '02', title: 'Neural Depth', desc: 'Depth Anything V2 runs entirely in your browser. No image ever leaves your device. The neural net predicts per-pixel depth in real time.', icon: 'psychology', accent: 'teal' },
-              { num: '03', title: 'Explore in 3D', desc: 'Over a million Gaussian splats are projected into 3D space. Rotate, zoom, pan — then download the PLY file for any renderer.', icon: 'view_in_ar', accent: 'emerald' },
-            ].map((step, i) => (
-              <motion.div
-                key={i}
-                initial={{ opacity: 0, y: 30 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: i * 0.12 }}
-                className="relative group"
-              >
-                <div className="relative bg-gray-900/60 backdrop-blur-sm border border-white/[0.06] rounded-2xl p-8 h-full hover:border-cyan-500/20 transition-all duration-500">
-                  {/* Step number */}
-                  <div className="absolute -top-5 left-8 text-[4rem] font-black leading-none text-white/[0.04] select-none">{step.num}</div>
-
-                  {/* Icon */}
-                  <div className={`w-14 h-14 rounded-xl bg-${step.accent}-500/10 border border-${step.accent}-500/20 flex items-center justify-center mb-5 group-hover:scale-110 transition-transform`}>
-                    <span className={`material-symbols-outlined text-2xl text-${step.accent}-400`}>{step.icon}</span>
-                  </div>
-
-                  <h3 className="text-xl font-bold text-white mb-3">{step.title}</h3>
-                  <p className="text-gray-400 leading-relaxed text-[15px]">{step.desc}</p>
-                </div>
-              </motion.div>
-            ))}
+        <div className="relative z-10 max-w-6xl mx-auto px-6 py-32 grid md:grid-cols-12 gap-12">
+          <div className="md:col-span-5 flex flex-col justify-center">
+            <FadeUpText>
+              <h3 className="text-sm tracking-[0.2em] text-cyan-400 uppercase mb-6 font-mono font-bold">Monocular Inference</h3>
+              <p className="text-4xl md:text-6xl font-normal leading-tight tracking-tight mb-8">
+                From a single <br/><span className="italic font-serif text-gray-500">photograph.</span>
+              </p>
+            </FadeUpText>
+          </div>
+          <div className="md:col-span-1" />
+          <div className="md:col-span-6 flex flex-col justify-center">
+             <FadeUpText delay={0.2}>
+              <p className="text-xl md:text-2xl text-gray-400 font-light leading-relaxed mb-10">
+                Turn any static 2D image into an explorable 3D Gaussian Splat scene right from your browser. Apple's ML-SHARP network predicts photorealistic novel views in seconds.
+              </p>
+            </FadeUpText>
+            <FadeUpText delay={0.3}>
+              <p className="text-lg text-gray-500 font-light leading-relaxed mb-10">
+                The geometry is reconstructed privately on your device utilizing Depth Anything V2. Zero cloud uploads, infinite spatial possibilities.
+              </p>
+            </FadeUpText>
           </div>
         </div>
       </section>
 
-      {/* ═══════════════════════════════════════════
-          TECHNOLOGY
-          ═══════════════════════════════════════════ */}
-      <section className="py-24 px-6 bg-gradient-to-b from-transparent via-cyan-950/[0.07] to-transparent">
-        <div className="max-w-6xl mx-auto">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            className="text-center mb-16"
-          >
-            <p className="text-sm font-bold tracking-[0.2em] uppercase text-teal-400 mb-3">Under the Hood</p>
-            <h2 className="text-4xl md:text-5xl font-bold text-white">Built on Cutting-Edge Research</h2>
-          </motion.div>
+      {/* 
+        ═══════════════════════════════════════════
+        HORIZONTAL SCROLL HIJACK SECTION (WAT WE DOEN analog)
+        ═══════════════════════════════════════════ 
+      */}
+      <section ref={horizontalRef} className="relative h-[400vh] bg-[#020202]">
+        {/* Sticky Container */}
+        <div className="sticky top-0 h-screen w-full flex flex-col justify-center overflow-hidden">
+          
+          {/* Dynamic Background Area */}
+          <div className="absolute inset-0 z-0 pointer-events-none bg-black">
+            {/* Background Texture/Gradient Overlay */}
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(6,182,212,0.15)_0%,rgba(0,0,0,0.8)_80%)] z-10" />
+          </div>
 
-          <div className="grid md:grid-cols-2 gap-8">
-            {/* Gaussian Splatting card */}
-            <motion.div
-              initial={{ opacity: 0, x: -40 }}
-              whileInView={{ opacity: 1, x: 0 }}
-              viewport={{ once: true }}
-              className="bg-gray-900/50 backdrop-blur-sm rounded-2xl border border-white/[0.06] p-8"
+          <div className="absolute top-[15%] left-10 md:left-24 z-10 pointer-events-none">
+            <h3 className="text-[100px] md:text-[200px] font-black tracking-tighter text-white/[0.03]">PROCESS</h3>
+          </div>
+
+          <div className="relative z-20 px-10 md:px-24 mb-6 max-w-7xl mx-auto w-full">
+            <p className="text-sm font-bold tracking-[0.2em] uppercase text-cyan-400 mb-4 font-mono">Workflow</p>
+            <h2 className="text-5xl md:text-7xl font-normal tracking-tight">Image to 3D.</h2>
+          </div>
+
+          {/* Horizontal Track Container */}
+          <div className="relative z-20 overflow-hidden w-full h-[65vh]">
+            <motion.div 
+              style={{ x: xTransform }}
+              className="absolute top-0 left-0 flex w-[200%] md:w-[220%] h-full items-center px-10 md:px-24"
             >
-              <h3 className="text-xl font-bold text-cyan-400 mb-4 flex items-center gap-2">
-                <span className="material-symbols-outlined text-2xl">blur_on</span>
-                3D Gaussian Splatting
-              </h3>
-              <p className="text-gray-400 mb-5 leading-relaxed">
-                Scenes are represented as millions of oriented 3D Gaussians — each with position, rotation, anisotropic scale, color (spherical harmonics), and opacity.
-                The result renders in real-time via differentiable rasterization.
-              </p>
-              <div className="grid grid-cols-2 gap-3">
-                {['Photorealistic synthesis', 'Complex materials', 'Real-time WebGL', 'Compact PLY files'].map((t, i) => (
-                  <div key={i} className="flex items-center gap-2 text-sm text-gray-300">
-                    <span className="material-symbols-outlined text-cyan-500 text-base">check_circle</span>
-                    {t}
-                  </div>
-                ))}
+              {/* ITEM 1 */}
+              <div className="w-1/3 h-full flex items-center justify-start pr-12 md:pr-20 group">
+                 <div className="relative w-full border-l-[1px] border-white/10 pl-10 md:pl-16 hover:border-cyan-400 transition-colors duration-500 py-4">
+                   <div className="absolute -left-5 -top-4 text-[80px] font-serif italic text-white/5 select-none pointer-events-none group-hover:text-cyan-400/20 transition-colors duration-500 leading-none">01</div>
+                   <h3 className="text-4xl md:text-5xl font-bold mb-4 text-white tracking-tight">Upload Your <br/><span className="text-gray-500 font-normal">Photo.</span></h3>
+                   <p className="text-gray-400 text-lg md:text-xl leading-relaxed max-w-xl">
+                     Start with any 2D image. Our client-side pipeline instantly ingests the photograph, keeping the original image completely private on your machine—zero server uploads required.
+                   </p>
+                 </div>
+              </div>
+
+              {/* ITEM 2 */}
+              <div className="w-1/3 h-full flex items-center justify-start pr-12 md:pr-20 group">
+                 <div className="relative w-full border-l-[1px] border-white/10 pl-10 md:pl-16 hover:border-teal-400 transition-colors duration-500 py-4">
+                   <div className="absolute -left-5 -top-4 text-[80px] font-serif italic text-white/5 select-none pointer-events-none group-hover:text-teal-400/20 transition-colors duration-500 leading-none">02</div>
+                   <h3 className="text-4xl md:text-5xl font-bold mb-4 text-white tracking-tight">Apple <br/><span className="text-gray-500 font-normal">ML-SHARP.</span></h3>
+                   <p className="text-gray-400 text-lg md:text-xl leading-relaxed max-w-xl">
+                     Apple's ML-SHARP network dynamically runs monocular inference, taking the geometric backbone from Depth Anything V2 to generate up to 1.18 million 3D Gaussian Splats natively.
+                   </p>
+                 </div>
+              </div>
+
+              {/* ITEM 3 */}
+              <div className="w-1/3 h-full flex items-center justify-start pr-12 md:pr-20 group">
+                 <div className="relative w-full border-l-[1px] border-white/10 pl-10 md:pl-16 hover:border-blue-400 transition-colors duration-500 py-4">
+                   <div className="absolute -left-5 -top-4 text-[80px] font-serif italic text-white/5 select-none pointer-events-none group-hover:text-blue-400/20 transition-colors duration-500 leading-none">03</div>
+                   <h3 className="text-4xl md:text-5xl font-bold mb-4 text-white tracking-tight">WebGL <br/><span className="text-gray-500 font-normal">Interactive.</span></h3>
+                   <p className="text-gray-400 text-lg md:text-xl leading-relaxed max-w-xl">
+                     Watch the splats populate instantly in our high-performance WebGL viewer. Fly around your new 3D spatial reality or download the standard `.ply` file immediately.
+                   </p>
+                 </div>
               </div>
             </motion.div>
-
-            {/* SHARP Neural Network card */}
-            <motion.div
-              initial={{ opacity: 0, x: 40 }}
-              whileInView={{ opacity: 1, x: 0 }}
-              viewport={{ once: true }}
-              className="bg-gray-900/50 backdrop-blur-sm rounded-2xl border border-white/[0.06] p-8"
-            >
-              <h3 className="text-xl font-bold text-teal-400 mb-4 flex items-center gap-2">
-                <span className="material-symbols-outlined text-2xl">neurology</span>
-                SHARP Neural Network
-              </h3>
-              <p className="text-gray-400 mb-5 leading-relaxed">
-                Apple's SHARP model performs monocular view synthesis — predicting 3D structure from a single 2D image.
-                Combined with Depth Anything V2, it achieves state-of-the-art depth estimation that runs entirely in your browser.
-              </p>
-              <div className="grid grid-cols-2 gap-3 text-sm">
-                {[
-                  { k: 'Architecture', v: 'DINOv2 ViT-L/16' },
-                  { k: 'Resolution', v: 'Up to 1536px' },
-                  { k: 'Output', v: '~1.18M Splats' },
-                  { k: 'Runtime', v: 'WebGPU / WASM' },
-                ].map((item, i) => (
-                  <div key={i} className="bg-gray-800/50 rounded-lg p-3">
-                    <p className="text-[11px] text-gray-500 uppercase tracking-wider">{item.k}</p>
-                    <p className="text-white font-medium mt-0.5">{item.v}</p>
-                  </div>
-                ))}
-              </div>
-            </motion.div>
           </div>
+
+          {/* Progress Indicator */}
+          <div className="absolute bottom-16 right-10 md:right-24 z-20 flex gap-6 items-center">
+             <div className="text-2xl font-mono font-bold tracking-widest text-white">
+               0{activeIndex + 1} <span className="text-white/20 font-light">/ 03</span>
+             </div>
+             <div className="w-48 h-[2px] bg-white/10 relative hidden md:block overflow-hidden">
+                <motion.div 
+                  className="absolute top-0 left-0 h-full bg-cyan-400 transition-all duration-300 ease-out"
+                  style={{ width: `${((activeIndex + 1) / 3) * 100}%` }}
+                />
+             </div>
+          </div>
+
         </div>
       </section>
 
-      {/* ═══════════════════════════════════════════
-          USE CASES
-          ═══════════════════════════════════════════ */}
-      <section className="py-24 px-6">
-        <div className="max-w-6xl mx-auto">
-          <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="text-center mb-16">
-            <p className="text-sm font-bold tracking-[0.2em] uppercase text-emerald-400 mb-3">Applications</p>
-            <h2 className="text-4xl md:text-5xl font-bold text-white">Built For Creators</h2>
-          </motion.div>
-
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
-            {[
-              { title: 'Virtual Tours', desc: 'Create walkthrough experiences from real-estate photos.', icon: 'travel_explore' },
-              { title: 'Product Visualization', desc: 'Let customers inspect products from every angle.', icon: 'inventory_2' },
-              { title: 'Cultural Heritage', desc: 'Digitize historical sites with photorealistic 3D.', icon: 'account_balance' },
-              { title: 'Game Assets', desc: 'Generate 3D reference geometry from concept art.', icon: 'sports_esports' },
-              { title: 'Research', desc: 'Explore depth estimation and novel-view synthesis.', icon: 'science' },
-              { title: 'Digital Art', desc: 'Turn paintings and illustrations into explorable 3D worlds.', icon: 'palette' },
-            ].map((c, i) => (
-              <motion.div
-                key={i}
-                initial={{ opacity: 0, y: 24 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: i * 0.06 }}
-                className="flex items-start gap-4 p-5 rounded-xl bg-gray-900/40 border border-white/[0.04] hover:border-cyan-500/15 transition-all"
-              >
-                <div className="w-10 h-10 shrink-0 rounded-lg bg-cyan-500/10 flex items-center justify-center">
-                  <span className="material-symbols-outlined text-cyan-400">{c.icon}</span>
-                </div>
-                <div>
-                  <h4 className="font-semibold text-white mb-1">{c.title}</h4>
-                  <p className="text-sm text-gray-400 leading-relaxed">{c.desc}</p>
-                </div>
-              </motion.div>
-            ))}
-          </div>
+      {/* 
+        ═══════════════════════════════════════════
+        CLOSING CTA SECTION
+        ═══════════════════════════════════════════ 
+      */}
+      <section className="relative z-10 py-52 bg-[#050505] flex justify-center border-t border-white/5">
+        <div className="max-w-5xl text-center px-6">
+          <FadeUpText>
+             <h2 className="text-5xl md:text-[7rem] font-bold tracking-tighter mb-10 leading-none text-white drop-shadow-2xl">
+               GENERATE THE<br/><span className="italic font-serif text-cyan-200">ENVIRONMENT.</span>
+             </h2>
+          </FadeUpText>
+          <FadeUpText delay={0.2}>
+             <p className="text-xl md:text-2xl text-gray-300 mb-16 max-w-3xl mx-auto font-light leading-relaxed">
+               Ditch the server queues. Upload your photograph and convert it to a full 3D gaussian splat using <strong className="text-white font-semibold">Apple ML-SHARP</strong>—for free, in seconds, privately on your device.
+             </p>
+          </FadeUpText>
+          <FadeUpText delay={0.3}>
+            <Link
+               to="/sharp"
+               className="group relative inline-flex items-center justify-center px-14 py-6 rounded-full overflow-hidden border border-cyan-400 bg-cyan-500/10 hover:bg-cyan-500/20 backdrop-blur-md transition-all cursor-pointer shadow-[0_0_50px_rgba(6,182,212,0.2)] hover:shadow-[0_0_80px_rgba(6,182,212,0.5)]"
+             >
+               <span className="relative z-10 flex items-center gap-3 font-bold uppercase tracking-[0.2em] text-cyan-50 text-base">
+                 Upload Photo <span className="material-symbols-outlined text-xl group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform">north_east</span>
+               </span>
+               <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity bg-[radial-gradient(circle_at_center,rgba(6,182,212,0.4),transparent_70%)]" />
+             </Link>
+          </FadeUpText>
         </div>
-      </section>
-
-      {/* ═══════════════════════════════════════════
-          OUTPUT SPECS
-          ═══════════════════════════════════════════ */}
-      <section className="py-20 px-6">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          className="max-w-4xl mx-auto bg-gradient-to-r from-gray-900 via-gray-900/80 to-gray-900 border border-white/[0.06] rounded-2xl p-8 md:p-10"
-        >
-          <h3 className="text-2xl font-bold text-white mb-6 text-center">Output Specification</h3>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
-            {[
-              { label: 'Format', value: 'PLY (Binary)' },
-              { label: 'Color', value: 'sRGB' },
-              { label: 'Typical Size', value: '60 – 80 MB' },
-              { label: 'Coords', value: 'OpenCV (y-down)' },
-            ].map((s, i) => (
-              <div key={i} className="bg-gray-800/40 rounded-lg p-4">
-                <p className="text-[10px] uppercase tracking-widest text-gray-500 mb-1">{s.label}</p>
-                <p className="text-white font-medium">{s.value}</p>
-              </div>
-            ))}
-          </div>
-          <p className="text-center text-gray-500 text-sm mt-6">
-            Works with Anemoia's built-in 3D Splat Viewer and all standard Gaussian Splat renderers.
-          </p>
-        </motion.div>
-      </section>
-
-      {/* ═══════════════════════════════════════════
-          FINAL CTA
-          ═══════════════════════════════════════════ */}
-      <section className="relative py-32 px-6 overflow-hidden">
-        {/* Ambient glow */}
-        <div className="absolute inset-0 pointer-events-none">
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full bg-cyan-600/[0.07] blur-[120px]" />
-        </div>
-
-        <motion.div
-          initial={{ opacity: 0, y: 24 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          className="relative z-10 max-w-3xl mx-auto text-center"
-        >
-          <h2 className="text-4xl md:text-5xl font-bold mb-6 text-white">
-            Ready to Build in 3D?
-          </h2>
-          <p className="text-xl text-gray-400 mb-10 max-w-xl mx-auto leading-relaxed">
-            Drop a photo, wait a few seconds, explore your scene from any angle. Entirely free, entirely private.
-          </p>
-          <Link
-            to="/sharp"
-            className="group inline-flex items-center gap-3 px-12 py-5 rounded-xl text-xl font-bold bg-gradient-to-r from-cyan-500 to-teal-500 text-gray-950 shadow-2xl shadow-cyan-500/20 hover:shadow-cyan-500/40 hover:scale-[1.04] transition-all"
-          >
-            <span className="material-symbols-outlined text-2xl group-hover:rotate-12 transition-transform">rocket_launch</span>
-            Launch SHARP 3D
-          </Link>
-
-          <p className="text-gray-600 text-sm mt-10">
-            Based on{' '}
-            <a href="https://apple.github.io/ml-sharp/" target="_blank" rel="noopener noreferrer" className="text-gray-500 hover:text-cyan-400 underline underline-offset-2 transition-colors">
-              Mescheder et al., 2025
-            </a>{' '}
-            — "SHARP: Monocular View Synthesis in Less Than a Second"
-          </p>
-        </motion.div>
       </section>
 
       <Footer />

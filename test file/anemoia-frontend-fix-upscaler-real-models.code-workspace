@@ -1,0 +1,13 @@
+{
+	"folders": [
+		{
+			"path": ".."
+		},
+		{
+			"path": "../../../anemoia-backend"
+		}
+	],
+	"settings": {
+		"powershell.cwd": "anemoia-frontend-fix-upscaler-real-models"
+	}
+}

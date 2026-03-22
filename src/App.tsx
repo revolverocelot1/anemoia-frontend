@@ -23,7 +23,7 @@ import ImageComparisonPage from './pages/ImageComparisonPage';
 import ImageComparisonResultsPage from './pages/ImageComparisonResultsPage';
 import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
 import TermsOfServicePage from './pages/TermsOfServicePage';
-import SplatViewerPage from './pages/SplatViewerPage';
+import RadiaViewerPage from './pages/RadiaViewerPage';
 import TestPage from './pages/TestPage';
 import AnimeVideoToCodePage from './pages/AnimeVideoToCodePage';
 // TPoseToolPage shelved - incomplete
@@ -45,6 +45,7 @@ import SupportPage from './pages/SupportPage'
 import AdminSupportPage from './pages/AdminSupportPage'
 import AdminDashboardPage from './pages/AdminDashboardPage'
 import GeminiImageChatPage from './pages/GeminiImageChatPage'
+import PromoAd from './components/PromoAd'
 
 // Lazy load SubtitlePage to prevent ONNX runtime conflicts on app startup
 const SubtitlePage = lazy(() => import('./pages/SubtitlePageEnhanced'));
@@ -543,7 +544,7 @@ function App() {
               path="/splat-viewer"
               element={
                 <AnimatedPage>
-                  <SplatViewerPage />
+                  <RadiaViewerPage />
                 </AnimatedPage>
               }
             />
@@ -693,6 +694,44 @@ function App() {
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </SupabaseAuthProvider>
+        <div className="absolute bottom-0 left-0 w-full pointer-events-none z-[40]">
+          {/* Ad Container literally attached to the App's bottom DOM flow */}
+          <div className="absolute bottom-6 left-6 flex flex-col items-start">
+            <div className="pointer-events-auto flex flex-col">
+              {/* ML-SHARP Global Ad - blocked on specific routes */}
+              <PromoAd 
+                id="ml-sharp"
+                videoSrc="/videos/sharp-demo-1.mp4"
+                targetUrl="/sharp/landing"
+                tagline="Try Apple ML-SHARP"
+                title="Turn any image into a 3D Gaussian Splat"
+                subtitle="100% private. Browser-based. Generate in seconds."
+                ctaText="Generate 3D Now"
+                blocklist={[
+                  '/', 
+                  '/splat-viewer/landing', 
+                  '/sharp/landing', 
+                  '/splat-viewer', 
+                  '/radia-viewer', 
+                  '/sharp'
+                ]}
+              />
+
+              {/* ASCII Video Converter Ad - ONLY on the /sharp tool page */}
+              <PromoAd 
+                id="ascii-converter"
+                videoSrc="/videos/ascii-demo-video.mp4"
+                targetUrl="/ascii-video-converter/landing"
+                tagline="New Tool"
+                title="Convert any video to ASCII Art"
+                subtitle="Real-time browser rendering. 100% private."
+                ctaText="Try ASCII Converter"
+                allowlist={['/sharp']}
+              />
+            </div>
+          </div>
+        </div>
+
         {/* CoffeeDonation shelved - buymeacoffee link expired */}
       </div>
     </ErrorBoundary>

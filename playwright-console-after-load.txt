@@ -1,0 +1,172 @@
+Total messages: 177 (Errors: 2, Warnings: 1)
+Returning 169 messages for level "info"
+
+[LOG] ONNX Runtime patch applied - allowing first backend registrations @ http://localhost:5173/src/utils/onnx-patch.ts:64
+[INFO] %cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold @ http://localhost:5173/node_modules/.vite/deps/chunk-6W5FFVKH.js?v=483e8454:21550
+[LOG] Three.js modules loaded: {three: true, r3f: true, drei: true} @ http://localhost:5173/src/main.tsx:27
+[WARNING] The powerPreference option is currently ignored when calling requestAdapter() on Windows. See https://crbug.com/369219127 @ http://localhost:5173/src/utils/gpuUtils.ts:162
+[LOG] Initial 3D background state: {saved: null, isProduction: false, defaultValue: true, hostname: localhost} @ http://localhost:5173/src/App.tsx:92
+[LOG] Initial 3D background state: {saved: null, isProduction: false, defaultValue: true, hostname: localhost} @ http://localhost:5173/src/App.tsx:92
+[LOG] Checking URL for auth tokens: {hash: , accessToken: not found, refreshToken: not found, allParams: Array(0)} @ http://localhost:5173/src/context/SupabaseAuthContext.tsx:41
+[LOG] Deployment Environment: {userAgent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWeb…KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36, platform: Win32, vendor: Google Inc., language: en-US, onLine: true} @ http://localhost:5173/src/utils/gpuUtils.ts:373
+[LOG] Starting GPU detection... @ http://localhost:5173/src/utils/gpuUtils.ts:245
+[LOG] WebGL Info: {webGLVersion: 2, webGLContext: webgl2, vendor: WebKit, renderer: WebKit WebGL, unmaskedVendor: Google Inc. (Intel)} @ http://localhost:5173/src/utils/gpuUtils.ts:285
+[LOG] App environment: {hostname: localhost, isProduction: false, show3DBackground: true, backgroundType: solar, threeLoaded: true} @ http://localhost:5173/src/App.tsx:128
+[LOG] Three.js modules are ready! @ http://localhost:5173/src/App.tsx:147
+[LOG] Checking URL for auth tokens: {hash: , accessToken: not found, refreshToken: not found, allParams: Array(0)} @ http://localhost:5173/src/context/SupabaseAuthContext.tsx:41
+[LOG] Deployment Environment: {userAgent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWeb…KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36, platform: Win32, vendor: Google Inc., language: en-US, onLine: true} @ http://localhost:5173/src/utils/gpuUtils.ts:373
+[LOG] Starting GPU detection... @ http://localhost:5173/src/utils/gpuUtils.ts:245
+[LOG] WebGL Info: {webGLVersion: 2, webGLContext: webgl2, vendor: WebKit, renderer: WebKit WebGL, unmaskedVendor: Google Inc. (Intel)} @ http://localhost:5173/src/utils/gpuUtils.ts:285
+[LOG] App environment: {hostname: localhost, isProduction: false, show3DBackground: true, backgroundType: solar, threeLoaded: true} @ http://localhost:5173/src/App.tsx:128
+[LOG] Three.js modules are ready! @ http://localhost:5173/src/App.tsx:147
+[LOG] WebGPU device acquired: GPUDevice @ http://localhost:5173/src/utils/gpuUtils.ts:170
+[LOG] WebGPU Adapter Info not supported in this browser @ http://localhost:5173/src/utils/gpuUtils.ts:179
+[LOG] WebGPU supported: true @ http://localhost:5173/src/utils/gpuUtils.ts:232
+[LOG] Enabled WebGL extension: EXT_texture_filter_anisotropic @ http://localhost:5173/src/utils/gpuUtils.ts:148
+[LOG] Enabled WebGL extension: OES_texture_float_linear @ http://localhost:5173/src/utils/gpuUtils.ts:148
+[LOG] Enabled WebGL extension: WEBGL_compressed_texture_s3tc @ http://localhost:5173/src/utils/gpuUtils.ts:148
+[LOG] GPU Detected: {tier: 1, type: integrated, vendor: Google Inc. (Intel), renderer: ANGLE (Intel, Intel(R) UHD Graphics (0x00009BA4) Direct3D11 vs_5_0 ps_5_0, D3D11), unmaskedVendor: Google Inc. (Intel)} @ http://localhost:5173/src/utils/gpuUtils.ts:84
+[LOG] GPU Memory Info: {totalJSHeapSize: 63707455, usedJSHeapSize: 53093995, jsHeapSizeLimit: 4294967296} @ http://localhost:5173/src/utils/gpuUtils.ts:240
+[LOG] GPU acceleration initialized @ http://localhost:5173/src/main.tsx:55
+[LOG] Three.js modules are ready! @ http://localhost:5173/src/App.tsx:147
+[LOG] Three.js modules are ready! @ http://localhost:5173/src/App.tsx:147
+[LOG] GPU Tier Detection: {device: undefined, fps: 65, gpu: intel corporation uhd, isMobile: false, tier: 3} @ http://localhost:5173/src/utils/gpuUtils.ts:298
+[LOG] GPU Detection Complete: {tier: 3, type: BENCHMARK, fps: 65, device: undefined, renderer: intel corporation uhd} @ http://localhost:5173/src/App.tsx:117
+[LOG] GPU Tier Detection: {device: undefined, fps: 65, gpu: intel corporation uhd, isMobile: false, tier: 3} @ http://localhost:5173/src/utils/gpuUtils.ts:298
+[LOG] GPU Detection Complete: {tier: 3, type: BENCHMARK, fps: 65, device: undefined, renderer: intel corporation uhd} @ http://localhost:5173/src/App.tsx:117
+[LOG] Auth state changed: INITIAL_SESSION undefined @ http://localhost:5173/src/context/SupabaseAuthContext.tsx:77
+[LOG] R3FCanvas mounted and rendering @ http://localhost:5173/src/three/R3FCanvas.tsx:25
+[LOG] Available backgrounds: {SolarSystemBackground: true} @ http://localhost:5173/src/three/R3FCanvas.tsx:26
+[LOG] Starting GPU detection... @ http://localhost:5173/src/utils/gpuUtils.ts:245
+[LOG] WebGL Info: {webGLVersion: 2, webGLContext: webgl2, vendor: WebKit, renderer: WebKit WebGL, unmaskedVendor: Google Inc. (Intel)} @ http://localhost:5173/src/utils/gpuUtils.ts:285
+[LOG] [SharpPage] Preloading Depth Anything V2 neural network... @ http://localhost:5173/src/pages/SharpPage.tsx:597
+[LOG] R3FCanvas unmounted @ http://localhost:5173/src/three/R3FCanvas.tsx:40
+[LOG] R3FCanvas mounted and rendering @ http://localhost:5173/src/three/R3FCanvas.tsx:25
+[LOG] Available backgrounds: {SolarSystemBackground: true} @ http://localhost:5173/src/three/R3FCanvas.tsx:26
+[LOG] Starting GPU detection... @ http://localhost:5173/src/utils/gpuUtils.ts:245
+[LOG] WebGL Info: {webGLVersion: 2, webGLContext: webgl2, vendor: WebKit, renderer: WebKit WebGL, unmaskedVendor: Google Inc. (Intel)} @ http://localhost:5173/src/utils/gpuUtils.ts:285
+[LOG] [SharpPage] Preloading Depth Anything V2 neural network... @ http://localhost:5173/src/pages/SharpPage.tsx:597
+[LOG] [SharpPage] Service health: {status: ok, modelLoaded: true, device: demo, version: 1.0.0-demo} @ http://localhost:5173/src/pages/SharpPage.tsx:595
+[LOG] [SharpPage] Service health: {status: ok, modelLoaded: true, device: demo, version: 1.0.0-demo} @ http://localhost:5173/src/pages/SharpPage.tsx:595
+[LOG] GPU Tier Detection: {device: undefined, fps: 65, gpu: intel corporation uhd, isMobile: false, tier: 3} @ http://localhost:5173/src/utils/gpuUtils.ts:298
+[LOG] GPU Tier Detection: {device: undefined, fps: 65, gpu: intel corporation uhd, isMobile: false, tier: 3} @ http://localhost:5173/src/utils/gpuUtils.ts:298
+[LOG] Canvas created, WebGL context: WebGLRenderer @ http://localhost:5173/src/three/R3FCanvas.tsx:89
+[LOG] WebGL version: WebGL 2.0 (OpenGL ES 3.0 Chromium) @ http://localhost:5173/src/three/R3FCanvas.tsx:92
+[LOG] WebGL renderer: WebKit WebGL @ http://localhost:5173/src/three/R3FCanvas.tsx:93
+[LOG] WebGL vendor: WebKit @ http://localhost:5173/src/three/R3FCanvas.tsx:94
+[LOG] Planet Mercuria mounted @ http://localhost:5173/src/three/SolarSystemBackground.tsx:40
+[LOG] Planet Venusia mounted @ http://localhost:5173/src/three/SolarSystemBackground.tsx:40
+[LOG] Planet Terra Prime mounted @ http://localhost:5173/src/three/SolarSystemBackground.tsx:40
+[LOG] Planet Marsis mounted @ http://localhost:5173/src/three/SolarSystemBackground.tsx:40
+[LOG] Planet Jupitron mounted @ http://localhost:5173/src/three/SolarSystemBackground.tsx:40
+[LOG] Planet Saturnia mounted @ http://localhost:5173/src/three/SolarSystemBackground.tsx:40
+[LOG] Planet Uranova mounted @ http://localhost:5173/src/three/SolarSystemBackground.tsx:40
+[LOG] Planet Neptus mounted @ http://localhost:5173/src/three/SolarSystemBackground.tsx:40
+[LOG] Planet Plutonia mounted @ http://localhost:5173/src/three/SolarSystemBackground.tsx:40
+[LOG] Solar System: Using low performance mode @ http://localhost:5173/src/three/SolarSystemBackground.tsx:460
+[LOG] SolarSystemBackground mounted {renderer: WebGLRenderer, capabilities: Object, maxTextureSize: 16384, precision: highp, webGLVersion: 2} @ http://localhost:5173/src/three/SolarSystemBackground.tsx:461
+[LOG] WebGL render info: {memory: Object, render: Object, programs: 0} @ http://localhost:5173/src/three/SolarSystemBackground.tsx:471
+[LOG] [SharpPage] Neural depth model preloaded @ http://localhost:5173/src/pages/SharpPage.tsx:599
+[LOG] [SharpPage] Neural depth model preloaded @ http://localhost:5173/src/pages/SharpPage.tsx:599
+[ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:8000/api/analytics/track:0
+[LOG] [SharpService] Generating with mode: demo, gridSize: 768 @ http://localhost:5173/src/services/sharp.service.ts:167
+[LOG] [SharpService] EXIF library not loaded, skipping focal length extraction @ http://localhost:5173/src/services/sharp.service.ts:15
+[LOG] [SharpService] Sending to worker: gridSize=768, expected splats=589824 @ http://localhost:5173/src/services/sharp.service.ts:326
+[LOG] [SharpFileStore] Stored file: test-person-real_3d.ply (31.50 MB) @ http://localhost:5173/src/utils/sharpFileStore.ts:37
+[LOG] [SplatPreview3D] Loading progress: 6% @ http://localhost:5173/src/pages/SharpPage.tsx:309
+[LOG] [SplatPreview3D] Loading progress: 13% @ http://localhost:5173/src/pages/SharpPage.tsx:309
+[LOG] [SplatPreview3D] Loading progress: 19% @ http://localhost:5173/src/pages/SharpPage.tsx:309
+[LOG] [SplatPreview3D] Loading progress: 6% @ http://localhost:5173/src/pages/SharpPage.tsx:309
+[LOG] [SplatPreview3D] Loading progress: 13% @ http://localhost:5173/src/pages/SharpPage.tsx:309
+[LOG] [SplatPreview3D] Loading progress: 25% @ http://localhost:5173/src/pages/SharpPage.tsx:309
+[LOG] [SplatPreview3D] Loading progress: 32% @ http://localhost:5173/src/pages/SharpPage.tsx:309
+[LOG] [SplatPreview3D] Loading progress: 38% @ http://localhost:5173/src/pages/SharpPage.tsx:309
+[LOG] [SplatPreview3D] Loading progress: 44% @ http://localhost:5173/src/pages/SharpPage.tsx:309
+[LOG] [SplatPreview3D] Loading progress: 19% @ http://localhost:5173/src/pages/SharpPage.tsx:309
+[LOG] [SplatPreview3D] Loading progress: 25% @ http://localhost:5173/src/pages/SharpPage.tsx:309
+[LOG] [SplatPreview3D] Loading progress: 32% @ http://localhost:5173/src/pages/SharpPage.tsx:309
+[LOG] [SplatPreview3D] Loading progress: 38% @ http://localhost:5173/src/pages/SharpPage.tsx:309
+[LOG] [SplatPreview3D] Loading progress: 51% @ http://localhost:5173/src/pages/SharpPage.tsx:309
+[LOG] [SplatPreview3D] Loading progress: 57% @ http://localhost:5173/src/pages/SharpPage.tsx:309
+[LOG] [SplatPreview3D] Loading progress: 63% @ http://localhost:5173/src/pages/SharpPage.tsx:309
+[LOG] [SplatPreview3D] Loading progress: 70% @ http://localhost:5173/src/pages/SharpPage.tsx:309
+[LOG] [SplatPreview3D] Loading progress: 76% @ http://localhost:5173/src/pages/SharpPage.tsx:309
+[LOG] [SplatPreview3D] Loading progress: 83% @ http://localhost:5173/src/pages/SharpPage.tsx:309
+[LOG] [SplatPreview3D] Loading progress: 89% @ http://localhost:5173/src/pages/SharpPage.tsx:309
+[LOG] [SplatPreview3D] Loading progress: 95% @ http://localhost:5173/src/pages/SharpPage.tsx:309
+[LOG] [SplatPreview3D] Loading progress: 44% @ http://localhost:5173/src/pages/SharpPage.tsx:309
+[LOG] [SplatPreview3D] Loading progress: 51% @ http://localhost:5173/src/pages/SharpPage.tsx:309
+[LOG] [SplatPreview3D] Loading progress: 57% @ http://localhost:5173/src/pages/SharpPage.tsx:309
+[LOG] [SplatPreview3D] Loading progress: 63% @ http://localhost:5173/src/pages/SharpPage.tsx:309
+[LOG] [SplatPreview3D] Loading progress: 70% @ http://localhost:5173/src/pages/SharpPage.tsx:309
+[LOG] [SplatPreview3D] Loading progress: 76% @ http://localhost:5173/src/pages/SharpPage.tsx:309
+[LOG] [SplatPreview3D] Loading progress: 83% @ http://localhost:5173/src/pages/SharpPage.tsx:309
+[LOG] [SplatPreview3D] Loading progress: 89% @ http://localhost:5173/src/pages/SharpPage.tsx:309
+[LOG] [SplatPreview3D] Loading progress: 95% @ http://localhost:5173/src/pages/SharpPage.tsx:309
+[LOG] [SplatPreview3D] Loading progress: 100% @ http://localhost:5173/src/pages/SharpPage.tsx:309
+[LOG] x float 0 @ http://localhost:5173/node_modules/.vite/deps/gsplat.js?v=483e8454:715
+[LOG] y float 4 @ http://localhost:5173/node_modules/.vite/deps/gsplat.js?v=483e8454:715
+[LOG] z float 8 @ http://localhost:5173/node_modules/.vite/deps/gsplat.js?v=483e8454:715
+[LOG] f_dc_0 float 12 @ http://localhost:5173/node_modules/.vite/deps/gsplat.js?v=483e8454:715
+[LOG] f_dc_1 float 16 @ http://localhost:5173/node_modules/.vite/deps/gsplat.js?v=483e8454:715
+[LOG] f_dc_2 float 20 @ http://localhost:5173/node_modules/.vite/deps/gsplat.js?v=483e8454:715
+[LOG] opacity float 24 @ http://localhost:5173/node_modules/.vite/deps/gsplat.js?v=483e8454:715
+[LOG] scale_0 float 28 @ http://localhost:5173/node_modules/.vite/deps/gsplat.js?v=483e8454:715
+[LOG] scale_1 float 32 @ http://localhost:5173/node_modules/.vite/deps/gsplat.js?v=483e8454:715
+[LOG] scale_2 float 36 @ http://localhost:5173/node_modules/.vite/deps/gsplat.js?v=483e8454:715
+[LOG] rot_0 float 40 @ http://localhost:5173/node_modules/.vite/deps/gsplat.js?v=483e8454:715
+[LOG] rot_1 float 44 @ http://localhost:5173/node_modules/.vite/deps/gsplat.js?v=483e8454:715
+[LOG] rot_2 float 48 @ http://localhost:5173/node_modules/.vite/deps/gsplat.js?v=483e8454:715
+[LOG] rot_3 float 52 @ http://localhost:5173/node_modules/.vite/deps/gsplat.js?v=483e8454:715
+[LOG] [SplatPreview3D] Loading progress: 100% @ http://localhost:5173/src/pages/SharpPage.tsx:309
+[LOG] x float 0 @ http://localhost:5173/node_modules/.vite/deps/gsplat.js?v=483e8454:715
+[LOG] y float 4 @ http://localhost:5173/node_modules/.vite/deps/gsplat.js?v=483e8454:715
+[LOG] z float 8 @ http://localhost:5173/node_modules/.vite/deps/gsplat.js?v=483e8454:715
+[LOG] f_dc_0 float 12 @ http://localhost:5173/node_modules/.vite/deps/gsplat.js?v=483e8454:715
+[LOG] f_dc_1 float 16 @ http://localhost:5173/node_modules/.vite/deps/gsplat.js?v=483e8454:715
+[LOG] f_dc_2 float 20 @ http://localhost:5173/node_modules/.vite/deps/gsplat.js?v=483e8454:715
+[LOG] opacity float 24 @ http://localhost:5173/node_modules/.vite/deps/gsplat.js?v=483e8454:715
+[LOG] scale_0 float 28 @ http://localhost:5173/node_modules/.vite/deps/gsplat.js?v=483e8454:715
+[LOG] scale_1 float 32 @ http://localhost:5173/node_modules/.vite/deps/gsplat.js?v=483e8454:715
+[LOG] scale_2 float 36 @ http://localhost:5173/node_modules/.vite/deps/gsplat.js?v=483e8454:715
+[LOG] rot_0 float 40 @ http://localhost:5173/node_modules/.vite/deps/gsplat.js?v=483e8454:715
+[LOG] rot_1 float 44 @ http://localhost:5173/node_modules/.vite/deps/gsplat.js?v=483e8454:715
+[LOG] rot_2 float 48 @ http://localhost:5173/node_modules/.vite/deps/gsplat.js?v=483e8454:715
+[LOG] rot_3 float 52 @ http://localhost:5173/node_modules/.vite/deps/gsplat.js?v=483e8454:715
+[LOG] [SplatPreview3D] PLY loaded successfully, starting animation @ http://localhost:5173/src/pages/SharpPage.tsx:312
+[LOG] Checking URL for auth tokens: {hash: , accessToken: not found, refreshToken: not found, allParams: Array(0)} @ http://localhost:5173/src/context/SupabaseAuthContext.tsx:41
+[LOG] [SharpFileStore] Retrieved file: test-person-real_3d.ply @ http://localhost:5173/src/utils/sharpFileStore.ts:55
+[LOG] [SplatViewerPage] Loading file from IndexedDB: test-person-real_3d.ply @ http://localhost:5173/src/pages/SplatViewerPage.tsx:3076
+[LOG] Auth state changed: INITIAL_SESSION undefined @ http://localhost:5173/src/context/SupabaseAuthContext.tsx:77
+[LOG] [GaussianSplatRenderer] Loading: blob:http://localhost:5173/7b9b7820-c3a5-4ada-8a45-50cc1194b @ http://localhost:5173/src/pages/SplatViewerPage.tsx:1143
+[LOG] [GaussianSplatRenderer] Loading: blob:http://localhost:5173/7b9b7820-c3a5-4ada-8a45-50cc1194b @ http://localhost:5173/src/pages/SplatViewerPage.tsx:1143
+[LOG] x float 0 @ http://localhost:5173/node_modules/.vite/deps/gsplat.js?v=483e8454:715
+[LOG] y float 4 @ http://localhost:5173/node_modules/.vite/deps/gsplat.js?v=483e8454:715
+[LOG] z float 8 @ http://localhost:5173/node_modules/.vite/deps/gsplat.js?v=483e8454:715
+[LOG] f_dc_0 float 12 @ http://localhost:5173/node_modules/.vite/deps/gsplat.js?v=483e8454:715
+[LOG] f_dc_1 float 16 @ http://localhost:5173/node_modules/.vite/deps/gsplat.js?v=483e8454:715
+[LOG] f_dc_2 float 20 @ http://localhost:5173/node_modules/.vite/deps/gsplat.js?v=483e8454:715
+[LOG] opacity float 24 @ http://localhost:5173/node_modules/.vite/deps/gsplat.js?v=483e8454:715
+[LOG] scale_0 float 28 @ http://localhost:5173/node_modules/.vite/deps/gsplat.js?v=483e8454:715
+[LOG] scale_1 float 32 @ http://localhost:5173/node_modules/.vite/deps/gsplat.js?v=483e8454:715
+[LOG] scale_2 float 36 @ http://localhost:5173/node_modules/.vite/deps/gsplat.js?v=483e8454:715
+[LOG] rot_0 float 40 @ http://localhost:5173/node_modules/.vite/deps/gsplat.js?v=483e8454:715
+[LOG] rot_1 float 44 @ http://localhost:5173/node_modules/.vite/deps/gsplat.js?v=483e8454:715
+[LOG] rot_2 float 48 @ http://localhost:5173/node_modules/.vite/deps/gsplat.js?v=483e8454:715
+[LOG] rot_3 float 52 @ http://localhost:5173/node_modules/.vite/deps/gsplat.js?v=483e8454:715
+[LOG] [GaussianSplatRenderer] Scene loaded, starting animation @ http://localhost:5173/src/pages/SplatViewerPage.tsx:1152
+[LOG] x float 0 @ http://localhost:5173/node_modules/.vite/deps/gsplat.js?v=483e8454:715
+[LOG] y float 4 @ http://localhost:5173/node_modules/.vite/deps/gsplat.js?v=483e8454:715
+[LOG] z float 8 @ http://localhost:5173/node_modules/.vite/deps/gsplat.js?v=483e8454:715
+[LOG] f_dc_0 float 12 @ http://localhost:5173/node_modules/.vite/deps/gsplat.js?v=483e8454:715
+[LOG] f_dc_1 float 16 @ http://localhost:5173/node_modules/.vite/deps/gsplat.js?v=483e8454:715
+[LOG] f_dc_2 float 20 @ http://localhost:5173/node_modules/.vite/deps/gsplat.js?v=483e8454:715
+[LOG] opacity float 24 @ http://localhost:5173/node_modules/.vite/deps/gsplat.js?v=483e8454:715
+[LOG] scale_0 float 28 @ http://localhost:5173/node_modules/.vite/deps/gsplat.js?v=483e8454:715
+[LOG] scale_1 float 32 @ http://localhost:5173/node_modules/.vite/deps/gsplat.js?v=483e8454:715
+[LOG] scale_2 float 36 @ http://localhost:5173/node_modules/.vite/deps/gsplat.js?v=483e8454:715
+[LOG] rot_0 float 40 @ http://localhost:5173/node_modules/.vite/deps/gsplat.js?v=483e8454:715
+[LOG] rot_1 float 44 @ http://localhost:5173/node_modules/.vite/deps/gsplat.js?v=483e8454:715
+[LOG] rot_2 float 48 @ http://localhost:5173/node_modules/.vite/deps/gsplat.js?v=483e8454:715
+[LOG] rot_3 float 52 @ http://localhost:5173/node_modules/.vite/deps/gsplat.js?v=483e8454:715
+[ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:8000/api/analytics/track:0

@@ -181,31 +181,166 @@ const HomePage = () => {
                   accent="2"
                   path="/pose-estimation"
                 />
-                <ToolCard
-                  variants={itemVariants}
-                  title="AI Upscaling"
-                  description="GPU-accelerated image enhancement using Real-ESRGAN. Upscale images 4x with WebGL compute shaders for instant results."
-                  icon="zoom_in"
-                  accent="3"
-                  path="/upscaler"
-                />
+                {/* AI Upscaling Card - Custom Emblem */}
+                <motion.div variants={itemVariants}>
+                  <Link to="/upscaler" className="card h-full block group relative overflow-hidden" data-accent="3">
+                    <div className="absolute inset-0 bg-gradient-to-br from-blue-500/0 via-cyan-500/0 to-emerald-500/0 group-hover:from-blue-500/10 group-hover:via-cyan-500/10 group-hover:to-emerald-500/10 transition-colors duration-500"></div>
+                    <div className="p-6 flex flex-col items-start text-left flex-1 h-full relative z-10">
+                      <div className="icon-container mb-4 w-full h-32 bg-black/20 rounded-xl overflow-hidden border border-white/5 relative" style={{ perspective: '1000px' }}>
+                        {/* 3D Upscaler Animation */}
+                        <div className="absolute inset-0">
+                          <img src="/emblems/ai_upscaling_emblem.png" alt="AI Upscaling" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
+                          <div className="absolute inset-0 shadow-[inset_0_0_40px_rgba(0,0,0,0.8)] pointer-events-none" />
+                        </div>
+                      </div>
+                      <h3 className="text-xl font-bold mb-3 text-white group-hover:text-cyan-400 transition-colors">AI Upscaling</h3>
+                      <p className="text-base text-gray-300 flex-1 leading-relaxed">
+                        GPU-accelerated image enhancement using Real-ESRGAN. Upscale images 4x with WebGL compute shaders for instant results.
+                      </p>
+                      <div className="mt-4 pt-4 w-full">
+                        <div className="flex items-center text-sm font-medium text-cyan-400 group-hover:text-cyan-300 transition-colors">
+                          <span>Explore AI Upscaling</span>
+                          <span className="material-symbols-outlined text-lg ml-1 group-hover:translate-x-1 transition-transform">arrow_forward</span>
+                        </div>
+                      </div>
+                    </div>
+                  </Link>
+                </motion.div>
                 
-                <ToolCard
-                  variants={itemVariants}
-                  title="SHARP 3D Generator"
-                  description="Transform any image into 3D Gaussian Splats using Apple's neural network. Single-image to photorealistic 3D in seconds."
-                  icon="auto_awesome"
-                  accent="5"
-                  path="/sharp"
-                />
-                <ToolCard
-                  variants={itemVariants}
-                  title="3D Splat Viewer"
-                  description="WebGL renderer for Gaussian Splats, Triangle Splats, and PLY meshes. Experience cutting-edge 3D reconstruction with GPU-optimized rendering."
-                  icon="camera_invert"
-                  accent="6"
-                  path="/splat-viewer"
-                />
+                {/* SHARP 3D Generator Card - Custom Emblem */}
+                <motion.div variants={itemVariants}>
+                  <Link to="/sharp" className="card h-full block group relative overflow-hidden" data-accent="5">
+                    <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/0 via-violet-500/0 to-fuchsia-500/0 group-hover:from-indigo-500/10 group-hover:via-violet-500/10 group-hover:to-fuchsia-500/10 transition-colors duration-500"></div>
+                    <div className="p-6 flex flex-col items-start text-left flex-1 h-full relative z-10">
+                      <div className="icon-container mb-4 w-full h-32 bg-black/20 rounded-xl overflow-hidden border border-white/5 relative" style={{ perspective: '1000px' }}>
+                        {/* 2D Image to 3D Neural Mesh Animation */}
+                        <div className="absolute inset-0">
+                          <img src="/emblems/sharp_3d_emblem.png" alt="SHARP 3D Generator" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
+                          <div className="absolute inset-0 shadow-[inset_0_0_40px_rgba(0,0,0,0.8)] pointer-events-none" />
+                        </div>
+                      </div>
+                      <h3 className="text-xl font-bold mb-3 text-white group-hover:text-indigo-400 transition-colors">SHARP 3D Generator</h3>
+                      <p className="text-base text-gray-300 flex-1 leading-relaxed">
+                        Transform any image into 3D Gaussian Splats using Apple's neural network. Single-image to photorealistic 3D in seconds.
+                      </p>
+                      <div className="mt-4 pt-4 w-full">
+                        <div className="flex items-center text-sm font-medium text-indigo-400 group-hover:text-indigo-300 transition-colors">
+                          <span>Explore SHARP Generator</span>
+                          <span className="material-symbols-outlined text-lg ml-1 group-hover:translate-x-1 transition-transform">arrow_forward</span>
+                        </div>
+                      </div>
+                    </div>
+                  </Link>
+                </motion.div>
+                {/* 3D Splat Viewer Card - Custom Emblem */}
+                <motion.div variants={itemVariants}>
+                  <Link to="/splat-viewer" className="card h-full block group relative overflow-hidden" data-accent="6">
+                    <div className="absolute inset-0 bg-gradient-to-br from-violet-500/0 via-fuchsia-500/0 to-pink-500/0 group-hover:from-violet-500/10 group-hover:via-fuchsia-500/10 group-hover:to-pink-500/10 transition-colors duration-500"></div>
+                    <div className="p-6 flex flex-col items-start text-left flex-1 h-full relative z-10">
+                      <div className="icon-container mb-4 w-full h-32 bg-black/20 rounded-xl overflow-hidden border border-white/5 relative" style={{ perspective: '1000px' }}>
+                        {/* Swirling Splats Animation */}
+                        <div className="absolute inset-0">
+                          <img src="/emblems/splat_viewer_emblem.png" alt="3D Splat Viewer" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
+                          <div className="absolute inset-0 shadow-[inset_0_0_40px_rgba(0,0,0,0.8)] pointer-events-none" />
+                        </div>
+                      </div>
+                      <h3 className="text-xl font-bold mb-3 text-white group-hover:text-violet-400 transition-colors">3D Splat Viewer</h3>
+                      <p className="text-base text-gray-300 flex-1 leading-relaxed">
+                        WebGL renderer for Gaussian Splats, Triangle Splats, and PLY meshes. Experience cutting-edge 3D reconstruction with GPU-optimized rendering.
+                      </p>
+                      <div className="mt-4 pt-4 w-full">
+                        <div className="flex items-center text-sm font-medium text-violet-400 group-hover:text-violet-300 transition-colors">
+                          <span>Explore Splat Viewer</span>
+                          <span className="material-symbols-outlined text-lg ml-1 group-hover:translate-x-1 transition-transform">arrow_forward</span>
+                        </div>
+                      </div>
+                    </div>
+                  </Link>
+                </motion.div>
+                {/* Triangle Splatting Card - Custom Emblem */}
+                <motion.div variants={itemVariants}>
+                  <Link to="/triangle-splatting" className="card h-full block group relative overflow-hidden" data-accent="8">
+                    {/* Background glow effect on hover */}
+                    <div className="absolute inset-0 bg-gradient-to-br from-pink-500/0 via-purple-500/0 to-cyan-500/0 group-hover:from-pink-500/10 group-hover:via-purple-500/10 group-hover:to-cyan-500/10 transition-colors duration-500"></div>
+                    
+                    <div className="p-6 flex flex-col items-start text-left flex-1 h-full relative z-10">
+                      <div className="icon-container mb-4 w-full h-32 bg-black/20 rounded-xl overflow-hidden border border-white/5 relative" style={{ perspective: '1000px' }}>
+                        {/* 3D Triangle Splatting Animation Engine */}
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          {/* Orbiting ring */}
+                          <motion.div 
+                            className="absolute w-24 h-24 rounded-full border border-pink-500/20"
+                            animate={{ rotateX: [60, 60], rotateZ: [0, 360] }}
+                            transition={{ duration: 10, repeat: Infinity, ease: 'linear' }}
+                          />
+
+                          {/* Triangle 1 - Wireframe Outer Hierarchy */}
+                          <motion.div 
+                            className="absolute"
+                            animate={{ rotateY: [0, 360], rotateX: [10, -10, 10] }}
+                            transition={{ duration: 8, repeat: Infinity, ease: 'linear' }}
+                          >
+                            <svg width="70" height="70" viewBox="0 0 100 100" className="overflow-visible drop-shadow-[0_0_8px_rgba(232,121,249,0.5)]">
+                              <polygon points="50,10 95,85 5,85" fill="none" stroke="#e879f9" strokeWidth="1.5" strokeLinejoin="round" />
+                              <polygon points="50,10 50,85 95,85" fill="none" stroke="#22d3ee" strokeWidth="1" strokeDasharray="3 3" />
+                              <polygon points="50,10 5,85 50,85" fill="none" stroke="#a78bfa" strokeWidth="1" strokeDasharray="3 3" />
+                              <polygon points="50,85 75,45 25,45" fill="none" stroke="#f472b6" strokeWidth="1" opacity="0.5" />
+                            </svg>
+                          </motion.div>
+                          
+                          {/* Triangle 2 - Solid inner glowing core */}
+                          <motion.div 
+                            className="absolute"
+                            animate={{ rotateY: [360, 0], scale: [0.7, 0.9, 0.7] }}
+                            transition={{ duration: 6, repeat: Infinity, ease: 'easeInOut' }}
+                          >
+                            <svg width="45" height="45" viewBox="0 0 100 100" className="drop-shadow-[0_0_20px_rgba(232,121,249,0.9)]">
+                              <polygon points="50,15 85,80 15,80" fill="url(#triangle-grad)" opacity="0.9" />
+                              <defs>
+                                <linearGradient id="triangle-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+                                  <stop offset="0%" stopColor="#c026d3" />
+                                  <stop offset="50%" stopColor="#e879f9" />
+                                  <stop offset="100%" stopColor="#06b6d4" />
+                                </linearGradient>
+                              </defs>
+                            </svg>
+                          </motion.div>
+
+                          {/* Geometric Splat Particles */}
+                          {[...Array(12)].map((_, i) => (
+                            <motion.div
+                              key={i}
+                              className="absolute w-0 h-0 border-l-[3px] border-r-[3px] border-b-[5px] border-transparent border-b-cyan-300 drop-shadow-[0_0_5px_#22d3ee]"
+                              animate={{
+                                y: [0, (Math.random() - 0.5) * 80],
+                                x: [0, (Math.random() - 0.5) * 80],
+                                rotate: [0, Math.random() * 360],
+                                scale: [0, Math.random() + 0.5, 0],
+                                opacity: [0, 1, 0]
+                              }}
+                              transition={{
+                                duration: 2 + Math.random() * 3,
+                                repeat: Infinity,
+                                delay: Math.random() * 2,
+                                ease: "easeInOut"
+                              }}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                      <h3 className="text-xl font-bold mb-3 text-white group-hover:text-fuchsia-400 transition-colors">Triangle Splatting</h3>
+                      <p className="text-base text-gray-300 flex-1 leading-relaxed">
+                        GPU-accelerated triangle-based 3D Gaussian Splatting. A next-gen rendering technique that replaces splat discs with triangle meshes for sharper, more detailed 3D scenes.
+                      </p>
+                      <div className="mt-4 pt-4 w-full">
+                        <div className="flex items-center text-sm font-medium text-fuchsia-400 group-hover:text-fuchsia-300 transition-colors">
+                          <span>Explore Triangle Splatting</span>
+                          <span className="material-symbols-outlined text-lg ml-1 group-hover:translate-x-1 transition-transform">arrow_forward</span>
+                        </div>
+                      </div>
+                    </div>
+                  </Link>
+                </motion.div>
                 <ToolCard
                   variants={itemVariants}
                   title="Image Comparison"

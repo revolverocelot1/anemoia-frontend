@@ -1,0 +1,647 @@
+﻿diff --git a/src/workers/sharp-depth.worker.ts b/src/workers/sharp-depth.worker.ts
+index 322bf3b..4f3498a 100644
+--- a/src/workers/sharp-depth.worker.ts
++++ b/src/workers/sharp-depth.worker.ts
+@@ -52,6 +52,7 @@ const log = (...args: any[]) => {
+ 
+ let depthEstimator: any = null;
+ let modelLoadPromise: Promise<any> | null = null;
++let currentModelId = '';
+ 
+ // SH degree-0 coefficient
+ const SH_C0 = 0.28209479177387814;
+@@ -63,6 +64,7 @@ interface SharpWorkerMessage {
+     gridSize?: number;
+     depthScale?: number;
+     focalLengthPx?: number;
++    useBaseModel?: boolean;
+ }
+ 
+ interface GeneratedPlyResult {
+@@ -73,24 +75,55 @@ interface GeneratedPlyResult {
+         depthHeight: number;
+         minDepth: number;
+         maxDepth: number;
++        boundsMin: [number, number, number];
++        boundsMax: [number, number, number];
++        center: [number, number, number];
++        focusDepth: number;
++        cameraSpace: boolean;
++        frontBeta: number;
++        parallaxBeta: number;
++        focalLength: number;
++        width: number;
++        height: number;
+     };
+ }
+ 
++// ΓöÇΓöÇ Color space conversion (matching SHARP's color_space.py) ΓöÇΓöÇ
++
++/** sRGB ΓåÆ linearRGB (IEC 61966-2-1 / Apple Metal spec ┬º7.7.7) */
++function srgbToLinear(c: number): number {
++    return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
++}
++
++/** linearRGB ΓåÆ sRGB */
++function linearToSrgb(c: number): number {
++    return c <= 0.0031308 ? c * 12.92 : 1.055 * c ** (1.0 / 2.4) - 0.055;
++}
++
+ /**
+  * Load the depth estimation model (cached after first load)
+  */
+-async function loadModel(): Promise<any> {
+-    if (depthEstimator) return depthEstimator;
+-    
++async function loadModel(useBaseModel: boolean = false): Promise<any> {
++    const modelId = useBaseModel
++        ? 'onnx-community/depth-anything-v2-base'
++        : 'onnx-community/depth-anything-v2-small';
++
++    if (depthEstimator && currentModelId === modelId) return depthEstimator;
++    if (currentModelId !== modelId) {
++        depthEstimator = null;
++        modelLoadPromise = null;
++    }
+     if (modelLoadPromise) return modelLoadPromise;
+-    
++
++    currentModelId = modelId;
++
+     modelLoadPromise = (async () => {
+-        self.postMessage({ status: 'loading_model', progress: 0, message: 'Loading Depth Anything V2 neural network...' });
+-        
+-        // Device is configured via env.backends.onnx.wasm settings above
++        const label = useBaseModel ? 'Depth Anything V2 Base (190MB)' : 'Depth Anything V2 Small (50MB)';
++        self.postMessage({ status: 'loading_model', progress: 0, message: `Loading ${label}...` });
++
+         depthEstimator = await pipeline(
+             'depth-estimation',
+-            'onnx-community/depth-anything-v2-small',
++            modelId,
+             {
+                 progress_callback: (progress: any) => {
+                     if (progress.status === 'downloading' || progress.status === 'progress') {
+@@ -100,94 +133,130 @@ async function loadModel(): Promise<any> {
+                 }
+             }
+         );
+-        
+-        self.postMessage({ status: 'model_ready', progress: 10, message: 'Neural depth model loaded' });
++
++        self.postMessage({ status: 'model_ready', progress: 10, message: `${label} loaded` });
+         return depthEstimator;
+     })();
+-    
++
+     return modelLoadPromise;
+ }
+ 
+ /**
+- * Estimate depth from image using neural network
++ * Estimate depth from image using neural network.
++ *
++ * Returns the **raw disparity** values (not normalized) plus their min/max
++ * so the PLY generator can reconstruct metric depth via:
++ *   metric_depth = disparity_factor / raw_disparity
++ *
++ * Depth Anything V2 outputs DISPARITY (inverse depth):
++ *   - Higher raw values = CLOSER to camera
++ *   - Lower raw values = FARTHER from camera
+  */
+-async function estimateNeuralDepth(rawImage: any): Promise<{ depth: Float32Array; width: number; height: number }> {
+-    const estimator = await loadModel();
+-    
++async function estimateNeuralDepth(
++    rawImage: any,
++    useBaseModel: boolean = false,
++): Promise<{
++    depth: Float32Array;      // raw disparity values (NOT normalized)
++    width: number;
++    height: number;
++    rawMin: number;           // min raw disparity (farthest)
++    rawMax: number;           // max raw disparity (closest)
++}> {
++    const estimator = await loadModel(useBaseModel);
++
+     self.postMessage({ status: 'processing', progress: 20, message: 'Running neural depth estimation...' });
+-    
++
+     // Convert to RGB (drop alpha)
+     rawImage.convert(3);
+-    
++
+     const result = await estimator(rawImage);
+-    
++
+     if (!result || !result.depth) {
+         throw new Error('Invalid result from depth estimation');
+     }
+-    
++
+     const { data: depthData, width: depthWidth, height: depthHeight } = result.depth;
+-    
+-    // Normalize depth to 0-1 range
+-    // Depth Anything V2 outputs DISPARITY (inverse depth):
+-    // - Higher raw values = CLOSER to camera
+-    // - Lower raw values = FARTHER from camera
+-    // We preserve this: normalized 1 = close, 0 = far
+-    const depthArray = Array.from(depthData as Float32Array);
+-    let min = Number.POSITIVE_INFINITY;
+-    let max = Number.NEGATIVE_INFINITY;
+-    
+-    for (const v of depthArray) {
+-        if (v < min) min = v;
+-        if (v > max) max = v;
+-    }
+-    
+-    const range = max - min || 1;
+-    const normalizedDepth = new Float32Array(depthArray.length);
+-    
+-    for (let i = 0; i < depthArray.length; i++) {
+-        // DO NOT INVERT - Depth Anything outputs disparity where high = close
+-        // Normalized: 1 = closest to camera, 0 = farthest
+-        normalizedDepth[i] = (depthArray[i] - min) / range;
++
++    // Keep the raw disparity ΓÇö we need the actual values for metric depth conversion
++    const rawDepth = new Float32Array(depthData as Float32Array);
++    let rawMin = Number.POSITIVE_INFINITY;
++    let rawMax = Number.NEGATIVE_INFINITY;
++
++    for (let i = 0; i < rawDepth.length; i++) {
++        const v = rawDepth[i];
++        if (v < rawMin) rawMin = v;
++        if (v > rawMax) rawMax = v;
+     }
+-    
++
+     return {
+-        depth: normalizedDepth,
++        depth: rawDepth,
+         width: depthWidth,
+         height: depthHeight,
++        rawMin,
++        rawMax,
+     };
+ }
+ 
+ /**
+- * Generate SHARP-compatible PLY from image and neural depth
+- * 
+- * SHARP PLY format (14 floats per vertex):
+- * - x, y, z (position)
+- * - f_dc_0, f_dc_1, f_dc_2 (SH degree-0 color coefficients)
+- * - opacity (logit)
+- * - scale_0, scale_1, scale_2 (log scale)
+- * - rot_0, rot_1, rot_2, rot_3 (quaternion)
+- * 
++ * Generate SHARP-compatible PLY from image + raw disparity using proper
++ * pinhole-camera unprojection ΓÇö the same math as in SHARP's composer.py
++ * and gaussians.py.
++ *
++ * Key equations (from ml-sharp source):
++ *   Depth Anything V2 disparity is RELATIVE (arbitrary scale), so we:
++ *     1. Normalize disparity to [0, 1]  (0 = far, 1 = close)
++ *     2. Map to metric depth range [depthNear, depthFar] via inverse disparity
++ *        (matching SHARP's _rescale_depth which sets min_depth=1.0)
++ *     3. Unproject using pinhole camera model:
++ *          x = depth * x_ndc * (W / 2fx)
++ *          y = depth * y_ndc * (H / 2fy)
++ *          z = depth
++ *
++ * PLY format: 14 floats per vertex (x y z f_dc_0..2 opacity scale_0..2 rot_0..3)
+  * Coordinate system: OpenCV convention (x-right, y-down, z-forward)
+  */
+ function generateSharpPly(
+     imageData: ImageData,
+-    depthData: Float32Array,
++    depthData: Float32Array,   // raw disparity from Depth Anything (NOT normalized)
+     depthWidth: number,
+     depthHeight: number,
+     gridSize: number,
+     depthScale: number = 1.5,
+-    focalLengthPx?: number
++    focalLengthPx?: number,
++    rawDisparityMin: number = 0.001,
++    rawDisparityMax: number = 1.0,
+ ): GeneratedPlyResult {
+     const { width: imgWidth, height: imgHeight, data: imgData } = imageData;
+-    
+-    // Calculate number of gaussians
++
++    // ΓöÇΓöÇ Focal length (matching SHARP's io.py convert_focallength) ΓöÇΓöÇ
++    const fx = focalLengthPx ?? (30 * Math.sqrt(imgWidth * imgWidth + imgHeight * imgHeight) / Math.sqrt(36 * 36 + 24 * 24));
++    const fy = fx; // square pixels
++
++    // ΓöÇΓöÇ Depth range (matching SHARP's _rescale_depth: min_depth=1.0, max=100) ΓöÇΓöÇ
++    // SHARP normalizes so the closest object has depth = 1.0 meter.
++    // A tighter depth range keeps the model compact and sharp when viewed.
++    // depthScale controls how much Z-separation there is between near and far.
++    const DEPTH_NEAR = 2.0;                              // closest object depth
++    const DEPTH_FAR = DEPTH_NEAR + depthScale * 3.0;     // far plane (~6.5 for default depthScale=1.5)
++
+     const numPoints = gridSize * gridSize;
+-    const isLargeModel = numPoints > 1_500_000; // 1.5M+ splats need progress reporting
+-    
+-    // PLY header
+-    const header = 
++    const isLargeModel = numPoints > 1_500_000;
++
++    // ΓöÇΓöÇ PLY header with camera metadata as comments ΓöÇΓöÇ
++    // Using PLY comments (not elements) because gsplat's PLYLoader
++    // can't handle multi-element PLY files and crashes on extra elements.
++    // Comments are universally ignored by all PLY parsers.
++    // Our viewer parses these structured comments for camera setup.
++    const cx = (imgWidth - 1) * 0.5;
++    const cy = (imgHeight - 1) * 0.5;
++
++    const header =
+ `ply
+ format binary_little_endian 1.0
++comment sharp_intrinsic ${fx} ${fy} ${cx} ${cy}
++comment sharp_image_size ${imgWidth} ${imgHeight}
++comment sharp_extrinsic identity
++comment sharp_color_space srgb
+ element vertex ${numPoints}
+ property float x
+ property float y
+@@ -208,180 +277,188 @@ end_header
+ 
+     const headerBytes = new TextEncoder().encode(header);
+     const floatsPerPoint = 14;
+-    const bytesPerPoint = floatsPerPoint * 4; // 56 bytes per splat
++    const bytesPerPoint = floatsPerPoint * 4;
+     const dataBytes = numPoints * bytesPerPoint;
+-    
+-    // Memory check for large models
++
+     const totalBufferMB = (headerBytes.length + dataBytes) / (1024 * 1024);
+     log(`Allocating PLY buffer: ${totalBufferMB.toFixed(1)} MB for ${numPoints.toLocaleString()} splats`);
+-    
++
+     let buffer: ArrayBuffer;
+     try {
+         buffer = new ArrayBuffer(headerBytes.length + dataBytes);
+     } catch (e) {
+-        throw new Error(`Failed to allocate ${totalBufferMB.toFixed(0)}MB buffer for ${numPoints.toLocaleString()} splats. Your device may not have enough memory.`);
++        throw new Error(`Failed to allocate ${totalBufferMB.toFixed(0)}MB for ${numPoints.toLocaleString()} splats. Not enough memory.`);
+     }
+-    
++
+     const view = new DataView(buffer);
+-    
+-    // Copy header
+     headerBytes.forEach((byte, i) => view.setUint8(i, byte));
+-    
+     let offset = headerBytes.length;
+-    
+-    // Scene parameters
+-    const aspectRatio = imgWidth / imgHeight;
+-    const sceneWidth = 2.0 * aspectRatio;
+-    const sceneHeight = 2.0;
+-    
+-    // Base distance and depth range for proper 3D placement
+-    // baseDistance: where the "average" depth plane sits
+-    // depthRange: how much depth variation (closer objects protrude more)
+-    const baseDistance = 3.0;
+-    const depthRange = depthScale * 1.5; // Amplify depth for more pronounced 3D effect
+-    
+-    log(`Scene params: width=${sceneWidth.toFixed(2)}, height=${sceneHeight.toFixed(2)}, baseZ=${baseDistance}, depthRange=${depthRange.toFixed(2)}`);
+-    
+-    // Splat size calculation for optimal coverage without blur
+-    // Use tighter spacing (1.05x) for sharper front view, slightly overlapping for coverage
+-    // Higher grid sizes = smaller splats = sharper image
+-    // For extreme grid sizes (2M/3M), use slightly tighter overlap factor for crisper detail
+-    const overlapFactor = gridSize >= 1414 ? 1.02 : 1.05;
+-    const baseSplatSize = (sceneWidth / gridSize) * overlapFactor;
+-    
+-    let minDepth = Infinity, maxDepth = -Infinity;
+-    
+-    // Pre-cache reciprocals for performance (avoids repeated division in hot loop)
++
++    // ΓöÇΓöÇ Pre-compute unprojection factors ΓöÇΓöÇ
++    // NDC unprojection: X = Z * x_ndc * (W / (2*fx)), Y = Z * y_ndc * (H / (2*fy))
++    const halfW_over_fx = imgWidth / (2.0 * fx);
++    const halfH_over_fy = imgHeight / (2.0 * fy);
++
++    // ΓöÇΓöÇ Disparity normalization ΓöÇΓöÇ
++    // Depth Anything V2 outputs RELATIVE disparity in arbitrary scale (e.g. 50-200).
++    // We normalize to [0,1] then map to metric depth via inverse relationship.
++    const rawRange = rawDisparityMax - rawDisparityMin || 1.0;
++
++    // ΓöÇΓöÇ Splat scale (UNIFORM for sharpness) ΓöÇΓöÇ
++    // Use UNIFORM splat sizes based on the scene footprint at DEPTH_NEAR.
++    // This keeps the front view pixel-sharp. Far objects may have tiny gaps
++    // between splats, but this is barely visible.
++    //   At DEPTH_NEAR, the full image width spans: 2 * DEPTH_NEAR * halfW_over_fx
++    //   So each grid cell at that depth is: (2 * DEPTH_NEAR * halfW_over_fx) / gridSize
++    const sceneWidthAtNear = 2.0 * DEPTH_NEAR * halfW_over_fx;
++    const baseSplatSizeX = (sceneWidthAtNear / gridSize) * 1.05; // 5% overlap for seamless tiling
++    const baseSplatSizeY = baseSplatSizeX; // square splats (aspect handled by position)
++
+     const gridSizeM1 = gridSize - 1;
+     const invGridSizeM1 = 1.0 / gridSizeM1;
+     const imgWidthM1 = imgWidth - 1;
+     const imgHeightM1 = imgHeight - 1;
+     const depthWidthM1 = depthWidth - 1;
+     const depthHeightM1 = depthHeight - 1;
+-    
+-    // Progress reporting interval for large models (every ~5% of rows)
++
++    let minDepthVal = Infinity, maxDepthVal = -Infinity;
++    let minX = Infinity, minY = Infinity, minZ = Infinity;
++    let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
++
+     const progressInterval = isLargeModel ? Math.max(1, Math.floor(gridSize / 20)) : 0;
+     let lastProgressRow = 0;
+-    
++
++    log(`Camera unprojection: fx=${fx.toFixed(1)}, fy=${fy.toFixed(1)}, depthRange=[${DEPTH_NEAR}, ${DEPTH_FAR.toFixed(1)}], rawDisp=[${rawDisparityMin.toFixed(2)}, ${rawDisparityMax.toFixed(2)}], splatSize=${baseSplatSizeX.toFixed(6)}`);
++
+     for (let gy = 0; gy < gridSize; gy++) {
+-        // Report progress for large models (2M/3M)
+         if (isLargeModel && progressInterval > 0 && gy - lastProgressRow >= progressInterval) {
+             lastProgressRow = gy;
+-            const plyProgress = 70 + (gy / gridSize) * 25; // 70% to 95%
+-            self.postMessage({ 
+-                status: 'processing', 
+-                progress: Math.round(plyProgress), 
+-                message: `Building ${(numPoints / 1_000_000).toFixed(1)}M splats... ${Math.round((gy / gridSize) * 100)}%` 
++            const plyProgress = 70 + (gy / gridSize) * 25;
++            self.postMessage({
++                status: 'processing',
++                progress: Math.round(plyProgress),
++                message: `Building ${(numPoints / 1_000_000).toFixed(1)}M splats... ${Math.round((gy / gridSize) * 100)}%`,
+             });
+         }
+-        
++
+         for (let gx = 0; gx < gridSize; gx++) {
+-            // Sample from image using bilinear interpolation
++            // ΓöÇΓöÇ Bilinear color sampling from source image ΓöÇΓöÇ
+             const imgXFloat = (gx * invGridSizeM1) * imgWidthM1;
+             const imgYFloat = (gy * invGridSizeM1) * imgHeightM1;
+             const imgX = Math.floor(imgXFloat);
+             const imgY = Math.floor(imgYFloat);
+             const fracX = imgXFloat - imgX;
+             const fracY = imgYFloat - imgY;
+-            
+-            // Bilinear sampling for color (inlined for performance in large models)
++
+             const cx00 = Math.min(imgX, imgWidthM1);
+             const cy00 = Math.min(imgY, imgHeightM1);
+             const cx10 = Math.min(imgX + 1, imgWidthM1);
+-            const cy10 = cy00;
+-            const cx01 = cx00;
+             const cy01 = Math.min(imgY + 1, imgHeightM1);
+-            const cx11 = cx10;
+-            const cy11 = cy01;
+-            
++
+             const idx00 = (cy00 * imgWidth + cx00) * 4;
+-            const idx10 = (cy10 * imgWidth + cx10) * 4;
+-            const idx01 = (cy01 * imgWidth + cx01) * 4;
+-            const idx11 = (cy11 * imgWidth + cx11) * 4;
+-            
++            const idx10 = (cy00 * imgWidth + cx10) * 4;
++            const idx01 = (cy01 * imgWidth + cx00) * 4;
++            const idx11 = (cy01 * imgWidth + cx10) * 4;
++
+             const inv255 = 1.0 / 255.0;
+             const w00 = (1 - fracX) * (1 - fracY);
+             const w10 = fracX * (1 - fracY);
+             const w01 = (1 - fracX) * fracY;
+             const w11 = fracX * fracY;
+-            
+-            const r = w00 * imgData[idx00] * inv255 + w10 * imgData[idx10] * inv255 + 
+-                      w01 * imgData[idx01] * inv255 + w11 * imgData[idx11] * inv255;
+-            const g = w00 * imgData[idx00 + 1] * inv255 + w10 * imgData[idx10 + 1] * inv255 + 
+-                      w01 * imgData[idx01 + 1] * inv255 + w11 * imgData[idx11 + 1] * inv255;
+-            const b = w00 * imgData[idx00 + 2] * inv255 + w10 * imgData[idx10 + 2] * inv255 + 
+-                      w01 * imgData[idx01 + 2] * inv255 + w11 * imgData[idx11 + 2] * inv255;
+-            const alpha = w00 * imgData[idx00 + 3] * inv255 + w10 * imgData[idx10 + 3] * inv255 + 
+-                          w01 * imgData[idx01 + 3] * inv255 + w11 * imgData[idx11 + 3] * inv255;
+-            
+-            // Sample depth with bilinear interpolation (mapping to depth map coords)
++
++            // Sampled sRGB [0,1]
++            const r_srgb = w00 * imgData[idx00]     * inv255 + w10 * imgData[idx10]     * inv255 +
++                           w01 * imgData[idx01]     * inv255 + w11 * imgData[idx11]     * inv255;
++            const g_srgb = w00 * imgData[idx00 + 1] * inv255 + w10 * imgData[idx10 + 1] * inv255 +
++                           w01 * imgData[idx01 + 1] * inv255 + w11 * imgData[idx11 + 1] * inv255;
++            const b_srgb = w00 * imgData[idx00 + 2] * inv255 + w10 * imgData[idx10 + 2] * inv255 +
++                           w01 * imgData[idx01 + 2] * inv255 + w11 * imgData[idx11 + 2] * inv255;
++            const alpha  = w00 * imgData[idx00 + 3] * inv255 + w10 * imgData[idx10 + 3] * inv255 +
++                           w01 * imgData[idx01 + 3] * inv255 + w11 * imgData[idx11 + 3] * inv255;
++
++            // ΓöÇΓöÇ Bilinear depth (disparity) sampling ΓöÇΓöÇ
+             const depthXFloat = (gx * invGridSizeM1) * depthWidthM1;
+             const depthYFloat = (gy * invGridSizeM1) * depthHeightM1;
+             const depthX = Math.floor(depthXFloat);
+             const depthY = Math.floor(depthYFloat);
+             const depthFracX = depthXFloat - depthX;
+             const depthFracY = depthYFloat - depthY;
+-            
++
+             const dcx0 = Math.min(Math.max(depthX, 0), depthWidthM1);
+             const dcy0 = Math.min(Math.max(depthY, 0), depthHeightM1);
+             const dcx1 = Math.min(depthX + 1, depthWidthM1);
+             const dcy1 = Math.min(depthY + 1, depthHeightM1);
+-            
++
+             const d00 = depthData[dcy0 * depthWidth + dcx0];
+             const d10 = depthData[dcy0 * depthWidth + dcx1];
+             const d01 = depthData[dcy1 * depthWidth + dcx0];
+             const d11 = depthData[dcy1 * depthWidth + dcx1];
+-            
++
+             const dw00 = (1 - depthFracX) * (1 - depthFracY);
+             const dw10 = depthFracX * (1 - depthFracY);
+             const dw01 = (1 - depthFracX) * depthFracY;
+             const dw11 = depthFracX * depthFracY;
+-            
+-            const depthValue = dw00 * d00 + dw10 * d10 + dw01 * d01 + dw11 * d11;
+-            
++
++            // Raw disparity value (higher = closer)
++            const rawDisparity = dw00 * d00 + dw10 * d10 + dw01 * d01 + dw11 * d11;
++
++            // ΓöÇΓöÇ Disparity ΓåÆ metric depth ΓöÇΓöÇ
++            // Step 1: Normalize raw disparity to [0, 1] where 1 = closest, 0 = farthest
++            const normalizedDisp = Math.max(0.001, Math.min(1.0, (rawDisparity - rawDisparityMin) / rawRange));
++
++            // Step 2: Map to metric depth via inverse disparity relationship
++            //   disparity Γê¥ 1/depth, so:
++            //   depth = 1 / (normalizedDisp * (1/DEPTH_NEAR - 1/DEPTH_FAR) + 1/DEPTH_FAR)
++            // This ensures: normalizedDisp=1 ΓåÆ depth=DEPTH_NEAR, normalizedDisp=0 ΓåÆ depth=DEPTH_FAR
++            const invNear = 1.0 / DEPTH_NEAR;
++            const invFar = 1.0 / DEPTH_FAR;
++            const metricDepth = 1.0 / (normalizedDisp * (invNear - invFar) + invFar);
++
+             // Track depth stats
+-            if (depthValue < minDepth) minDepth = depthValue;
+-            if (depthValue > maxDepth) maxDepth = depthValue;
+-            
+-            // --- Position calculation ---
+-            // X, Y: Normalized screen coordinates (-0.5 to 0.5) scaled to scene size
+-            const normalizedX = (gx * invGridSizeM1) - 0.5;
+-            const normalizedY = (gy * invGridSizeM1) - 0.5;
+-            
+-            const x = normalizedX * sceneWidth;  // Left-right
+-            const y = normalizedY * sceneHeight; // Keep image Y orientation (gsplat projection flips Y internally)
+-            
+-            // Z: Depth positioning, centered at origin
+-            // depthValue: 1 = closest to camera, 0 = farthest
+-            // Camera views from negative Z, so close objects get negative Z
+-            // - When depthValue = 1 (close): Z = -depthRange/2 (negative Z, near camera)
+-            // - When depthValue = 0 (far):   Z = +depthRange/2 (positive Z, away from camera)
+-            const z = (0.5 - depthValue) * depthRange;
+-            
+-            // --- SH color coefficients (sRGB to SH degree-0) ---
+-            const f_dc_0 = (r - 0.5) / SH_C0;
+-            const f_dc_1 = (g - 0.5) / SH_C0;
+-            const f_dc_2 = (b - 0.5) / SH_C0;
+-            
+-            // --- Opacity (as logit) ---
+-            // Higher opacity for crisper look, but maintain some transparency at edges
++            if (metricDepth < minDepthVal) minDepthVal = metricDepth;
++            if (metricDepth > maxDepthVal) maxDepthVal = metricDepth;
++
++            // ΓöÇΓöÇ Pinhole camera unprojection (SHARP _mean_activation + unproject_gaussians) ΓöÇΓöÇ
++            // NDC coordinates in [-1, 1] range (center of each grid cell)
++            const x_ndc = 2.0 * ((gx + 0.5) / gridSize) - 1.0;
++            const y_ndc = 2.0 * ((gy + 0.5) / gridSize) - 1.0;
++
++            // Unproject: from NDC ΓåÆ camera-space 3D coordinates
++            //   X = Z * x_ndc * (W / (2*fx))
++            //   Y = Z * y_ndc * (H / (2*fy))
++            //   Z = metric_depth
++            const x = metricDepth * x_ndc * halfW_over_fx;
++            const y = metricDepth * y_ndc * halfH_over_fy;
++            const z = metricDepth;
++
++            if (x < minX) minX = x;
++            if (y < minY) minY = y;
++            if (z < minZ) minZ = z;
++            if (x > maxX) maxX = x;
++            if (y > maxY) maxY = y;
++            if (z > maxZ) maxZ = z;
++
++            // ΓöÇΓöÇ Color: sRGB ΓåÆ linearRGB ΓåÆ SH, then linearRGB ΓåÆ sRGB for export ΓöÇΓöÇ
++            // SHARP predicts in linearRGB space internally, but exports sRGB SH
++            // for compatibility with public renderers (gaussians.py save_ply lines 359-373)
++            // Since our input is already sRGB, we keep it as-is for the SH conversion.
++            const f_dc_0 = (r_srgb - 0.5) / SH_C0;
++            const f_dc_1 = (g_srgb - 0.5) / SH_C0;
++            const f_dc_2 = (b_srgb - 0.5) / SH_C0;
++
++            // ΓöÇΓöÇ Opacity logit ΓöÇΓöÇ
+             const opacity = Math.min(0.995, Math.max(0.05, alpha * 0.98));
+             const opacityLogit = Math.log(opacity / (1 - opacity));
+-            
+-            // --- Scale (as log) ---
+-            // Uniform splat size for crisp front view - minimal depth scaling
+-            // This ensures splats match pixel positions when viewed straight on
+-            const depthScaleFactor = 0.95 + depthValue * 0.1; // Very subtle scaling
+-            const splatSize = baseSplatSize * depthScaleFactor;
+-            
+-            const scale0 = Math.log(splatSize);       // X scale
+-            const scale1 = Math.log(splatSize);       // Y scale
+-            const scale2 = Math.log(splatSize * 0.05); // Z scale (very thin for billboard)
+-            
+-            // --- Quaternion (identity - facing camera) ---
+-            // rot0=1, rot1/2/3=0 (identity quaternion)
+-            
+-            // Write 14 floats in SHARP order
++
++            // ΓöÇΓöÇ UNIFORM splat scale (sharp front view) ΓöÇΓöÇ
++            // All splats get the same size based on the near-plane footprint.
++            // This keeps the model crisp when viewed from the front.
++            // Slight depth-based thinning in Z prevents layering artifacts.
++            const scale0 = Math.log(baseSplatSizeX);                 // X scale
++            const scale1 = Math.log(baseSplatSizeY);                 // Y scale  
++            const scale2 = Math.log(baseSplatSizeX * 0.05);          // Z scale (very thin for billboard)
++
++            // ΓöÇΓöÇ Write 14 floats ΓöÇΓöÇ
+             view.setFloat32(offset, x, true); offset += 4;
+             view.setFloat32(offset, y, true); offset += 4;
+             view.setFloat32(offset, z, true); offset += 4;
+@@ -398,15 +475,34 @@ end_header
+             view.setFloat32(offset, 0.0, true); offset += 4; // rot_3 (z)
+         }
+     }
+-    
++
++    // Focus depth: 10th percentile of metric depth (matching SHARP camera.py)
++    const focusDepth = minZ + (maxZ - minZ) * 0.1;
++
++    log(`PLY complete: ${numPoints.toLocaleString()} splats, metadata in comments [fx=${fx.toFixed(1)}, image=${imgWidth}├ù${imgHeight}]`);
++
+     return {
+         plyBuffer: buffer,
+         metadata: {
+             gaussianCount: numPoints,
+             depthWidth,
+             depthHeight,
+-            minDepth,
+-            maxDepth,
++            minDepth: minDepthVal,
++            maxDepth: maxDepthVal,
++            boundsMin: [minX, minY, minZ],
++            boundsMax: [maxX, maxY, maxZ],
++            center: [
++                (minX + maxX) * 0.5,
++                (minY + maxY) * 0.5,
++                (minZ + maxZ) * 0.5,
++            ],
++            focusDepth,
++            cameraSpace: true,
++            frontBeta: 0.025,
++            parallaxBeta: 0.065,
++            focalLength: fx,      // for viewer FOV calculation
++            width: imgWidth,      // for viewer aspect ratio
++            height: imgHeight,
+         },
+     };
+ }
+@@ -415,11 +511,11 @@ end_header
+  * Main message handler
+  */
+ self.onmessage = async (event: MessageEvent<SharpWorkerMessage>) => {
+-    const { command, imageData, imageUrl, gridSize = 512, depthScale = 1.5, focalLengthPx } = event.data;
++    const { command, imageData, imageUrl, gridSize = 512, depthScale = 1.5, focalLengthPx, useBaseModel = false } = event.data;
+     
+     if (command === 'preload') {
+         try {
+-            await loadModel();
++            await loadModel(useBaseModel);
+             self.postMessage({ status: 'preload_complete' });
+         } catch (error: any) {
+             self.postMessage({ status: 'error', error: error?.message || 'Failed to preload model' });
+@@ -474,12 +570,12 @@ self.onmessage = async (event: MessageEvent<SharpWorkerMessage>) => {
+         
+         // Step 2: Run neural depth estimation
+         self.postMessage({ status: 'processing', progress: 15, message: 'Running neural depth estimation...' });
+-        const { depth: depthData, width: depthWidth, height: depthHeight } = await estimateNeuralDepth(rawImage);
++        const { depth: depthData, width: depthWidth, height: depthHeight, rawMin, rawMax } = await estimateNeuralDepth(rawImage, useBaseModel);
+         
+-        log(`Depth map: ${depthWidth}x${depthHeight}, range after normalization: 0-1 (1=close, 0=far)`);
++        log(`Depth map: ${depthWidth}x${depthHeight}, raw disparity range: [${rawMin.toFixed(4)}, ${rawMax.toFixed(4)}]`);
+         self.postMessage({ status: 'processing', progress: 60, message: 'Neural depth map computed' });
+         
+-        // Step 3: Generate PLY
++        // Step 3: Generate PLY with proper camera unprojection
+         self.postMessage({ status: 'processing', progress: 70, message: `Generating ${(gridSize * gridSize / 1000).toFixed(0)}K Gaussian splats...` });
+         
+         const imageDataObj = new ImageData(imgData, imgWidth, imgHeight);
+@@ -490,7 +586,9 @@ self.onmessage = async (event: MessageEvent<SharpWorkerMessage>) => {
+             depthHeight,
+             gridSize,
+             depthScale,
+-            focalLengthPx
++            focalLengthPx,
++            rawMin,
++            rawMax,
+         );
+         
+         self.postMessage({ status: 'processing', progress: 95, message: 'Finalizing...' });

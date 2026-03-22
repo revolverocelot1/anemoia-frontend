@@ -11,6 +11,7 @@
  */
 
 import { sharpFileStore, type StoredFile } from '../utils/sharpFileStore';
+import { computeIntrinsicFov } from '../utils/splatLens';
 
 // Service configuration
 const SHARP_API_URL = import.meta.env.VITE_SHARP_API_URL || 'http://localhost:8000';
@@ -30,6 +31,13 @@ interface SharpWorkerResponse {
     depthHeight: number;
     minDepth: number;
     maxDepth: number;
+    boundsMin: [number, number, number];
+    boundsMax: [number, number, number];
+    center: [number, number, number];
+    focusDepth: number;
+    cameraSpace: boolean;
+    frontBeta: number;
+    parallaxBeta: number;
   };
 }
 
@@ -39,6 +47,7 @@ export interface GenerationOptions {
   focalLengthMm?: number;
   horizontalFovDeg?: number;
   gridSize?: number; // Controls splat count (gridSize²), default 512
+  useBaseModel?: boolean;
   onProgress?: (progress: number, message: string) => void;
 }
 
@@ -48,10 +57,21 @@ export interface GenerationResult {
   filename?: string;
   blob?: Blob;
   metadata?: {
+    defaultFov?: number;
     gaussianCount?: number;
     focalLength?: number;
     width?: number;
     height?: number;
+    originalFov?: number;
+    viewerCalibration?: {
+      boundsMin?: [number, number, number];
+      boundsMax?: [number, number, number];
+      center?: [number, number, number];
+      focusDepth?: number;
+      cameraSpace?: boolean;
+      frontBeta?: number;
+      parallaxBeta?: number;
+    };
     processingTimeMs?: number;
     fileSize?: number;
   };
@@ -195,7 +215,7 @@ class SharpService {
   /**
    * Preload the neural depth model (call this early for better UX)
    */
-  async preloadModel(): Promise<void> {
+  async preloadModel(useBaseModel: boolean = false): Promise<void> {
     try {
       const worker = await this.getWorker();
       
@@ -211,7 +231,7 @@ class SharpService {
         };
         
         worker.addEventListener('message', handler);
-        worker.postMessage({ command: 'preload' });
+        worker.postMessage({ command: 'preload', useBaseModel });
       });
     } catch (error) {
       console.warn('[SharpService] Model preload failed:', error);
@@ -300,16 +320,17 @@ class SharpService {
         focalLengthPx = mmToFocalLength(mm, dimensions.width, dimensions.height);
       }
 
+      const originalFov = (2 * Math.atan(dimensions.width / (2 * focalLengthPx)) * 180) / Math.PI;
       onProgress(10, 'Focal length calculated');
 
       let result: GenerationResult;
 
       switch (mode) {
         case 'remote':
-          result = await this.generateRemote(imageFile, focalLengthPx, dimensions, onProgress);
+          result = await this.generateRemote(imageFile, focalLengthPx, originalFov, dimensions, onProgress);
           break;
         case 'demo':
-          result = await this.generateDemo(imageFile, focalLengthPx, dimensions, gridSize, onProgress);
+          result = await this.generateDemo(imageFile, focalLengthPx, originalFov, dimensions, gridSize, options.useBaseModel ?? false, onProgress);
           break;
         case 'local-webgpu':
           result = { success: false, error: 'WebGPU inference not yet implemented' };
@@ -332,6 +353,7 @@ class SharpService {
   private async generateRemote(
     imageFile: File,
     focalLengthPx: number,
+    originalFov: number,
     dimensions: { width: number; height: number },
     onProgress: (progress: number, message: string) => void
   ): Promise<GenerationResult> {
@@ -372,10 +394,17 @@ class SharpService {
         size: blob.size,
         createdAt: new Date(),
         metadata: {
+          defaultFov: computeIntrinsicFov({
+            focalLength: focalLengthPx,
+            width: dimensions.width,
+            height: dimensions.height,
+            originalFov,
+          }, dimensions.width, dimensions.height, 60),
           gaussianCount,
           focalLength: focalLengthPx,
           width: dimensions.width,
           height: dimensions.height,
+          originalFov,
           processingTimeMs
         }
       };
@@ -404,8 +433,10 @@ class SharpService {
   private async generateDemo(
     imageFile: File,
     focalLengthPx: number,
+    originalFov: number,
     dimensions: { width: number; height: number },
     gridSize: number,
+    useBaseModel: boolean,
     onProgress: (progress: number, message: string) => void
   ): Promise<GenerationResult> {
     const startTime = performance.now();
@@ -462,10 +493,35 @@ class SharpService {
             size: blob.size,
             createdAt: new Date(),
             metadata: {
+              defaultFov: computeIntrinsicFov({
+                focalLength: focalLengthPx,
+                width: dimensions.width,
+                height: dimensions.height,
+                originalFov,
+                viewerCalibration: metadata ? {
+                  boundsMin: metadata.boundsMin,
+                  boundsMax: metadata.boundsMax,
+                  center: metadata.center,
+                  focusDepth: metadata.focusDepth,
+                  cameraSpace: metadata.cameraSpace,
+                  frontBeta: metadata.frontBeta,
+                  parallaxBeta: metadata.parallaxBeta,
+                } : undefined,
+              }, dimensions.width, dimensions.height, 60),
               gaussianCount: metadata?.gaussianCount || gridSize * gridSize,
               focalLength: focalLengthPx,
               width: dimensions.width,
               height: dimensions.height,
+              originalFov,
+              viewerCalibration: metadata ? {
+                boundsMin: metadata.boundsMin,
+                boundsMax: metadata.boundsMax,
+                center: metadata.center,
+                focusDepth: metadata.focusDepth,
+                cameraSpace: metadata.cameraSpace,
+                frontBeta: metadata.frontBeta,
+                parallaxBeta: metadata.parallaxBeta,
+              } : undefined,
               processingTimeMs: Math.round(processingTimeMs),
               fileSize: blob.size
             }
@@ -502,6 +558,7 @@ class SharpService {
         gridSize,
         depthScale: 1.5,
         focalLengthPx,
+        useBaseModel,
       });
     });
   }

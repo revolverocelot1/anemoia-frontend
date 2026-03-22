@@ -11,6 +11,8 @@ import {
 
 /* ─── Shared Sub-Components ─── */
 
+const isCloseNumber = (a: number, b: number, epsilon: number = 0.001) => Math.abs(a - b) < epsilon;
+
 const Slider = ({ label, value, min, max, step, onChange, icon, disabled, tooltip }: {
   label: string;
   value: number;
@@ -137,6 +139,7 @@ export interface SplatViewerControlsProps {
   viewerType: 'gaussian' | 'triangle' | 'mesh' | null;
   onResetView?: () => void;
   onFrontView?: () => void;
+  onParallaxView?: () => void;
   onSideView?: () => void;
   onTopView?: () => void;
   onToggleAutoRotate?: () => void;
@@ -145,6 +148,20 @@ export interface SplatViewerControlsProps {
   onToggleGrid?: () => void;
   showAxes?: boolean;
   onToggleAxes?: () => void;
+  defaultFov?: number;
+  originalFov?: number;
+  sourceWidth?: number;
+  sourceHeight?: number;
+  currentTelemetry?: {
+    position: [number, number, number];
+    target: [number, number, number];
+    alpha: number;
+    beta: number;
+    radius: number;
+    horizontalFov: number;
+    focalPx: number;
+  } | null;
+  onResetLens?: () => void;
 }
 
 /* ─── Main Component ─── */
@@ -155,6 +172,7 @@ const SplatViewerControls: React.FC<SplatViewerControlsProps> = ({
   viewerType,
   onResetView,
   onFrontView,
+  onParallaxView,
   onSideView,
   onTopView,
   onToggleAutoRotate,
@@ -163,6 +181,12 @@ const SplatViewerControls: React.FC<SplatViewerControlsProps> = ({
   onToggleGrid,
   showAxes = true,
   onToggleAxes,
+  defaultFov,
+  originalFov,
+  sourceWidth,
+  sourceHeight,
+  currentTelemetry,
+  onResetLens,
 }) => {
   const { settings, update } = useViewerSettings();
 
@@ -170,16 +194,37 @@ const SplatViewerControls: React.FC<SplatViewerControlsProps> = ({
   const [localExposure, setLocalExposure] = useState(settings.exposure);
   const [localWireframe, setLocalWireframe] = useState(settings.wireframe);
   const [localBg, setLocalBg] = useState(settings.backgroundColor);
-  const [localFov, setLocalFov] = useState(settings.fov ?? 60);
+  // FOV: read directly from settings, no local state (avoids bidirectional sync loops)
+  const displayFov = settings.fov;
+  const handleFovChange = (fov: number) => update({ fov });
 
   useEffect(() => {
-    update({ exposure: localExposure, wireframe: localWireframe, backgroundColor: localBg, fov: localFov });
-  }, [localExposure, localWireframe, localBg, localFov, update]);
+    setLocalExposure(prev => (isCloseNumber(prev, settings.exposure) ? prev : settings.exposure));
+  }, [settings.exposure]);
 
-  // FOV ↔ Focal Length conversion helpers (36mm full-frame sensor)
-  const SENSOR_WIDTH = 36;
-  const fovToFocalLength = (fov: number) => Math.round(SENSOR_WIDTH / (2 * Math.tan((fov * Math.PI / 180) / 2)));
-  const focalLengthToFov = (fl: number) => Math.round((2 * Math.atan(SENSOR_WIDTH / (2 * fl))) * (180 / Math.PI));
+  useEffect(() => {
+    setLocalWireframe(prev => (prev === settings.wireframe ? prev : settings.wireframe));
+  }, [settings.wireframe]);
+
+  useEffect(() => {
+    setLocalBg(prev => (prev === settings.backgroundColor ? prev : settings.backgroundColor));
+  }, [settings.backgroundColor]);
+
+  // Sync non-FOV settings to global context
+  useEffect(() => {
+    if (
+      isCloseNumber(settings.exposure, localExposure) &&
+      settings.wireframe === localWireframe &&
+      settings.backgroundColor === localBg
+    ) {
+      return;
+    }
+    update({ exposure: localExposure, wireframe: localWireframe, backgroundColor: localBg });
+  }, [localExposure, localWireframe, localBg, settings.exposure, settings.wireframe, settings.backgroundColor, update]);
+
+  const sliderReferencePx = Math.max(sourceWidth ?? 1536, sourceHeight ?? sourceWidth ?? 1536);
+  const fovToFocalPx = (fov: number) => Math.round(sliderReferencePx / (2 * Math.tan((fov * Math.PI / 180) / 2)));
+  const focalPxToFov = (fl: number) => Math.round((2 * Math.atan(sliderReferencePx / (2 * fl))) * (180 / Math.PI));
 
   const isGaussian = viewerType === 'gaussian';
 
@@ -221,7 +266,7 @@ const SplatViewerControls: React.FC<SplatViewerControlsProps> = ({
                   <Camera className="w-3.5 h-3.5" />
                   Camera Presets
                 </h4>
-                <div className="grid grid-cols-4 gap-2">
+                <div className={`grid gap-2 ${viewerType === 'gaussian' ? 'grid-cols-5' : 'grid-cols-4'}`}>
                   <CameraPresetButton
                     label="Reset"
                     icon={<RotateCcw className="w-4 h-4" />}
@@ -234,6 +279,14 @@ const SplatViewerControls: React.FC<SplatViewerControlsProps> = ({
                     onClick={() => onFrontView?.()}
                     tooltip="Front view (Numpad 1)"
                   />
+                  {viewerType === 'gaussian' && (
+                    <CameraPresetButton
+                      label="Depth"
+                      icon={<Layers className="w-4 h-4" />}
+                      onClick={() => onParallaxView?.()}
+                      tooltip="Slight calibrated parallax front view (Numpad 2)"
+                    />
+                  )}
                   <CameraPresetButton
                     label="Side"
                     icon={<Layers className="w-4 h-4" />}
@@ -345,19 +398,19 @@ const SplatViewerControls: React.FC<SplatViewerControlsProps> = ({
                     <div className="flex items-center justify-between">
                       <label className="text-sm font-medium text-gray-300 flex items-center gap-2">
                         <Camera className="w-4 h-4 text-gray-500" />
-                        Focal Length
+                        Focal Length (px)
                       </label>
                       <span className="text-xs font-mono text-cyan-400 bg-cyan-950/50 px-2 py-0.5 rounded">
-                        {fovToFocalLength(localFov)}mm
+                        {fovToFocalPx(displayFov)}px
                       </span>
                     </div>
                     <input
                       type="range"
-                      min={10}
-                      max={200}
+                      min={Math.max(100, Math.round(sliderReferencePx * 0.15))}
+                      max={Math.max(6000, Math.round(sliderReferencePx * 2.5))}
                       step={1}
-                      value={fovToFocalLength(localFov)}
-                      onChange={(e) => setLocalFov(focalLengthToFov(parseInt(e.target.value)))}
+                      value={fovToFocalPx(displayFov)}
+                      onChange={(e) => handleFovChange(focalPxToFov(parseInt(e.target.value)))}
                       className="w-full h-1.5 bg-gray-700 rounded-full appearance-none cursor-pointer accent-cyan-500
                         [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 
                         [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-cyan-500 
@@ -366,9 +419,9 @@ const SplatViewerControls: React.FC<SplatViewerControlsProps> = ({
                         [&::-webkit-slider-thumb]:hover:scale-110"
                     />
                     <div className="flex justify-between text-[9px] text-gray-500 px-0.5">
-                      <span>Wide 10mm</span>
-                      <span>Normal 50mm</span>
-                      <span>Tele 200mm</span>
+                      <span>Wide</span>
+                      <span>Original</span>
+                      <span>Tele</span>
                     </div>
                   </div>
                   <div className="space-y-2">
@@ -377,17 +430,30 @@ const SplatViewerControls: React.FC<SplatViewerControlsProps> = ({
                         <Eye className="w-4 h-4 text-gray-500" />
                         Field of View
                       </label>
-                      <span className="text-xs font-mono text-cyan-400 bg-cyan-950/50 px-2 py-0.5 rounded">
-                        {localFov}°
-                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs font-mono text-cyan-400 bg-cyan-950/50 px-2 py-0.5 rounded">
+                          {displayFov}°
+                        </span>
+                        <button
+                          onClick={() => {
+                            const resetFov = originalFov ?? 60;
+                            handleFovChange(resetFov);
+                            onResetLens?.();
+                          }}
+                          className="text-[9px] px-1.5 py-0.5 rounded bg-gray-700 text-gray-400 hover:text-cyan-300 hover:bg-gray-600 transition-colors"
+                          title="Reset to original generation lens"
+                        >
+                          OG
+                        </button>
+                      </div>
                     </div>
                     <input
                       type="range"
                       min={5}
                       max={120}
                       step={1}
-                      value={localFov}
-                      onChange={(e) => setLocalFov(parseInt(e.target.value))}
+                      value={displayFov}
+                      onChange={(e) => handleFovChange(parseInt(e.target.value))}
                       className="w-full h-1.5 bg-gray-700 rounded-full appearance-none cursor-pointer accent-cyan-500
                         [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 
                         [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-cyan-500 
@@ -395,7 +461,19 @@ const SplatViewerControls: React.FC<SplatViewerControlsProps> = ({
                         [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:transition-transform
                         [&::-webkit-slider-thumb]:hover:scale-110"
                     />
+                    <div className="text-[10px] text-gray-500">
+                      Horizontal FOV. `OG` restores the original lens used when the model was generated.
+                    </div>
                   </div>
+                  {currentTelemetry && (
+                    <div className="rounded-lg border border-cyan-500/15 bg-gray-900/60 px-3 py-2 text-[10px] text-gray-400">
+                      <div className="text-cyan-300 font-semibold mb-1">Live Camera</div>
+                      <div>Pos: {currentTelemetry.position.map((v) => v.toFixed(2)).join(', ')}</div>
+                      <div>Target: {currentTelemetry.target.map((v) => v.toFixed(2)).join(', ')}</div>
+                      <div>Alpha/Beta: {currentTelemetry.alpha.toFixed(2)} / {currentTelemetry.beta.toFixed(2)}</div>
+                      <div>Radius: {currentTelemetry.radius.toFixed(2)}</div>
+                    </div>
+                  )}
                 </div>
               </div>
 

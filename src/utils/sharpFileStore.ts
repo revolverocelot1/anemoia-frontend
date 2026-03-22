@@ -15,10 +15,21 @@ export interface StoredFile {
   size: number;
   createdAt: Date;
   metadata?: {
+    defaultFov?: number;
     gaussianCount?: number;
     focalLength?: number;
     width?: number;
     height?: number;
+    originalFov?: number;
+    viewerCalibration?: {
+      boundsMin?: [number, number, number];
+      boundsMax?: [number, number, number];
+      center?: [number, number, number];
+      focusDepth?: number;
+      cameraSpace?: boolean;
+      frontBeta?: number;
+      parallaxBeta?: number;
+    };
     processingTimeMs?: number;
     fileSize?: number;
   };

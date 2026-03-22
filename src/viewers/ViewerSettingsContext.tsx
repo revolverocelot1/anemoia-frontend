@@ -30,7 +30,14 @@ export const ViewerSettingsProvider = ({ children }: { children: ReactNode }) =>
   const [settings, setSettings] = useState<ViewerSettings>(() => {
     try {
       const stored = localStorage.getItem('viewerSettings');
-      return stored ? { ...defaultSettings, ...JSON.parse(stored) } : defaultSettings;
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        // Exclude 'fov' from localStorage — it's model-specific and should
+        // always start at the default (60°), then be overridden by model metadata.
+        const { fov: _discardedFov, ...rest } = parsed;
+        return { ...defaultSettings, ...rest };
+      }
+      return defaultSettings;
     } catch {
       return defaultSettings;
     }
@@ -38,8 +45,14 @@ export const ViewerSettingsProvider = ({ children }: { children: ReactNode }) =>
 
   const update = useCallback((partial: Partial<ViewerSettings>) => {
     setSettings((prev) => {
+      const changedKeys = Object.entries(partial) as Array<[keyof ViewerSettings, ViewerSettings[keyof ViewerSettings]]>;
+      if (changedKeys.length === 0 || changedKeys.every(([key, value]) => prev[key] === value)) {
+        return prev;
+      }
       const updated = { ...prev, ...partial };
-      localStorage.setItem('viewerSettings', JSON.stringify(updated));
+      // Persist to localStorage but exclude fov (model-specific, not session-persistent)
+      const { fov: _fov, ...persistable } = updated;
+      localStorage.setItem('viewerSettings', JSON.stringify(persistable));
       return updated;
     });
   }, []);
