@@ -28,6 +28,7 @@
     "src/opencut-z/OpenCutZApp.tsx",
     "src/opencut-z/RealOpenCutZEditor.tsx",
     "src/opencut-z/components/**/*",
-    "src/opencut-z/providers/**/*"
+    "src/opencut-z/providers/**/*",
+    "src/pages/_archive/**/*"
   ]
 }

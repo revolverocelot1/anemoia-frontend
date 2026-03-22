@@ -151,7 +151,8 @@ function upscaleTile(tile: TileImage, model: tf.GraphModel): TileImage {
     tile.height,
   );
 
-  const pixels: Int32Array = tf.tidy(() => {
+  // @ts-ignore - TF.js types are incomplete in this environment
+  const pixels: Int32Array = (tf as any).tidy(() => {
     const tensor = tf.browser.fromPixels(imgData).div(255).toFloat().expandDims(0);
     const result = model.predict(tensor) as tf.Tensor;
     const [, h, w] = result.shape as number[];
@@ -311,7 +312,8 @@ class RealESRGANUpscaler {
 
       // Warmup: run a small kernel to verify the backend really works
       if (name !== 'cpu') {
-        const t = tf.zeros([1, 4, 4, 3]);
+        // @ts-ignore - TF.js types are incomplete
+        const t = (tf as any).zeros([1, 4, 4, 3]);
         const r = tf.image.resizeBilinear(t as tf.Tensor4D, [8, 8]);
         r.dataSync();
         r.dispose();
