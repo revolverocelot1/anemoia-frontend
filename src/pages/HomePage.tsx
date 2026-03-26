@@ -33,13 +33,11 @@ const itemVariants: Variants = {
   },
 };
 
-const HomePage = () => {
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+interface HomePageProps {
+  onToggleSidebar?: () => void;
+}
 
-  const toggleSidebar = () => {
-    setSidebarOpen(!sidebarOpen);
-  };
-
+const HomePage: React.FC<HomePageProps> = ({ onToggleSidebar }) => {
   // Debug logging
   useEffect(() => {
     console.log('HomePage mounted');
@@ -120,8 +118,6 @@ const HomePage = () => {
 
   return (
     <div className="relative flex size-full min-h-screen flex-col dark group/design-root overflow-x-hidden" style={{ position: 'relative', zIndex: 10 }}>
-      {/* Sidebar */}
-      <Sidebar isOpen={sidebarOpen} onToggle={toggleSidebar} />
       
       <div className="layout-container flex h-full grow flex-col" style={{ position: 'relative', zIndex: 20 }}>
         <Header />
@@ -421,13 +417,13 @@ const HomePage = () => {
                 <motion.div
                   variants={itemVariants}
                   className="card h-full flex flex-col items-center justify-center text-center p-6 cursor-pointer relative overflow-hidden group"
-                  onClick={toggleSidebar}
+                  onClick={onToggleSidebar}
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
                   data-accent="7"
                 >
                   {/* Invisible button overlay to catch all clicks reliably */}
-                  <button className="absolute inset-0 w-full h-full z-20 cursor-pointer rounded-xl bg-transparent border-none appearance-none" onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleSidebar(); }} aria-label="Open Secret Tools" />
+                  <button className="absolute inset-0 w-full h-full z-20 cursor-pointer rounded-xl bg-transparent border-none appearance-none" onClick={(e) => { e.preventDefault(); e.stopPropagation(); onToggleSidebar?.(); }} aria-label="Open Secret Tools" />
 
                   {/* Holographic effect overlay */}
                   <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none">

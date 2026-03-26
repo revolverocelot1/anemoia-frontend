@@ -4,6 +4,7 @@ import AnimatedPage from './components/AnimatedPage';
 import ErrorBoundary from './components/ErrorBoundary';
 import LoadingFallback from './components/LoadingFallback';
 import ProtectedRoute from './components/ProtectedRoute';
+import Sidebar from './components/Sidebar';
 import HomePage from './pages/HomePage';
 import DepthMapPage from './pages/DepthMapPage';
 import AuthCallbackPage from './pages/AuthCallbackPage';
@@ -101,6 +102,9 @@ function App() {
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const [modulesReady, setModulesReady] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  const toggleSidebar = () => setSidebarOpen(!sidebarOpen);
 
   // Check for authentication tokens in URL on app load
   useEffect(() => {
@@ -279,6 +283,10 @@ function App() {
       
       {/* Temporarily disabled FileUploadFix to test video editor */}
       {/* <FileUploadFix /> */}
+      
+      {/* App-level Sidebar for Secret Tools escapes route-level transforms */}
+      <Sidebar isOpen={sidebarOpen} onToggle={toggleSidebar} />
+
       <div style={{ position: 'relative', zIndex: 10 }}>
         <SupabaseAuthProvider>
           <Routes>
@@ -286,7 +294,7 @@ function App() {
               path="/"
               element={
                 <AnimatedPage>
-                  <HomePage />
+                  <HomePage onToggleSidebar={toggleSidebar} />
                 </AnimatedPage>
               }
             />
