@@ -143,7 +143,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onToggle }) => {
     }
   ];
 
-  const readyTools = ['doom', 'anime-gallery', 'synthid-remover'];
+  const readyTools = ['doom', 'anime-gallery'];
 
   return (
     <>
@@ -154,7 +154,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onToggle }) => {
         style={{ top: '1.25rem', left: '1.25rem' }}
         whileHover={{ scale: 1.08 }}
         whileTap={{ scale: 0.92 }}
-        animate={{ x: isOpen ? 276 : 0 }}
+        animate={{ x: isOpen ? 384 : 0 }}
         transition={{ type: "spring", stiffness: 300, damping: 30 }}
       >
         <motion.span
@@ -183,21 +183,25 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onToggle }) => {
       <AnimatePresence>
         {isOpen && (
           <motion.div
-            initial={{ x: -320 }}
+            initial={{ x: -384 }}
             animate={{ x: 0 }}
-            exit={{ x: -320 }}
+            exit={{ x: -384 }}
             transition={{ type: "spring", stiffness: 300, damping: 30 }}
-            className="fixed left-0 top-0 bottom-0 z-40 w-72 flex flex-col bg-gray-950/98 backdrop-blur-xl shadow-2xl border-r border-cyan-500/15"
+            className="fixed inset-y-0 left-0 z-50 w-96 max-w-[85vw] flex flex-col bg-gray-950/98 backdrop-blur-xl shadow-2xl border-r border-cyan-500/15"
           >
             {/* Header — sticky top */}
             <div className="flex-shrink-0 px-5 py-5 border-b border-white/5">
               <div className="flex items-center gap-3">
-                <div className="w-9 h-9 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-lg flex items-center justify-center shadow-md shadow-cyan-500/20">
-                  <span className="material-symbols-outlined text-white text-lg">build</span>
+                <div className="w-10 h-10 bg-gradient-to-br from-purple-600 to-cyan-500 rounded-xl flex items-center justify-center shadow-lg shadow-cyan-500/20">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5 text-white">
+                    <rect x="5" y="11" width="14" height="10" rx="2" />
+                    <circle cx="12" cy="16" r="1" />
+                    <path d="M8 11V7a4 4 0 118 0v4" />
+                  </svg>
                 </div>
                 <div>
-                  <h2 className="text-lg font-bold text-white leading-tight">Misc Tools</h2>
-                  <p className="text-xs text-cyan-400/60">Utilities & experiments</p>
+                  <h2 className="text-lg font-bold text-white leading-tight">Secret Tools</h2>
+                  <p className="text-xs text-cyan-400/60">Classified utilities</p>
                 </div>
               </div>
             </div>
@@ -214,28 +218,38 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onToggle }) => {
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: index * 0.06 }}
-                    className={`relative p-3.5 rounded-xl border transition-all duration-150 cursor-pointer group bg-white/[0.02] hover:bg-white/[0.06] ${colors.border}`}
+                    className={`relative ${isReady ? 'p-5 rounded-2xl' : 'p-3 rounded-xl opacity-80'} border transition-all duration-150 cursor-pointer group bg-white/[0.02] hover:bg-white/[0.06] ${colors.border}`}
                     onClick={tool.onClick}
-                    whileHover={{ x: 4 }}
+                    whileHover={{ x: 4, scale: 1.01 }}
                     whileTap={{ scale: 0.98 }}
                   >
-                    <div className="flex items-center gap-3">
+                    <div className={`flex items-center ${isReady ? 'gap-4' : 'gap-3'}`}>
                       {/* Icon */}
-                      <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 bg-gradient-to-br ${colors.gradient} text-white shadow-sm group-hover:scale-105 transition-transform`}>
-                        {customIcons[tool.icon] || <span className="material-symbols-outlined text-lg">{tool.icon}</span>}
+                      <div className={`${isReady ? 'w-14 h-14 rounded-xl text-3xl' : 'w-10 h-10 rounded-lg text-xl'} flex items-center justify-center flex-shrink-0 bg-gradient-to-br ${colors.gradient} text-white shadow-sm group-hover:scale-105 transition-transform overflow-hidden`}>
+                        {tool.id === 'doom' ? (
+                          <img src="/emblems/doom_emblem_new.png" alt="DOOM" className="w-full h-full object-cover" />
+                        ) : tool.id === 'anime-gallery' ? (
+                          <img src="/emblems/aghpb_vintage.png" alt="AGHPB" className="w-full h-full object-cover" />
+                        ) : (
+                          customIcons[tool.icon] || <span className="material-symbols-outlined text-inherit">{tool.icon}</span>
+                        )}
                       </div>
                       
                       {/* Content */}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
-                          <h3 className="font-semibold text-white text-sm truncate">{tool.name}</h3>
-                          {tool.badge && (
-                            <span className={`px-1.5 py-0.5 text-[10px] font-bold rounded-md flex-shrink-0 ${colors.badge}`}>
+                          <h3 className={`${isReady ? 'font-bold text-lg' : 'font-semibold text-sm'} text-white truncate`}>{tool.name}</h3>
+                          {tool.badge && isReady && (
+                            <span className={`px-2 py-0.5 text-[11px] font-bold rounded-md flex-shrink-0 ${colors.badge}`}>
                               {tool.badge}
                             </span>
                           )}
                         </div>
-                        <p className="text-xs text-gray-500 mt-0.5 line-clamp-1">{tool.description}</p>
+                        {isReady ? (
+                          <p className="text-sm text-gray-400 mt-1 line-clamp-2 leading-snug">{tool.description}</p>
+                        ) : (
+                          <p className="text-xs text-gray-500 mt-0.5 line-clamp-1">{tool.description}</p>
+                        )}
                       </div>
                       
                       {/* Arrow */}
@@ -246,9 +260,9 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onToggle }) => {
                     
                     {/* Status */}
                     {!isReady && (
-                      <div className="mt-2 text-[10px] text-gray-600 flex items-center gap-1">
-                        <span className="material-symbols-outlined text-xs">construction</span>
-                        Coming soon
+                      <div className="mt-2 text-[10px] text-yellow-500 flex items-center gap-1 font-medium bg-yellow-500/10 w-fit px-1.5 py-0.5 rounded">
+                        <span className="material-symbols-outlined text-[10px]">warning</span>
+                        UNDER CONSTRUCTION
                       </div>
                     )}
                   </motion.div>

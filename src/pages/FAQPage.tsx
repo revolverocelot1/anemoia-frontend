@@ -11,112 +11,62 @@ interface FAQItem {
 }
 
 const faqData: { [key: string]: FAQItem[] } = {
-  'Getting Started': [
+  'The Studio': [
     {
-      q: 'What is Anemoia?',
-      a: 'Anemoia is a cutting-edge WebGL Studio that offers GPU-accelerated AI tools for creative professionals. Our platform features advanced image processing, video editing, face swapping, subtitle generation, and 3D visualization tools - all powered by WebGL and WebGPU technology for real-time performance directly in your browser.'
+      q: 'What actually is Anemoia?',
+      a: "It's a sandbox for pushing the limits of what browsers can do. We run heavy 3D rendering, machine learning, and computer vision algorithms right in your browser using WebGL and WebAssembly. No huge software installs, no massive cloud fees. Just drop a file in and let your GPU carry the weight."
     },
     {
-      q: 'Do I need to create an account to use the tools?',
-      a: 'You can use most of our core tools without creating an account. However, signing in with Google unlocks additional features, higher processing limits, the ability to save your work, and access to premium tools.'
+      q: 'Do I need a crazy expensive GPU to run this?',
+      a: "A dedicated GPU helps immensely, but it's not strictly required. If you're on a cloud VM or a lightweight laptop, Chrome will fall back to software rendering (like SwiftShader). Things will initially take longer to process, and you might even see a black canvas until you interact with it, but the math still checks out and it will work."
     },
     {
-      q: 'Is Anemoia free to use?',
-      a: 'Yes! We offer a generous free tier that includes access to all basic tools with reasonable usage limits. We also offer premium subscriptions for users who need higher limits, faster processing, or advanced features.'
-    },
-    {
-      q: 'What browsers are supported?',
-      a: 'Anemoia works best on modern browsers including Chrome, Firefox, Safari, and Edge. We recommend using the latest version for optimal performance and WebGL/WebGPU feature support. A dedicated GPU is recommended for best performance.'
+      q: 'Is it completely free?',
+      a: "Yeah, basically. The core client-side tools only cost your own electricity. We run dedicated backend endpoints for auth and some of the heavy-lifting Gemini stuff, so if you want to bypass limits or save your workspace, signing in is the way to go."
     }
   ],
-  'Image Processing Tools': [
+  'Neural Processing': [
     {
-      q: 'What is depth map generation and what can I use it for?',
-      a: 'Depth map generation creates a grayscale image representing the distance of surfaces from the camera viewpoint. Lighter areas are closer, darker areas are farther. It\'s useful for 3D modeling, visual effects, AR/VR applications, and creating stunning artistic effects.'
+      q: 'How does the image upscaler actually work?',
+      a: 'We chunk your image into 64x64 tiles and run them through local neural network weights (like Real-ESRGAN or CUGAN) right here in the browser. It hallucinates missing details instead of just blindly stretching pixels. The first time you run it, it pulls down a hefty model file (ranging from 2MB to 35MB), but after that, it lives natively in your browser cache.'
     },
     {
-      q: 'How does pose estimation work?',
-      a: 'Our pose estimation tool uses MoveNet Lightning to detect up to 17 key body joints in images containing people. It can detect multiple people simultaneously and provides accurate keypoint coordinates, making it perfect for fitness analysis, animation, and motion capture applications.'
+      q: 'What is the SHARP 3D Generator doing to my images?',
+      a: 'It uses monocular depth mapping to hallucinate 3D structure from a flat 2D image. Under the hood, a Web Worker blasts the image through a neural depth network and generates roughly 590,000 Gaussian splats in about 10 seconds. You go from a single JPEG directly to a fully orbital 3D point cloud.'
     },
     {
-      q: 'What makes your AI upscaler different from basic resize tools?',
-      a: 'Unlike simple pixel interpolation, our AI upscaler uses Real-ESRGAN (Enhanced Super-Resolution GAN) technology to intelligently predict and generate missing details. This results in sharper, more natural-looking high-resolution images with preserved textures and reduced artifacts.'
-    },
-    {
-      q: 'How does the Face Swap AI work?',
-      a: 'Our Face Swap tool uses advanced neural networks and WebGL acceleration to seamlessly swap faces between images. It detects facial features, preserves expressions, and blends skin tones for realistic results. The tool is currently in beta with ongoing improvements to the AI model.'
-    },
-    {
-      q: 'How does the image comparison tool work?',
-      a: 'Our advanced image comparison tool uses multiple algorithms including structural similarity (SSIM), mean squared error (MSE), feature detection, and AI-powered object recognition. It provides detailed analysis with difference highlighting, statistical metrics, and can detect objects and text changes.'
+      q: 'Face Swap is feeling magical. How are you doing that?',
+      a: "We're using a cocktail of specialized ONNX models executing via WebGL. The less you know about the exact blend, the better. Just know that it maps facial landmarks, warps the geometry, and handles the color matching locally. We keep the real secret sauce closely guarded."
     }
   ],
-  'Video Tools': [
+  'Spatial Computing': [
     {
-      q: 'What is Video Caption Studio?',
-      a: 'Video Caption Studio is our AI-powered subtitle generation and editing tool. It uses Whisper AI for automatic transcription, supports multiple languages, and provides a professional timeline editor for precise caption timing. Perfect for content creators, educators, and accessibility compliance.'
+      q: 'What formats can the 3D Splat Viewer handle?',
+      a: "We natively render .splat files and standard .ply point clouds using custom high-performance WebGL shaders. We handle the heavy matrix math, frustum culling, and alpha sorting so you can orbit millions of splats seamlessly at 60fps."
     },
     {
-      q: 'How accurate is the automatic transcription?',
-      a: 'Our transcription uses OpenAI\'s Whisper model, which achieves near-human accuracy for clear audio. Accuracy depends on audio quality, background noise, and speaker clarity. The tool supports over 90 languages and can handle multiple speakers, technical terminology, and various accents.'
-    },
-    {
-      q: 'What subtitle formats can I export?',
-      a: 'Video Caption Studio supports industry-standard formats including SRT (SubRip), VTT (WebVTT), and more formats coming soon. You can customize styling, positioning, and timing before export. All exports maintain frame-accurate synchronization.'
-    },
-    {
-      q: 'Is there a video editor available?',
-      a: 'Yes! We\'re developing a comprehensive video editor with timeline editing, transitions, effects, and GPU-accelerated rendering. It\'s currently in active development and will be released soon. Early access may be available for premium users.'
+      q: 'What is "Triangle Splatting"?',
+      a: "Triangle Splatting is a brand new, highly experimental technique that swaps traditional splat discs for actual geometric meshes to drastically increase sharpness. But here's the disclaimer: This is bleeding-edge tech. There is barely any ecosystem support for it, and it's mostly in here for researchers, academics, and graphics nerds who want to break things."
     }
   ],
-  '3D & Graphics Tools': [
+  'Classified Operations': [
     {
-      q: 'What is the 3D Splat Viewer?',
-      a: 'Our 3D Splat Viewer is a WebGL-powered renderer for cutting-edge 3D formats including Gaussian Splats, Triangle Splats, and PLY point clouds. It supports real-time rendering of photorealistic 3D captures and is perfect for viewing NeRF outputs and 3D scans.'
+      q: 'I found the Secret Tools tab. What is that?',
+      a: "We use this place for our weirdest experiments and retro hyper-fixations. Need to play DOOM in a WebAssembly sandbox mid-workflow? Want to look at a nostalgic 1990s terminal filled with anime girls holding programming books? That's what it's for. Don't ask too many questions."
     },
     {
-      q: 'Can I view my own 3D models?',
-      a: 'Yes! The Splat Viewer supports uploading your own .splat, .ply, and compatible 3D files. We handle models up to 500MB with optimized WebGL rendering. Larger files may require compression or decimation for smooth browser performance.'
-    },
-    {
-      q: 'What makes your 3D rendering special?',
-      a: 'We use custom WebGL shaders optimized for modern GPUs, supporting millions of points/splats with real-time performance. Our renderer includes advanced features like adaptive level-of-detail, frustum culling, and GPU-based sorting for optimal performance.'
+      q: 'Why are half the tools marked "Under Construction"?',
+      a: "Because we ship things broken and fix them live. We're actively building out tools for video object removal, batch conversion, and watermark neutralization. They'll unlock when they're actually stable (or at least stable enough)."
     }
   ],
-  'Technical & Privacy': [
+  'Telemetry & Privacy': [
     {
-      q: 'How is my data handled and stored?',
-      a: 'Your privacy is our priority. Images and videos are processed locally using WebGL when possible. For cloud features, files are encrypted, processed securely, and automatically deleted after processing. We never use your content for training without explicit consent.'
+      q: 'Why does the browser freeze or take forever the very first time I run a tool?',
+      a: "Because executing machine learning in the browser is hard. The first time you click 'Run', we download the neural network weights from our CDN. Sometimes the WebGL shader compilation locks up the main thread for a second. We cache everything in IndexedDB immediately, so the second time around, it skips the download and runs instantly."
     },
     {
-      q: 'Why is the first use of a tool slower than subsequent uses?',
-      a: 'The first time you use a tool, we need to load the AI model and initialize WebGL resources, which can take a few seconds. Once loaded, models are cached in your browser for much faster processing on subsequent uses during your session.'
-    },
-    {
-      q: 'What file formats are supported?',
-      a: 'We support common formats: Images (JPEG, PNG, WebP, GIF), Videos (MP4, WebM, MOV), 3D files (PLY, SPLAT). File size limits vary by tool but generally support files up to 100MB for images and 500MB for videos.'
-    },
-    {
-      q: 'Can I use the API for my applications?',
-      a: 'We\'re currently developing API access for developers. If you\'re interested in integrating our tools into your applications, please contact us for early access information and documentation.'
-    }
-  ],
-  'Troubleshooting': [
-    {
-      q: 'My image/video processing failed. What should I do?',
-      a: 'First, ensure your file is in a supported format and under the size limit. Check your internet connection and browser console for errors. Try refreshing the page and clearing browser cache. If issues persist, contact support with error details.'
-    },
-    {
-      q: 'The tool is loading slowly or not responding.',
-      a: 'Performance depends on your GPU, file size, and browser. Try: 1) Using a smaller file, 2) Closing other GPU-intensive tabs, 3) Updating your graphics drivers, 4) Using Chrome/Edge for best WebGL performance, 5) Disabling browser extensions that might interfere.'
-    },
-    {
-      q: 'Can I process multiple files at once?',
-      a: 'Currently, most tools process one file at a time for optimal quality. Batch processing is available for some tools in premium tier. Video Caption Studio supports queue processing for multiple videos.'
-    },
-    {
-      q: 'Why can\'t I see my results?',
-      a: 'Check your browser\'s download settings and popup blocker. Results might be blocked by security settings. Try right-clicking the download button and selecting "Save as". Ensure you have sufficient disk space for downloads.'
+      q: 'Are my files being uploaded to your servers?',
+      a: "The vast majority of the processing (upscaling, depth mapping, splat generation) happens directly on your own GPU. Your browser is doing the math. For the few features requiring our cloud nodes, data is transferred securely over TLS and dumped immediately after processing. We don't want to pay to store your random files, and we don't use them to train our internal models."
     }
   ]
 };
@@ -141,24 +91,24 @@ const Accordion = ({ items, categoryColor }: { items: FAQItem[], categoryColor: 
         return (
           <motion.div
             key={index}
-            className="bg-gray-800/50 backdrop-blur-sm rounded-xl border border-gray-700 overflow-hidden"
+            className={`bg-gradient-to-r from-gray-900/60 to-gray-800/40 backdrop-blur-md rounded-2xl border transition-all duration-300 overflow-hidden ${isOpen ? 'border-cyan-500/40 shadow-[0_0_15px_rgba(6,182,212,0.15)]' : 'border-white/5 hover:border-white/20'}`}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3, delay: index * 0.1 }}
+            transition={{ duration: 0.4, delay: index * 0.08 }}
           >
             <button
               onClick={() => toggleItem(index)}
-              className="w-full px-6 py-4 text-left flex items-center justify-between hover:bg-gray-700/30 transition-colors duration-200"
+              className="w-full px-6 py-5 text-left flex items-center justify-between hover:bg-white/[0.02] transition-colors duration-300 group"
               aria-expanded={isOpen}
             >
-              <span className="font-medium text-white pr-4">{item.q}</span>
+              <span className={`font-semibold pr-4 transition-colors duration-300 ${isOpen ? 'text-cyan-300' : 'text-gray-200 group-hover:text-white'}`}>{item.q}</span>
               <motion.div
                 animate={{ rotate: isOpen ? 180 : 0 }}
-                transition={{ duration: 0.2 }}
-                className="flex-shrink-0"
+                transition={{ duration: 0.3, type: "spring", stiffness: 200 }}
+                className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center transition-colors duration-300 ${isOpen ? 'bg-cyan-500/20' : 'bg-white/5 group-hover:bg-white/10'}`}
               >
-                <svg className={`w-5 h-5 ${categoryColor}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                <svg className={`w-4 h-4 ${isOpen ? 'text-cyan-400' : categoryColor}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 9l-7 7-7-7" />
                 </svg>
               </motion.div>
             </button>
@@ -168,12 +118,12 @@ const Accordion = ({ items, categoryColor }: { items: FAQItem[], categoryColor: 
                 height: isOpen ? 'auto' : 0,
                 opacity: isOpen ? 1 : 0
               }}
-              transition={{ duration: 0.3 }}
+              transition={{ duration: 0.3, ease: "easeInOut" }}
               className="overflow-hidden"
             >
-              <div className="px-6 pb-4">
-                <p className="text-gray-300 leading-relaxed">{item.a}</p>
-      </div>
+              <div className="px-6 pb-6 pt-2">
+                <p className="text-gray-400 font-light tracking-wide leading-relaxed text-sm md:text-base">{item.a}</p>
+              </div>
             </motion.div>
           </motion.div>
         );
@@ -188,12 +138,11 @@ const FAQPage = () => {
 
   const categories = Object.keys(faqData);
   const categoryColors = {
-    'Getting Started': 'text-blue-400',
-    'Image Processing Tools': 'text-purple-400',
-    'Video Tools': 'text-green-400',
-    '3D & Graphics Tools': 'text-red-400',
-    'Technical & Privacy': 'text-yellow-400',
-    'Troubleshooting': 'text-indigo-400'
+    'The Studio': 'text-blue-400',
+    'Neural Processing': 'text-purple-400',
+    'Spatial Computing': 'text-red-400',
+    'Classified Operations': 'text-green-500',
+    'Telemetry & Privacy': 'text-yellow-400'
   };
 
   const filteredData = () => {
@@ -317,12 +266,11 @@ const FAQPage = () => {
                   >
                     <div className="flex items-center space-x-3 mb-6">
                       <div className={`w-1 h-8 rounded-full bg-gradient-to-b ${
-                        category === 'Getting Started' ? 'from-blue-400 to-blue-600' :
-                        category === 'Image Processing Tools' ? 'from-purple-400 to-purple-600' :
-                        category === 'Video Tools' ? 'from-green-400 to-green-600' :
-                        category === '3D & Graphics Tools' ? 'from-red-400 to-red-600' :
-                        category === 'Technical & Privacy' ? 'from-yellow-400 to-yellow-600' :
-                        'from-indigo-400 to-indigo-600'
+                        category === 'The Studio' ? 'from-blue-400 to-blue-600' :
+                        category === 'Neural Processing' ? 'from-purple-400 to-purple-600' :
+                        category === 'Spatial Computing' ? 'from-red-400 to-red-600' :
+                        category === 'Classified Operations' ? 'from-green-400 to-green-600' :
+                        'from-yellow-400 to-yellow-600'
                       }`}></div>
                       <h2 className={`text-2xl font-bold ${categoryColors[category as keyof typeof categoryColors]}`}>
                         {category}

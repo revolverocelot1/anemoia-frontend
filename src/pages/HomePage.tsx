@@ -331,6 +331,7 @@ const HomePage = () => {
                       <h3 className="text-xl font-bold mb-3 text-white group-hover:text-fuchsia-400 transition-colors">Triangle Splatting</h3>
                       <p className="text-base text-gray-300 flex-1 leading-relaxed">
                         GPU-accelerated triangle-based 3D Gaussian Splatting. A next-gen rendering technique that replaces splat discs with triangle meshes for sharper, more detailed 3D scenes.
+                        <br/><span className="text-xs text-yellow-500/80 mt-2 block font-medium">⚠️ Note: Experimental bleeding-edge technology. Barely any ecosystem support exists; primarily intended for researchers.</span>
                       </p>
                       <div className="mt-4 pt-4 w-full">
                         <div className="flex items-center text-sm font-medium text-fuchsia-400 group-hover:text-fuchsia-300 transition-colors">
@@ -416,7 +417,7 @@ const HomePage = () => {
                   </Link>
                 </motion.div>
                 
-                {/* Miscellaneous Tools Card - Enhanced with Star Wars styling */}
+                {/* Secret Tools Card - Enhanced with glowing aesthetic */}
                 <motion.div
                   variants={itemVariants}
                   className="card h-full flex flex-col items-center justify-center text-center p-6 cursor-pointer relative overflow-hidden group"
@@ -425,26 +426,50 @@ const HomePage = () => {
                   whileTap={{ scale: 0.98 }}
                   data-accent="7"
                 >
+                  {/* Invisible button overlay to catch all clicks reliably */}
+                  <button className="absolute inset-0 w-full h-full z-20 cursor-pointer rounded-xl bg-transparent border-none appearance-none" onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleSidebar(); }} aria-label="Open Secret Tools" />
+
                   {/* Holographic effect overlay */}
-                  <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                  <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none">
                     <div className="absolute inset-0 bg-gradient-to-t from-cyan-500/10 to-transparent"></div>
                     <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(0,212,255,0.1),transparent_70%)]"></div>
                   </div>
                   
-                  <div className="icon-container mb-4 relative z-10" data-accent="7">
-                    <BsTools className="text-current w-8 h-8"/>
+                  {/* High effort animated SVG icon */}
+                  <div className="icon-container mb-4 relative z-10 pointer-events-none" data-accent="7">
+                    <div className="relative w-16 h-16 flex items-center justify-center">
+                      <motion.div 
+                        className="absolute inset-0 rounded-full border border-cyan-500/30 border-r-cyan-400/80 border-b-cyan-500/80"
+                        animate={{ rotate: 360 }}
+                        transition={{ duration: 4, repeat: Infinity, ease: 'linear' }}
+                      />
+                      <motion.div 
+                        className="absolute inset-1 rounded-full border border-purple-500/30 border-l-purple-400/80 border-t-purple-500/80"
+                        animate={{ rotate: -360 }}
+                        transition={{ duration: 3, repeat: Infinity, ease: 'linear' }}
+                      />
+                      <motion.div
+                        className="relative z-10 text-cyan-400"
+                        animate={{ scale: [1, 1.1, 1], filter: ['drop-shadow(0 0 2px rgba(34,211,238,0.5))', 'drop-shadow(0 0 8px rgba(34,211,238,0.9))', 'drop-shadow(0 0 2px rgba(34,211,238,0.5))'] }}
+                        transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+                      >
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-8 h-8">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+                        </svg>
+                      </motion.div>
+                    </div>
                   </div>
-                  <h3 className="text-xl font-bold mb-2 text-white relative z-10">Miscellaneous Tools</h3>
-                  <p className="text-sm text-[var(--text-secondary)] mb-4 relative z-10">
-                    Additional WebGL experiments and GPU-accelerated utilities. Explore advanced graphics techniques and neural rendering.
+                  <h3 className="text-xl font-bold mb-2 text-white relative z-10 pointer-events-none">Secret Tools</h3>
+                  <p className="text-sm text-[var(--text-secondary)] mb-4 relative z-10 pointer-events-none">
+                    Hidden utilities and experimental features. Use classified GPU endpoints for special applications.
                   </p>
-                  <div className="flex items-center text-sm font-medium text-[var(--primary-color)] relative z-10">
-                    <span>Click to explore</span>
-                    <span className="material-symbols-outlined text-lg ml-1 animate-pulse">arrow_forward</span>
+                  <div className="flex items-center text-sm font-medium text-[var(--primary-color)] relative z-10 pointer-events-none">
+                    <span>Unlock access</span>
+                    <span className="material-symbols-outlined text-lg ml-1 animate-pulse">lock_open</span>
                   </div>
                   
                   {/* Corner accent */}
-                  <div className="absolute top-0 right-0 w-16 h-16 opacity-20">
+                  <div className="absolute top-0 right-0 w-16 h-16 opacity-20 pointer-events-none">
                     <div className="absolute top-0 right-0 w-full h-full border-t-2 border-r-2 border-cyan-400"></div>
                   </div>
                 </motion.div>

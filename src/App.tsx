@@ -713,7 +713,11 @@ function App() {
                   '/sharp/landing', 
                   '/splat-viewer', 
                   '/radia-viewer', 
-                  '/sharp'
+                  '/sharp',
+                  '/account',
+                  '/admin/dashboard',
+                  '/admin/support',
+                  '/support'
                 ]}
               />
 
