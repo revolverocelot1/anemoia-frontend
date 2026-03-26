@@ -190,17 +190,16 @@ async function enlargeImage(
   const { width, height } = inputImg;
   const output = new TileImage(width * factor, height * factor);
 
+  // Tile count calculation — uses the same division-by-zero trick as the
+  // reference web-realesrgan worker.js:
+  //   When num=1: (inputSize - dim) / 0 → ±Infinity or NaN.
+  //     dim <= inputSize → 0/0=NaN or +Infinity → NaN<minLap = false → exits at 1 tile.
+  //     dim > inputSize  → negative/0 = -Infinity → -Inf<minLap = true → increments.
+  //   When num>1: normal overlap check until overlap ≥ minLap.
   let numX = 1;
-  while ((inputSize * numX - width) / Math.max(numX - 1, 1) < minLap && numX * inputSize < width + inputSize) numX++;
-  if (numX === 1 && width > inputSize) {
-    numX = Math.ceil(width / (inputSize - minLap));
-  }
-
+  for (; (inputSize * numX - width) / (numX - 1) < minLap; numX++);
   let numY = 1;
-  while ((inputSize * numY - height) / Math.max(numY - 1, 1) < minLap && numY * inputSize < height + inputSize) numY++;
-  if (numY === 1 && height > inputSize) {
-    numY = Math.ceil(height / (inputSize - minLap));
-  }
+  for (; (inputSize * numY - height) / (numY - 1) < minLap; numY++);
 
   const locsX = computeTileLocations(numX, inputSize, width);
   const locsY = computeTileLocations(numY, inputSize, height);
@@ -357,7 +356,13 @@ class RealESRGANUpscaler {
         message: `Downloading ${config.name} (${config.sizeLabel})...`,
         progress: 10,
       });
-      this.model = await tf.loadGraphModel(config.modelUrl);
+
+      try {
+        this.model = await tf.loadGraphModel(config.modelUrl);
+      } catch (err) {
+        throw new Error(`Failed to load model. Please run 'npm run download-upscaler-models' to install models locally.`);
+      }
+
       // Cache for next time
       try {
         await this.model.save(`indexeddb://${config.cacheKey}`);

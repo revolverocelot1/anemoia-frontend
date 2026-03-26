@@ -26,6 +26,10 @@ const NewUpscalerPage: React.FC = () => {
   const [statusMessage, setStatusMessage] = useState<string>('');
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
+  const [imageDimensions, setImageDimensions] = useState<{ width: number; height: number } | null>(null);
+  const [selectedModelName, setSelectedModelName] = useState<string>('');
+  const [selectedScaleFactor, setSelectedScaleFactor] = useState<number>(2);
 
   const workerRef = useRef<Worker | null>(null);
 
@@ -68,11 +72,24 @@ const NewUpscalerPage: React.FC = () => {
     setOriginalImage(file);
     setError(null);
     setProgress(0);
+    setSelectedScaleFactor(scaleFactor);
+
+    // Map model type to display name
+    const modelNames: Record<string, string> = {
+      'cugan': `Real-CUGAN ${scaleFactor}x`,
+      'esrgan-anime': `Real-ESRGAN 4x Anime`,
+      'esrgan-general': `Real-ESRGAN 4x General`,
+      'esrgan-8x': `Real-ESRGAN 8x Experimental`,
+    };
+    setSelectedModelName(modelNames[modelType] || modelType);
     
     const reader = new FileReader();
     reader.onload = (e) => {
+      const dataUrl = e.target?.result as string;
+      setImagePreviewUrl(dataUrl);
+
       const imageData = {
-        dataUrl: e.target?.result as string,
+        dataUrl,
         width: 0,
         height: 0,
         originalFileSize: formatFileSize(file.size)
@@ -82,6 +99,7 @@ const NewUpscalerPage: React.FC = () => {
       img.onload = () => {
         imageData.width = img.width;
         imageData.height = img.height;
+        setImageDimensions({ width: img.width, height: img.height });
         
         workerRef.current?.postMessage({
           command: 'upscale',
@@ -90,7 +108,7 @@ const NewUpscalerPage: React.FC = () => {
           modelType,
         });
       };
-      img.src = imageData.dataUrl;
+      img.src = dataUrl;
     };
     reader.readAsDataURL(file);
     
@@ -106,6 +124,8 @@ const NewUpscalerPage: React.FC = () => {
     setError(null);
     setProgress(0);
     setStatusMessage('');
+    setImagePreviewUrl(null);
+    setImageDimensions(null);
   };
 
   return (
@@ -149,7 +169,11 @@ const NewUpscalerPage: React.FC = () => {
             {view === 'processing' && (
             <ProcessingOverlay 
               statusMessage={statusMessage} 
-              progress={progress} 
+              progress={progress}
+              imagePreviewUrl={imagePreviewUrl}
+              modelName={selectedModelName}
+              imageDimensions={imageDimensions}
+              scaleFactor={selectedScaleFactor}
             />
             )}
           </AnimatePresence>
