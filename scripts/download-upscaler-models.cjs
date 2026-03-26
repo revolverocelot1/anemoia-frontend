@@ -2,26 +2,14 @@
  * download-upscaler-models.cjs
  *
  * Downloads TF.js model files for the AI Image Upscaler.
- * Cross-platform: uses only Node.js built-in modules (no curl/unzip dependency).
- *
- * Models are downloaded from:
- *   https://github.com/xororz/web-realesrgan/releases/download/v0.1.0/
- *
- * Each model is a zip archive containing one or more directories with:
- *   - model.json   (TF.js GraphModel descriptor)
- *   - group1-shard*.bin  (weight shards)
- *
- * After extraction the layout inside public/ matches what the worker expects:
- *   public/realcugan/2x-conservative-64/model.json
- *   public/realcugan/4x-conservative-64/model.json
- *   public/realesrgan/anime_plus-64/model.json
- *   public/realesrgan/general_plus-64/model.json
+ * Uses disk-based streaming to avoid Render's 512MB RAM limits crashing the build.
+ * Extracts using native OS tools (unzip on Linux/Mac, tar on Windows).
  */
 
 const fs = require('fs');
 const path = require('path');
 const https = require('https');
-const { createInflateRaw } = require('zlib');
+const { execSync } = require('child_process');
 
 const RELEASE_URL = 'https://github.com/xororz/web-realesrgan/releases/download/v0.1.0';
 const PUBLIC_DIR = path.join(__dirname, '..', 'public');
@@ -32,76 +20,53 @@ const NEEDED = [
   { zip: 'realesrgan.zip', dirs: [`realesrgan/anime_plus-${TILE_SIZE}`, `realesrgan/general_plus-${TILE_SIZE}`] },
 ];
 
-// ---- helpers ----------------------------------------------------------------
-
-/** Follow redirects (GitHub releases redirect to S3). */
-function download(url) {
+/** Stream download to a file on disk */
+function downloadToFile(url, destPath) {
   return new Promise((resolve, reject) => {
+    const file = fs.createWriteStream(destPath);
+    
     const get = (u) => {
       https.get(u, { headers: { 'User-Agent': 'anemoia-model-dl' } }, (res) => {
         if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-          get(res.headers.location);          // follow redirect
+          get(res.headers.location); // follow redirect
           return;
         }
         if (res.statusCode !== 200) {
-          reject(new Error(`HTTP ${res.statusCode} for ${u}`));
+          file.close();
+          fs.unlink(destPath, () => reject(new Error(`HTTP ${res.statusCode} for ${u}`)));
           return;
         }
-        const chunks = [];
-        res.on('data', (c) => chunks.push(c));
-        res.on('end', () => resolve(Buffer.concat(chunks)));
-        res.on('error', reject);
-      }).on('error', reject);
+        res.pipe(file);
+        
+        file.on('finish', () => {
+          file.close();
+          resolve();
+        });
+      }).on('error', (err) => {
+        file.close();
+        fs.unlink(destPath, () => reject(err));
+      });
     };
+    
     get(url);
   });
 }
 
-/**
- * Minimal ZIP reader — extracts files from a ZIP buffer.
- * Only handles Store (0) and Deflate (8) methods, which covers all TF.js model zips.
- */
-function extractZip(buf, prefixes) {
-  const files = [];
-  let offset = 0;
-
-  while (offset + 30 <= buf.length) {
-    const sig = buf.readUInt32LE(offset);
-    if (sig !== 0x04034b50) break;       // not a local file header
-
-    const method = buf.readUInt16LE(offset + 8);
-    const compSize = buf.readUInt32LE(offset + 18);
-    const uncompSize = buf.readUInt32LE(offset + 22);
-    const nameLen = buf.readUInt16LE(offset + 26);
-    const extraLen = buf.readUInt16LE(offset + 28);
-    const name = buf.slice(offset + 30, offset + 30 + nameLen).toString('utf8');
-    const dataStart = offset + 30 + nameLen + extraLen;
-    const rawData = buf.slice(dataStart, dataStart + compSize);
-    offset = dataStart + compSize;
-
-    // Skip directories and files we don't need
-    if (name.endsWith('/')) continue;
-    const matchesPrefix = prefixes.some((p) => name.startsWith(p));
-    if (!matchesPrefix) continue;
-
-    files.push({ name, method, rawData, uncompSize });
+function extractZip(zipPath, destDir) {
+  fs.mkdirSync(destDir, { recursive: true });
+  
+  try {
+    if (process.platform === 'win32') {
+      // Windows 10+ has tar built-in which can extract zips
+      execSync(`tar -xf "${zipPath}" -C "${destDir}"`, { stdio: 'inherit' });
+    } else {
+      // Linux/Mac use unzip
+      execSync(`unzip -o "${zipPath}" -d "${destDir}"`, { stdio: 'inherit' });
+    }
+  } catch (err) {
+    throw new Error(`Extraction failed. On Windows ensure Windows 10+, on Linux ensure 'unzip' is installed.\nOriginal error: ${err.message}`);
   }
-
-  return files;
 }
-
-function inflate(raw) {
-  return new Promise((resolve, reject) => {
-    const chunks = [];
-    const inf = createInflateRaw();
-    inf.on('data', (c) => chunks.push(c));
-    inf.on('end', () => resolve(Buffer.concat(chunks)));
-    inf.on('error', reject);
-    inf.end(raw);
-  });
-}
-
-// ---- main -------------------------------------------------------------------
 
 function allPresent() {
   return NEEDED.every(({ dirs }) =>
@@ -115,45 +80,36 @@ async function main() {
     return;
   }
 
+  const TMP_DIR = path.join(__dirname, '..', 'tmp_models');
+  if (!fs.existsSync(TMP_DIR)) fs.mkdirSync(TMP_DIR, { recursive: true });
+
   for (const { zip, dirs } of NEEDED) {
-    // Which subdirectories still need extraction?
-    const missing = dirs.filter(
-      (d) => !fs.existsSync(path.join(PUBLIC_DIR, d, 'model.json'))
-    );
+    const missing = dirs.filter((d) => !fs.existsSync(path.join(PUBLIC_DIR, d, 'model.json')));
     if (missing.length === 0) continue;
 
     const url = `${RELEASE_URL}/${zip}`;
-    console.log(`⬇  Downloading ${zip} (${missing.length} model(s) needed)...`);
-    const buf = await download(url);
-    console.log(`   Downloaded ${(buf.length / 1024 / 1024).toFixed(1)} MB`);
-
-    const entries = extractZip(buf, missing);
-    console.log(`   Extracting ${entries.length} files...`);
-
-    for (const entry of entries) {
-      const dest = path.join(PUBLIC_DIR, entry.name);
-      fs.mkdirSync(path.dirname(dest), { recursive: true });
-
-      let data;
-      if (entry.method === 0) {
-        data = entry.rawData;           // stored (no compression)
-      } else if (entry.method === 8) {
-        data = await inflate(entry.rawData);  // deflate
-      } else {
-        console.warn(`   ⚠ Unsupported compression method ${entry.method} for ${entry.name}, skipping`);
-        continue;
-      }
-      fs.writeFileSync(dest, data);
-    }
-
-    console.log(`   ✓ Extracted ${zip}`);
+    const zipPath = path.join(TMP_DIR, zip);
+    
+    console.log(`⬇  Downloading ${zip} to disk...`);
+    await downloadToFile(url, zipPath);
+    
+    console.log(`📦 Extracting ${zip}...`);
+    extractZip(zipPath, PUBLIC_DIR);
+    
+    // Clean up zip
+    fs.unlinkSync(zipPath);
+    console.log(`✓ Completed ${zip}`);
   }
 
-  console.log('✓ All upscaler models ready!');
+  // Clean up tmp dir
+  try { fs.rmdirSync(TMP_DIR); } catch (e) {}
+  
+  console.log('✨ All upscaler models installed successfully!');
 }
 
 main().catch((err) => {
-  console.error('⚠ Failed to download upscaler models:', err.message);
-  console.error('  Models will be unavailable. Run "npm run download-upscaler-models" manually.');
-  // Don't exit(1) — allow build to continue so the app works for other features.
+  console.error('⚠ Failed to download upscaler models:');
+  console.error(err);
+  console.error('  Models will be unavailable on the site. Please verify the build environment.');
+  process.exit(1); // Fail the build so Render accurately reports the failure!
 });
