@@ -1,1 +1,26 @@
-﻿{"demos":[{"id":"demo_1","name":"GOT Tywin","file":"/demos/GOT tywin short.m4vgs","view":{"fov":45,"shape":2,"splatSize":1.0,"cameraPos":[0,0,5]}},{"id":"demo_2","name":"Result 11","file":"/demos/result (11).m4vgs","view":{"fov":45,"shape":1,"splatSize":1.0,"cameraPos":[0,0,5]}}]}
+{
+  "demos": [
+    {
+      "id": "demo_1",
+      "name": "GOT Tywin",
+      "file": "/demos/GOT tywin short.m4vgs",
+      "view": {
+        "fov": 45,
+        "shape": 2,
+        "splatSize": 1.0,
+        "cameraPos": [0, 0, 5]
+      }
+    },
+    {
+      "id": "demo_2",
+      "name": "Result 11",
+      "file": "/demos/result (11).m4vgs",
+      "view": {
+        "fov": 45,
+        "shape": 1,
+        "splatSize": 1.0,
+        "cameraPos": [0, 0, 5]
+      }
+    }
+  ]
+}
