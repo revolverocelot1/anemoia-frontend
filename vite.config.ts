@@ -70,7 +70,7 @@ const demoManagerPlugin = () => {
             
             req.on('end', () => {
                res.statusCode = 200;
-               res.end(JSON.stringify({ success: true, file: `/m4vgs/demos/${filename}` }));
+               res.end(JSON.stringify({ success: true, file: `/demos/${filename}` }));
             });
             req.on('error', (err: any) => {
                res.statusCode = 500;
