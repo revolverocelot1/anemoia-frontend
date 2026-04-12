@@ -332,6 +332,7 @@ function App() {
                 </AnimatedPage>
               }
             />
+            {/* Archived: splat-viewer landing
             <Route
               path="/splat-viewer/landing"
               element={
@@ -339,7 +340,7 @@ function App() {
                   <SplatViewerLanding />
                 </AnimatedPage>
               }
-            />
+            /> */}
             <Route
               path="/triangle-splatting/landing"
               element={
@@ -548,6 +549,7 @@ function App() {
               }
             />
 
+            {/* Archived: splat-viewer page
             <Route
               path="/splat-viewer"
               element={
@@ -555,7 +557,7 @@ function App() {
                   <RadiaViewerPage />
                 </AnimatedPage>
               }
-            />
+            /> */}
             <Route
               path="/sharp"
               element={

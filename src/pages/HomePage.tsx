@@ -253,6 +253,43 @@ const HomePage: React.FC<HomePageProps> = ({ onToggleSidebar }) => {
                     </div>
                   </Link>
                 </motion.div>
+
+                {/* M4VGS 4D Viewer Card - DEMO */}
+                <motion.div variants={itemVariants}>
+                  <a href="/m4vgs/index.html" className="card h-full block group relative overflow-hidden" data-accent="7" target="_blank" rel="noopener noreferrer">
+                    <div className="absolute inset-0 bg-gradient-to-br from-violet-600/0 via-purple-500/0 to-cyan-500/0 group-hover:from-violet-600/20 group-hover:via-purple-500/20 group-hover:to-cyan-500/20 transition-colors duration-500"></div>
+                    <div className="p-6 flex flex-col items-start text-left flex-1 h-full relative z-10">
+                      
+                      {/* DEMO BADGE */}
+                      <div className="absolute top-4 right-4 z-20">
+                        <span className="px-2 py-1 text-[10px] font-bold bg-yellow-500/20 text-yellow-500 rounded-md ring-1 ring-yellow-500/50 uppercase tracking-widest backdrop-blur-sm shadow-lg shadow-yellow-500/10">DEMO</span>
+                      </div>
+
+                      <div className="icon-container mb-4 w-full h-32 bg-black/20 rounded-xl overflow-hidden border border-white/5 relative" style={{ perspective: '1000px' }}>
+                        <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-900 group-hover:scale-105 transition-transform duration-700">
+                          <div className="font-sans font-black text-4xl tracking-tight bg-gradient-to-br from-cyan-400 via-pink-500 to-purple-600 text-transparent bg-clip-text">
+                            M4VGS
+                          </div>
+                          <div className="text-[10px] text-gray-500 uppercase tracking-[0.2em] mt-1 font-bold">Volumetric</div>
+                          <div className="absolute inset-0 shadow-[inset_0_0_40px_rgba(0,0,0,0.8)] pointer-events-none" />
+                        </div>
+                      </div>
+                      <h3 className="text-xl font-bold mb-3 text-white group-hover:text-purple-400 transition-colors">
+                        M4VGS Volumetric Viewer
+                      </h3>
+                      <p className="text-base text-gray-300 flex-1 leading-relaxed">
+                        Standalone isolated viewer for 4D Volumetric Video. Features dolly zooming, immersive settings, and experimental tools in a dedicated Preact sandbox.
+                      </p>
+                      <div className="mt-4 pt-4 w-full">
+                        <div className="flex items-center text-sm font-medium text-purple-400 group-hover:text-purple-300 transition-colors">
+                          <span>Enter M4VGS Space</span>
+                          <span className="material-symbols-outlined text-lg ml-1 group-hover:translate-x-1 transition-transform">open_in_new</span>
+                        </div>
+                      </div>
+                    </div>
+                  </a>
+                </motion.div>
+
                 {/* Triangle Splatting Card - Custom Emblem */}
                 <motion.div variants={itemVariants}>
                   <Link to="/triangle-splatting" className="card h-full block group relative overflow-hidden" data-accent="8">
