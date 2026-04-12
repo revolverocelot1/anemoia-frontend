@@ -1,5 +1,6 @@
 {
-  "demos": [
+  "version": 1,
+  "models": [
     {
       "id": "demo_1",
       "name": "GOT Tywin",
