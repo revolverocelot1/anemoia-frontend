@@ -9,7 +9,7 @@
   },
   "scripts": {
     "dev": "vite",
-    "build": "node scripts/download-upscaler-models.cjs && tsc -b && vite build",
+    "build": "node scripts/download-upscaler-models.cjs && node scripts/download-m4vgs-demos.mjs && tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest",
