@@ -265,31 +265,12 @@ const HomePage: React.FC<HomePageProps> = ({ onToggleSidebar }) => {
                         <span className="px-2 py-1 text-[10px] font-bold bg-yellow-500/20 text-yellow-500 rounded-md ring-1 ring-yellow-500/50 uppercase tracking-widest backdrop-blur-sm shadow-lg shadow-yellow-500/10">DEMO</span>
                       </div>
 
-                      <div className="icon-container mb-4 w-full h-32 bg-gray-900 rounded-xl overflow-hidden border border-white/5 relative flex items-center justify-center group" style={{ perspective: '800px' }}>
-                        <div className="absolute inset-0 bg-gradient-to-br from-cyan-900/40 via-transparent to-pink-900/40 opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
-                        <svg className="absolute w-24 h-24 opacity-20 group-hover:opacity-60 group-hover:scale-110 transition-all duration-700 ease-out" viewBox="0 0 100 100">
-                          <polygon points="50,15 85,35 85,75 50,95 15,75 15,35" fill="none" stroke="url(#cyanPink)" strokeWidth="2" className="drop-shadow-[0_0_10px_rgba(0,255,255,0.5)]" />
-                          <polygon points="50,30 70,45 70,65 50,80 30,65 30,45" fill="none" stroke="url(#cyanPink)" strokeWidth="1.5" className="animate-[spin_10s_linear_infinite_reverse]" />
-                          <line x1="50" y1="15" x2="50" y2="30" stroke="url(#cyanPink)" strokeWidth="1" opacity="0.6"/>
-                          <line x1="85" y1="35" x2="70" y2="45" stroke="url(#cyanPink)" strokeWidth="1" opacity="0.6"/>
-                          <line x1="85" y1="75" x2="70" y2="65" stroke="url(#cyanPink)" strokeWidth="1" opacity="0.6"/>
-                          <line x1="50" y1="95" x2="50" y2="80" stroke="url(#cyanPink)" strokeWidth="1" opacity="0.6"/>
-                          <line x1="15" y1="75" x2="30" y2="65" stroke="url(#cyanPink)" strokeWidth="1" opacity="0.6"/>
-                          <line x1="15" y1="35" x2="30" y2="45" stroke="url(#cyanPink)" strokeWidth="1" opacity="0.6"/>
-                          <defs>
-                            <linearGradient id="cyanPink" x1="0%" y1="0%" x2="100%" y2="100%">
-                              <stop offset="0%" stopColor="#00f2fe" />
-                              <stop offset="100%" stopColor="#fe0979" />
-                            </linearGradient>
-                          </defs>
-                        </svg>
-                        <div className="z-10 text-center transform group-hover:translate-z-8 transition-transform duration-500">
-                          <div className="font-sans font-black text-[2rem] leading-none tracking-tight text-white drop-shadow-lg">
-                            4D<span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-pink-500">VGS</span>
-                          </div>
-                          <div className="text-[10px] text-gray-400 font-mono tracking-[0.2em] mt-2 group-hover:text-cyan-300 transition-colors">Volumetric Engine</div>
+                      <div className="icon-container mb-4 w-full h-32 bg-black/20 rounded-xl overflow-hidden border border-white/5 relative" style={{ perspective: '1000px' }}>
+                        {/* 4D Volumetric Viewer Animation */}
+                        <div className="absolute inset-0">
+                          <img src="/emblems/m4vgs_viewer_emblem.png" alt="M4VGS 4D Viewer" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
+                          <div className="absolute inset-0 shadow-[inset_0_0_40px_rgba(0,0,0,0.8)] pointer-events-none" />
                         </div>
-                        <div className="absolute inset-0 shadow-[inset_0_0_30px_rgba(0,0,0,0.8)] pointer-events-none" />
                       </div>
                       <h3 className="text-xl font-bold mb-3 text-white group-hover:text-cyan-400 transition-colors">
                         M4VGS Volumetric Viewer
