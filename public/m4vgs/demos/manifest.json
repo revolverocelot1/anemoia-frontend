@@ -21,6 +21,7 @@
       "id": "demo_1775986072243",
       "name": "DEMO.m4vgs",
       "file": "/demos/result (11).m4vgs",
+      "thumbnail": "/demos/vlcsnap-2026-04-12-16h18m43s554.png",
       "view": {
         "version": 4,
         "cameraPose": {
@@ -71,6 +72,30 @@
           "gapFillEnabled": true
         },
         "savedAt": 1775986060919
+      }
+    },
+    {
+      "id": "demo_1775990000000",
+      "name": "Recovered DEMO 3",
+      "file": "/demos/result (12).m4vgs",
+      "thumbnail": "/demos/vlcsnap-2026-04-12-16h57m54s364.png",
+      "view": {
+        "version": 4,
+        "cameraPose": {
+          "position": [0,0,0],
+          "target": [0,0,-2],
+          "up": [0,1,0],
+          "distance": 2,
+          "fov": 45,
+          "near": 0.01,
+          "far": 500,
+          "zoom": 1
+        },
+        "m4vgs": {
+          "depthScale": 3,
+          "pointScale": 1,
+          "bgScale": 0.6
+        }
       }
     }
   ]
