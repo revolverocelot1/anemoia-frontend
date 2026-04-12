@@ -228,25 +228,45 @@ const HomePage: React.FC<HomePageProps> = ({ onToggleSidebar }) => {
                     </div>
                   </Link>
                 </motion.div>
-                {/* 3D Splat Viewer Card - Custom Emblem */}
+                {/* 4D Volumetric Viewer Card - Custom CSS Emblem */}
                 <motion.div variants={itemVariants}>
                   <Link to="/splat-viewer" className="card h-full block group relative overflow-hidden" data-accent="6">
                     <div className="absolute inset-0 bg-gradient-to-br from-violet-500/0 via-fuchsia-500/0 to-pink-500/0 group-hover:from-violet-500/10 group-hover:via-fuchsia-500/10 group-hover:to-pink-500/10 transition-colors duration-500"></div>
                     <div className="p-6 flex flex-col items-start text-left flex-1 h-full relative z-10">
-                      <div className="icon-container mb-4 w-full h-32 bg-black/20 rounded-xl overflow-hidden border border-white/5 relative" style={{ perspective: '1000px' }}>
-                        {/* Swirling Splats Animation */}
-                        <div className="absolute inset-0">
-                          <img src="/emblems/splat_viewer_emblem.png" alt="3D Splat Viewer" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
-                          <div className="absolute inset-0 shadow-[inset_0_0_40px_rgba(0,0,0,0.8)] pointer-events-none" />
+                      <div className="icon-container mb-4 w-full h-32 bg-black/20 rounded-xl overflow-hidden border border-white/5 relative" style={{ perspective: '800px' }}>
+                        {/* Dynamic 4D Point Cloud Animation */}
+                        <div className="absolute inset-0 flex items-center justify-center transform-gpu">
+                          {/* Central Core */}
+                          <div className="absolute w-8 h-8 bg-violet-500 rounded-full blur-[10px] opacity-60 group-hover:bg-pink-500 group-hover:scale-125 transition-all duration-700"></div>
+                          
+                          {/* Swirling Geometry */}
+                          <div className="absolute inset-0" style={{ transformStyle: 'preserve-3d', animation: 'spin 12s linear infinite' }}>
+                            {Array.from({ length: 30 }).map((_, i) => (
+                              <div 
+                                key={i}
+                                className="absolute w-1.5 h-1.5 bg-white rounded-full opacity-70 group-hover:bg-pink-200 transition-colors duration-500"
+                                style={{
+                                  left: '50%', top: '50%',
+                                  transform: `rotateX(${i * 12}deg) rotateY(${i * 24}deg) translateZ(${25 + (i % 3)*10}px)`,
+                                  boxShadow: '0 0 5px rgba(255,255,255,0.5)'
+                                }}
+                              />
+                            ))}
+                          </div>
+                          
+                          {/* Gyroscopic Rings */}
+                          <div className="absolute w-20 h-20 border border-violet-400/30 rounded-full group-hover:border-fuchsia-400/60 transition-colors duration-700 font-bold" style={{ transformStyle: 'preserve-3d', animation: 'spin 6s linear infinite reverse', transform: 'rotateX(75deg)' }}></div>
+                          <div className="absolute w-20 h-20 border border-violet-400/30 rounded-full group-hover:border-fuchsia-400/60 transition-colors duration-700 font-bold" style={{ transformStyle: 'preserve-3d', animation: 'spin 8s linear infinite', transform: 'rotateY(75deg)' }}></div>
                         </div>
+                        <div className="absolute inset-0 shadow-[inset_0_0_40px_rgba(0,0,0,0.8)] pointer-events-none" />
                       </div>
-                      <h3 className="text-xl font-bold mb-3 text-white group-hover:text-violet-400 transition-colors">3D Splat Viewer</h3>
+                      <h3 className="text-xl font-bold mb-3 text-white group-hover:text-violet-400 transition-colors">4D Volumetric Viewer</h3>
                       <p className="text-base text-gray-300 flex-1 leading-relaxed">
-                        WebGL renderer for Gaussian Splats, Triangle Splats, and PLY meshes. Experience cutting-edge 3D reconstruction with GPU-optimized rendering.
+                        An experimental 4D viewer for .m4vgs volumetric files. Currently, only official demo models are available.
                       </p>
                       <div className="mt-4 pt-4 w-full">
                         <div className="flex items-center text-sm font-medium text-violet-400 group-hover:text-violet-300 transition-colors">
-                          <span>Explore Splat Viewer</span>
+                          <span>Explore 4D Viewer</span>
                           <span className="material-symbols-outlined text-lg ml-1 group-hover:translate-x-1 transition-transform">arrow_forward</span>
                         </div>
                       </div>
