@@ -82,9 +82,21 @@
       "view": {
         "version": 4,
         "cameraPose": {
-          "position": [0,0,0],
-          "target": [0,0,-2],
-          "up": [0,1,0],
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "target": [
+            0,
+            0,
+            -2
+          ],
+          "up": [
+            0,
+            1,
+            0
+          ],
           "distance": 2,
           "fov": 45,
           "near": 0.01,
@@ -96,6 +108,63 @@
           "pointScale": 1,
           "bgScale": 0.6
         }
+      }
+    },
+    {
+      "id": "demo_1775998411108",
+      "name": "dune fight (1080p 21:9).m4vgs",
+      "file": "/demos/result (31).m4vgs",
+      "thumbnail": "/demos/vlcsnap-2026-04-12-18h25m01s400.png",
+      "view": {
+        "version": 4,
+        "cameraPose": {
+          "position": [
+            0.012380540473222193,
+            -0.009111136795580402,
+            -0.1953756968649758
+          ],
+          "target": [
+            -0.07613942237824921,
+            -0.010402552239552849,
+            -2.315339017397828
+          ],
+          "up": [
+            0,
+            1,
+            0
+          ],
+          "distance": 2.1218110028892183,
+          "fov": 40,
+          "near": 0.01,
+          "far": 500,
+          "zoom": 1
+        },
+        "view": {
+          "aspectRatio": null,
+          "backgroundColor": "#0c0d10",
+          "cameraRange": 2.488888888888889,
+          "immersiveSensitivity": 1
+        },
+        "model": {
+          "applyCoordinateFlip": true,
+          "modelScale": 1
+        },
+        "m4vgs": {
+          "depthScale": 2.9,
+          "pointScale": 1,
+          "bgScale": 0.4,
+          "splatShape": "mesh",
+          "kbEnabled": true,
+          "orbitLock": {
+            "locked": true,
+            "minAz": 0.0032114108513700834,
+            "maxAz": 0.09009002250619894,
+            "minPol": 1.5273117461699337,
+            "maxPol": 1.6141903578247627
+          },
+          "gapFillEnabled": true
+        },
+        "savedAt": 1775998360421
       }
     }
   ]

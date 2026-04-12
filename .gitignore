@@ -37,3 +37,4 @@ public/models/**/*.safetensors
 # TF.js upscaler models (downloaded at dev time, not committed)
 public/realcugan/
 public/realesrgan/
+public/m4vgs/demos/*.m4vgs
