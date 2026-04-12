@@ -5,22 +5,72 @@
       "id": "demo_1",
       "name": "GOT Tywin",
       "file": "/demos/GOT tywin short.m4vgs",
+      "thumbnail": null,
       "view": {
         "fov": 45,
         "shape": 2,
-        "splatSize": 1.0,
-        "cameraPos": [0, 0, 5]
+        "splatSize": 1,
+        "cameraPos": [
+          0,
+          0,
+          5
+        ]
       }
     },
     {
-      "id": "demo_2",
-      "name": "Result 11",
+      "id": "demo_1775986072243",
+      "name": "DEMO.m4vgs",
       "file": "/demos/result (11).m4vgs",
       "view": {
-        "fov": 45,
-        "shape": 1,
-        "splatSize": 1.0,
-        "cameraPos": [0, 0, 5]
+        "version": 4,
+        "cameraPose": {
+          "position": [
+            -0.05323427430620029,
+            -0.013203701815113635,
+            -0.12107288726302845
+          ],
+          "target": [
+            -0.04663599438279082,
+            -0.03925988906597481,
+            -1.9778639634465203
+          ],
+          "up": [
+            0,
+            1,
+            0
+          ],
+          "distance": 1.8569856118954313,
+          "fov": 38,
+          "near": 0.01,
+          "far": 500,
+          "zoom": 1
+        },
+        "view": {
+          "aspectRatio": null,
+          "backgroundColor": "#0c0d10",
+          "cameraRange": 2.0555555555555554,
+          "immersiveSensitivity": 1
+        },
+        "model": {
+          "applyCoordinateFlip": true,
+          "modelScale": 1
+        },
+        "m4vgs": {
+          "depthScale": 3,
+          "pointScale": 1,
+          "bgScale": 0.6000000000000001,
+          "splatShape": "mesh",
+          "kbEnabled": false,
+          "orbitLock": {
+            "locked": true,
+            "minAz": -0.0035535781240236333,
+            "maxAz": 0.06819884668018769,
+            "minPol": 1.5043264633718203,
+            "maxPol": 1.5760788881760317
+          },
+          "gapFillEnabled": true
+        },
+        "savedAt": 1775986060919
       }
     }
   ]
