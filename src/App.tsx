@@ -731,7 +731,7 @@ function App() {
                 ]}
               />
 
-              {/* ASCII Video Converter Ad - ONLY on the /sharp tool page */}
+              {/* ASCII Video Converter Ad - Shelved for now 
               <PromoAd 
                 id="ascii-converter"
                 videoSrc="/videos/ascii-demo-video.mp4"
@@ -740,6 +740,19 @@ function App() {
                 title="Convert any video to ASCII Art"
                 subtitle="Real-time browser rendering. 100% private."
                 ctaText="Try ASCII Converter"
+                allowlist={['/sharp']}
+              />
+              */}
+
+              {/* M4VGS Demo Ad - ONLY on the /sharp tool page */}
+              <PromoAd 
+                id="m4vgs-promo"
+                videoSrc="/videos/m4vgs-promo.mp4"
+                targetUrl="https://anemoias.me/m4vgs/index.html"
+                tagline="New Research"
+                title="Extract 4D Volumetric Space from Video"
+                subtitle="Witness temporal splatting in action. Peer directly into the fourth dimension in this exclusive live demo."
+                ctaText="Enter Live Demo"
                 allowlist={['/sharp']}
               />
             </div>

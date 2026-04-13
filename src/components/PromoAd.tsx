@@ -79,52 +79,101 @@ const PromoAd: React.FC<PromoAdProps> = ({
           className="relative inline-block z-[40] rounded-2xl shadow-[0_10px_40px_rgba(0,0,0,0.6)] group mb-4 last:mb-0"
         >
           {/* Ad Container linking to target URL */}
-          <Link to={targetUrl} className="block relative w-full h-full cursor-pointer overflow-hidden rounded-2xl bg-black border border-white/10 group-hover:border-cyan-500/50 transition-colors duration-300">
-            
-            {/* Background Video */}
-            <video 
-              autoPlay 
-              loop 
-              muted 
-              playsInline 
-              className="absolute inset-0 w-full h-full object-cover opacity-60 mix-blend-screen scale-105 group-hover:scale-100 transition-transform duration-700"
-            >
-              <source src={videoSrc} type="video/mp4" />
-            </video>
-
-            {/* Gradient Overlay for text readability */}
-            <div className="absolute inset-0 bg-gradient-to-t from-black via-black/80 to-transparent pointer-events-none" />
-
-            {/* Dismiss Button - Red Cross */}
-            <button 
-              onClick={handleDismiss}
-              className="absolute -top-2 -right-2 z-30 w-7 h-7 flex items-center justify-center rounded-full bg-red-600 text-white shadow-lg border-2 border-white hover:bg-red-500 hover:scale-110 transition-all"
-              aria-label="Dismiss Ad"
-            >
-              <span className="material-symbols-outlined text-[14px] font-bold">close</span>
-            </button>
-
-            {/* Content / Copy */}
-            <div className="relative z-10 p-5 flex flex-col justify-end h-full">
-              <div className="inline-block px-2 py-1 bg-cyan-500/20 border border-cyan-400/30 rounded text-[10px] font-bold tracking-widest text-cyan-300 uppercase mb-3 w-max backdrop-blur-md">
-                {tagline}
-              </div>
-              <h3 className="text-white font-bold text-lg leading-tight mb-2 drop-shadow-md">
-                {title}
-              </h3>
-              <p className="text-gray-300 text-xs font-light mb-4 drop-shadow-md">
-                {subtitle}
-              </p>
+          {targetUrl.startsWith('http') ? (
+            <a href={targetUrl} target="_blank" rel="noopener noreferrer" className="block relative w-full h-full cursor-pointer overflow-hidden rounded-2xl bg-black border border-white/10 group-hover:border-cyan-500/50 transition-colors duration-300">
               
-              <div className="flex items-center text-cyan-400 text-xs font-bold uppercase tracking-wider group-hover:text-cyan-300 transition-colors">
-                {ctaText}
-                <span className="material-symbols-outlined text-[14px] ml-1 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform">north_east</span>
-              </div>
-            </div>
+              {/* Background Video */}
+              <video 
+                autoPlay 
+                loop 
+                muted 
+                playsInline 
+                className="absolute inset-0 w-full h-full object-cover opacity-80 scale-105 group-hover:scale-100 transition-transform duration-700"
+              >
+                <source src={videoSrc} type="video/mp4" />
+              </video>
 
-            {/* Subtle pulse edge glow */}
-            <div className="absolute inset-0 pointer-events-none shadow-[inset_0_0_20px_rgba(6,182,212,0.1)] group-hover:shadow-[inset_0_0_30px_rgba(6,182,212,0.3)] transition-shadow duration-500" />
-          </Link>
+              {/* Gradient Overlay for text readability */}
+              <div className="absolute inset-0 bg-gradient-to-t from-black via-black/80 to-transparent pointer-events-none" />
+
+              {/* Dismiss Button - Red Cross */}
+              <button 
+                onClick={handleDismiss}
+                className="absolute -top-2 -right-2 z-30 w-7 h-7 flex items-center justify-center rounded-full bg-red-600 text-white shadow-lg border-2 border-white hover:bg-red-500 hover:scale-110 transition-all"
+                aria-label="Dismiss Ad"
+              >
+                <span className="material-symbols-outlined text-[14px] font-bold">close</span>
+              </button>
+
+              {/* Content / Copy */}
+              <div className="relative z-10 p-5 flex flex-col justify-end h-full">
+                <div className="inline-block px-2 py-1 bg-cyan-500/20 border border-cyan-400/30 rounded text-[10px] font-bold tracking-widest text-cyan-300 uppercase mb-3 w-max backdrop-blur-md">
+                  {tagline}
+                </div>
+                <h3 className="text-white font-bold text-lg leading-tight mb-2 drop-shadow-md">
+                  {title}
+                </h3>
+                <p className="text-gray-300 text-xs font-light mb-4 drop-shadow-md">
+                  {subtitle}
+                </p>
+                
+                <div className="flex items-center text-cyan-400 text-xs font-bold uppercase tracking-wider group-hover:text-cyan-300 transition-colors">
+                  {ctaText}
+                  <span className="material-symbols-outlined text-[14px] ml-1 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform">north_east</span>
+                </div>
+              </div>
+
+              {/* Subtle pulse edge glow */}
+              <div className="absolute inset-0 pointer-events-none shadow-[inset_0_0_20px_rgba(6,182,212,0.1)] group-hover:shadow-[inset_0_0_30px_rgba(6,182,212,0.3)] transition-shadow duration-500" />
+            </a>
+          ) : (
+            <Link to={targetUrl} className="block relative w-full h-full cursor-pointer overflow-hidden rounded-2xl bg-black border border-white/10 group-hover:border-cyan-500/50 transition-colors duration-300">
+              
+              {/* Background Video */}
+              <video 
+                autoPlay 
+                loop 
+                muted 
+                playsInline 
+                className="absolute inset-0 w-full h-full object-cover opacity-80 scale-105 group-hover:scale-100 transition-transform duration-700"
+              >
+                <source src={videoSrc} type="video/mp4" />
+              </video>
+
+              {/* Gradient Overlay for text readability */}
+              <div className="absolute inset-0 bg-gradient-to-t from-black via-black/80 to-transparent pointer-events-none" />
+
+              {/* Dismiss Button - Red Cross */}
+              <button 
+                onClick={handleDismiss}
+                className="absolute -top-2 -right-2 z-30 w-7 h-7 flex items-center justify-center rounded-full bg-red-600 text-white shadow-lg border-2 border-white hover:bg-red-500 hover:scale-110 transition-all"
+                aria-label="Dismiss Ad"
+              >
+                <span className="material-symbols-outlined text-[14px] font-bold">close</span>
+              </button>
+
+              {/* Content / Copy */}
+              <div className="relative z-10 p-5 flex flex-col justify-end h-full">
+                <div className="inline-block px-2 py-1 bg-cyan-500/20 border border-cyan-400/30 rounded text-[10px] font-bold tracking-widest text-cyan-300 uppercase mb-3 w-max backdrop-blur-md">
+                  {tagline}
+                </div>
+                <h3 className="text-white font-bold text-lg leading-tight mb-2 drop-shadow-md">
+                  {title}
+                </h3>
+                <p className="text-gray-300 text-xs font-light mb-4 drop-shadow-md">
+                  {subtitle}
+                </p>
+                
+                <div className="flex items-center text-cyan-400 text-xs font-bold uppercase tracking-wider group-hover:text-cyan-300 transition-colors">
+                  {ctaText}
+                  <span className="material-symbols-outlined text-[14px] ml-1 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform">north_east</span>
+                </div>
+              </div>
+
+              {/* Subtle pulse edge glow */}
+              <div className="absolute inset-0 pointer-events-none shadow-[inset_0_0_20px_rgba(6,182,212,0.1)] group-hover:shadow-[inset_0_0_30px_rgba(6,182,212,0.3)] transition-shadow duration-500" />
+            </Link>
+          )}
         </motion.div>
       )}
     </AnimatePresence>
