@@ -60,7 +60,7 @@
           "depthScale": 3,
           "pointScale": 1,
           "bgScale": 0.6000000000000001,
-          "splatShape": "mesh",
+          "splatShape": "square",
           "kbEnabled": false,
           "orbitLock": {
             "locked": true,
@@ -106,7 +106,8 @@
         "m4vgs": {
           "depthScale": 3,
           "pointScale": 1,
-          "bgScale": 0.6
+          "bgScale": 0.6,
+          "splatShape": "square"
         }
       }
     },
@@ -153,7 +154,7 @@
           "depthScale": 2.9,
           "pointScale": 1,
           "bgScale": 0.4,
-          "splatShape": "mesh",
+          "splatShape": "square",
           "kbEnabled": true,
           "orbitLock": {
             "locked": true,
