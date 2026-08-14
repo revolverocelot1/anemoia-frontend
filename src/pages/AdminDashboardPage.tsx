@@ -4,7 +4,7 @@ import { useSupabaseAuth } from '../context/SupabaseAuthContext';
 import { motion } from 'framer-motion';
 import { fetchDashboardData, type AnalyticsDashboardData } from '../services/analytics';
 
-const ADMIN_EMAILS = ['srushtiraj.patil20@vit.edu'];
+import { ADMIN_EMAILS, isUserAdmin } from '../constants/admin';
 const G = '#00ff41'; // terminal green
 const GD = '#00cc33'; // dimmer
 const GDD = '#006b1d'; // very dim
@@ -66,7 +66,7 @@ const AdminDashboardPage = () => {
   const [err, setErr] = useState('');
   const [now, setNow] = useState(Date.now());
   const timerRef = useRef<ReturnType<typeof setInterval>>();
-  const isAdmin = user && ADMIN_EMAILS.includes(user.email || '');
+  const isAdmin = isUserAdmin(user?.email);
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) navigate('/login?redirect=/admin/dashboard');
