@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useSupabaseAuth } from '../context/SupabaseAuthContext';
 import { supabase } from '../services/supabase';
 import { motion, AnimatePresence } from 'framer-motion';
+import { ADMIN_EMAILS, isUserAdmin } from '../constants/admin';
 
 interface AdminResponse {
   id: string;
@@ -33,9 +34,8 @@ const AdminSupportPage = () => {
   const [replyText, setReplyText] = useState('');
   const [isReplying, setIsReplying] = useState(false);
 
-  // Admin email addresses
-  const ADMIN_EMAILS = ['srushtiraj.patil20@vit.edu'];
-  const isAdmin = user && ADMIN_EMAILS.includes(user.email || '');
+  // Admin check
+  const isAdmin = isUserAdmin(user?.email);
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -241,7 +241,7 @@ const AdminSupportPage = () => {
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.95 }}
                 className="bg-gray-900 border border-gray-800 rounded-lg p-6 max-w-3xl w-full max-h-[85vh] overflow-y-auto"
-                onClick={(e) => e.stopPropagation()}
+                onClick={(e: React.MouseEvent) => e.stopPropagation()}
               >
                 <div className="flex justify-between items-start mb-6">
                   <div>

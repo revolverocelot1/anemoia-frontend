@@ -6,14 +6,14 @@ import Footer from '../components/Footer';
 import AnimatedPage from '../components/AnimatedPage';
 import { useNavigate } from 'react-router-dom';
 import { useState } from 'react';
+import { ADMIN_EMAILS, isUserAdmin } from '../constants/admin';
 
 export default function AccountPage() {
   const navigate = useNavigate();
   const { isAuthenticated, user, signOut, isLoading: authLoading } = useSupabaseAuth();
   
-  // Admin email addresses - same as in AdminSupportPage
-  const ADMIN_EMAILS = ['srushtiraj.patil20@vit.edu'];
-  const isAdmin = user && ADMIN_EMAILS.includes(user.email || '');
+  // Admin check - checks both srushtiraj.patil20@vit.edu and srushtirajforgc@gmail.com
+  const isAdmin = isUserAdmin(user?.email);
   
   const [isSigningOut, setIsSigningOut] = useState(false);
 
