@@ -1,4 +1,19 @@
+import { APP_COMMIT, APP_BRANCH, APP_BUILD_TIME, GITHUB_REPO } from '../constants/version';
+
 const Footer = () => {
+  const buildDate = (() => {
+    try {
+      const d = new Date(APP_BUILD_TIME);
+      return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    } catch {
+      return APP_BUILD_TIME;
+    }
+  })();
+
+  const commitUrl = APP_COMMIT !== 'dev' && APP_COMMIT !== 'unknown'
+    ? `${GITHUB_REPO}/commit/${APP_COMMIT}`
+    : null;
+
   return (
     <footer className="w-full border-t border-gray-700/30 mt-auto bg-gray-900/50 backdrop-blur-sm">
       <div className="max-w-6xl mx-auto px-4 py-8">
@@ -43,10 +58,30 @@ const Footer = () => {
           <p className="text-xs text-gray-500">
             Professional AI-powered image processing tools. Enhance your images with cutting-edge technology.
           </p>
+          {/* Version badge */}
+          <p className="text-[10px] text-gray-600 mt-2 font-mono tracking-wide">
+            {commitUrl ? (
+              <a
+                href={commitUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:text-gray-400 transition-colors duration-200"
+              >
+                {APP_COMMIT}
+              </a>
+            ) : (
+              <span>{APP_COMMIT}</span>
+            )}
+            <span className="mx-1">·</span>
+            <span>{APP_BRANCH}</span>
+            <span className="mx-1">·</span>
+            <span>Built {buildDate}</span>
+          </p>
         </div>
       </div>
     </footer>
   );
 };
 
-export default Footer; 
+export default Footer;
+ 

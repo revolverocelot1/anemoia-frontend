@@ -3,6 +3,21 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import * as fs from 'node:fs';
 import { dirname, resolve } from 'node:path';
+import { execSync } from 'node:child_process';
+
+// Git metadata for version badge (injected at build time)
+const getGitInfo = () => {
+  try {
+    const commit = execSync('git rev-parse --short HEAD').toString().trim();
+    const branch = execSync('git rev-parse --abbrev-ref HEAD').toString().trim();
+    const buildTime = new Date().toISOString();
+    return { commit, branch, buildTime };
+  } catch {
+    return { commit: 'unknown', branch: 'unknown', buildTime: new Date().toISOString() };
+  }
+};
+const gitInfo = getGitInfo();
+console.log(`[Vite] Building: ${gitInfo.commit} on ${gitInfo.branch}`);
 
 const demoManagerPlugin = () => {
   console.log('--- DEMO MANAGER PLUGIN INITIALIZED! ---');
@@ -152,6 +167,11 @@ export default defineConfig({
   base: '/',
   assetsInclude: ['**/*.wasm'],
   publicDir: 'public',
+  define: {
+    'import.meta.env.VITE_APP_COMMIT': JSON.stringify(process.env.VITE_APP_COMMIT || gitInfo.commit),
+    'import.meta.env.VITE_APP_BRANCH': JSON.stringify(process.env.VITE_APP_BRANCH || gitInfo.branch),
+    'import.meta.env.VITE_APP_BUILD_TIME': JSON.stringify(process.env.VITE_APP_BUILD_TIME || gitInfo.buildTime),
+  },
   optimizeDeps: {
     exclude: [
       '@ffmpeg/ffmpeg',
