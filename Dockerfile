@@ -1,6 +1,5 @@
-# ── Stage 1: Build ──────────────────────────────────────────────
+# # Stage 1: Build
 FROM node:20-alpine AS builder
-
 WORKDIR /app
 
 # Install git (needed for version badge git info extraction)
@@ -17,15 +16,15 @@ COPY . .
 # Build args for version injection (Coolify provides these automatically)
 ARG COMMIT_SHA=unknown
 ARG SOURCE_BRANCH=unknown
+ARG BUILD_TIME=unknown
 
 ENV VITE_APP_COMMIT=${COMMIT_SHA}
 ENV VITE_APP_BRANCH=${SOURCE_BRANCH}
-ENV VITE_APP_BUILD_TIME=${BUILD_TIME:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}
 
 # Build the Vite production bundle
-RUN npm run build
+RUN if [ "$BUILD_TIME" = "unknown" ]; then export VITE_APP_BUILD_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ); else export VITE_APP_BUILD_TIME=$BUILD_TIME; fi && npm run build
 
-# ── Stage 2: Serve ──────────────────────────────────────────────
+# Stage 2: Serve
 FROM nginx:alpine
 
 # Copy built static files
@@ -38,6 +37,6 @@ COPY nginx_anemoia.conf /etc/nginx/conf.d/default.conf
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
   CMD wget -q --spider http://localhost/health || exit 1
 
-EXPOSE 80
+  EXPOSE 80
 
-CMD ["nginx", "-g", "daemon off;"]
+  CMD ["nginx", "-g", "daemon off;"]
