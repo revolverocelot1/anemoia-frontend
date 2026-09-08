@@ -37,7 +37,7 @@ export const GeminiWatermarkLanding: React.FC = () => {
   const [sliderPos, setSliderPos] = useState(52);
   const [isDragging, setIsDragging] = useState(false);
   const [showRoiBox, setShowRoiBox] = useState(true);
-  const [showLoupe, setShowLoupe] = useState(false);
+  const [zoomLevel, setZoomLevel] = useState<number>(4.5);
   const [activeFaq, setActiveFaq] = useState<number | null>(null);
   const sliderContainerRef = useRef<HTMLDivElement>(null);
 
@@ -217,20 +217,20 @@ export const GeminiWatermarkLanding: React.FC = () => {
               Drag to Inspect: Zero Blur, Zero Inpainting Patch
             </h2>
             <p className="mt-3 text-slate-400 text-sm sm:text-base">
-              Original Google Imagen 3 output with the 40px watermark star in the bottom-right corner vs. our deterministic reverse-alpha output.
+              Original Google Imagen 3 monochrome portrait with the small watermark star in the bottom-right corner vs. our deterministic reverse-alpha output. Use the <strong>Macro Zoom</strong> below to inspect the exact difference where the watermark was erased.
             </p>
           </div>
 
           {/* Interactive Comparison Card Container */}
-          <div className="relative rounded-3xl p-3 sm:p-5 bg-gradient-to-b from-slate-900/80 to-slate-950/90 border border-cyan-500/30 shadow-[0_0_80px_rgba(6,182,212,0.15)]">
+          <div className="relative rounded-3xl p-3 sm:p-5 bg-gradient-to-b from-slate-900/80 to-slate-950/90 border border-cyan-500/30 shadow-[0_0_80px_rgba(6,182,212,0.15)] max-w-4xl mx-auto">
             {/* Telemetry Bar Above Preview */}
             <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 mb-3 rounded-xl bg-black/50 border border-white/[0.06] text-xs font-mono text-slate-400">
               <div className="flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-cyan-400" />
-                <span className="text-white font-bold">SOURCE:</span> 1024×571 sRGB (Real User Upload)
+                <span className="text-white font-bold">SOURCE:</span> 1024×1024 sRGB (Real User Upload)
               </div>
               <div className="flex items-center gap-4">
-                <span>DETECTED ROI: <strong className="text-cyan-300">x:932 y:479 (40×40)</strong></span>
+                <span>DETECTED ROI: <strong className="text-cyan-300">x:950 y:949 (28×28 px)</strong></span>
                 <span>CONFIDENCE: <strong className="text-emerald-400">100.0%</strong></span>
               </div>
               <div className="flex items-center gap-2">
@@ -247,47 +247,104 @@ export const GeminiWatermarkLanding: React.FC = () => {
               </div>
             </div>
 
+            {/* Interactive Zoom Mode Selector */}
+            <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-2 mb-4 rounded-xl bg-slate-950/70 border border-cyan-500/20">
+              <div className="flex items-center gap-2 text-xs font-mono text-slate-300">
+                <span className="text-cyan-400 font-bold">MAGNIFICATION:</span>
+                <span className="text-slate-400 hidden sm:inline">Zoom in to inspect small watermark removal</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={() => setZoomLevel(4.5)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-mono font-bold flex items-center gap-1.5 transition-all ${
+                    zoomLevel === 4.5
+                      ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-[0_0_20px_rgba(6,182,212,0.5)] border border-cyan-400/50 scale-105'
+                      : 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-white/10'
+                  }`}
+                >
+                  <Maximize2 className="w-3.5 h-3.5 text-cyan-300" />
+                  <span>4.5× Macro (Watermark Difference)</span>
+                </button>
+                <button
+                  onClick={() => setZoomLevel(2.5)}
+                  className={`px-2.5 py-1.5 rounded-lg text-xs font-mono font-medium transition-all ${
+                    zoomLevel === 2.5
+                      ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40'
+                      : 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-white/10'
+                  }`}
+                >
+                  <span>2.5× Context</span>
+                </button>
+                <button
+                  onClick={() => setZoomLevel(1)}
+                  className={`px-2.5 py-1.5 rounded-lg text-xs font-mono font-medium transition-all ${
+                    zoomLevel === 1
+                      ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40'
+                      : 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-white/10'
+                  }`}
+                >
+                  <span>1× Full Portrait</span>
+                </button>
+              </div>
+            </div>
+
             {/* Split Comparison Canvas */}
             <div
               ref={sliderContainerRef}
               onMouseDown={() => setIsDragging(true)}
               onTouchStart={() => setIsDragging(true)}
-              className="relative w-full aspect-[16/9] max-h-[620px] rounded-2xl overflow-hidden cursor-ew-resize select-none border border-white/[0.08] bg-black"
+              className="relative w-full max-w-[680px] mx-auto aspect-square rounded-2xl overflow-hidden cursor-ew-resize select-none border border-white/[0.08] bg-black shadow-2xl"
             >
               {/* Clean Output Image (Background / Right Side) */}
-              <img
-                src="/test-images/gemini-watermark-after.jpg"
-                alt="Gemini image cleaned without watermark"
-                className="absolute inset-0 w-full h-full object-contain pointer-events-none"
-              />
+              <div
+                className="absolute inset-0 transition-transform duration-500 ease-out pointer-events-none"
+                style={{
+                  transform: `scale(${zoomLevel})`,
+                  transformOrigin: '94.5% 94.5%',
+                }}
+              >
+                <img
+                  src="/test-images/gemini-watermark-after.jpg"
+                  alt="Gemini image cleaned without watermark"
+                  className="w-full h-full object-cover pointer-events-none"
+                />
+              </div>
 
               {/* Watermarked Original Image (Clipped / Left Side) */}
               <div
                 className="absolute inset-0 overflow-hidden pointer-events-none"
                 style={{ clipPath: `inset(0 ${100 - sliderPos}% 0 0)` }}
               >
-                <img
-                  src="/test-images/gemini-watermark-before.jpg"
-                  alt="Original Gemini image with visible watermark"
-                  className="absolute inset-0 w-full h-full object-contain"
-                />
+                <div
+                  className="w-full h-full transition-transform duration-500 ease-out"
+                  style={{
+                    transform: `scale(${zoomLevel})`,
+                    transformOrigin: '94.5% 94.5%',
+                  }}
+                >
+                  <img
+                    src="/test-images/gemini-watermark-before.jpg"
+                    alt="Original Gemini image with visible watermark"
+                    className="w-full h-full object-cover"
+                  />
 
-                {/* Optional Watermark ROI Marker */}
-                {showRoiBox && (
-                  <div
-                    className="absolute border-2 border-dashed border-red-500 bg-red-500/10 pointer-events-none rounded transition-all"
-                    style={{
-                      right: '8.8%',
-                      bottom: '8.8%',
-                      width: '4.2%',
-                      height: '7.2%'
-                    }}
-                  >
-                    <span className="absolute -top-5 right-0 bg-red-500 text-white text-[9px] font-mono px-1.5 py-0.5 rounded shadow">
-                      WATERMARK
-                    </span>
-                  </div>
-                )}
+                  {/* Optional Watermark ROI Marker */}
+                  {showRoiBox && (
+                    <div
+                      className="absolute border-2 border-dashed border-red-500 bg-red-500/15 pointer-events-none rounded transition-all shadow-[0_0_15px_rgba(239,68,68,0.5)]"
+                      style={{
+                        left: '92.4%',
+                        top: '92.3%',
+                        width: '3.4%',
+                        height: '3.4%'
+                      }}
+                    >
+                      <span className="absolute -top-5 right-0 bg-red-500 text-white text-[9px] font-mono px-1.5 py-0.5 rounded shadow whitespace-nowrap">
+                        WATERMARK (28×28)
+                      </span>
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Split Slider Divider Line */}
@@ -308,6 +365,14 @@ export const GeminiWatermarkLanding: React.FC = () => {
               <div className="absolute top-4 right-4 pointer-events-none px-3 py-1 rounded-md bg-cyan-950/80 backdrop-blur-md border border-cyan-500/30 text-xs font-mono text-cyan-300 font-bold">
                 AFTER: 100% Inverted Clean
               </div>
+
+              {/* Zoom Telemetry Pill Inside Viewport */}
+              {zoomLevel > 1 && (
+                <div className="absolute bottom-4 left-4 pointer-events-none px-3 py-1.5 rounded-full bg-slate-950/90 backdrop-blur-md border border-cyan-500/40 text-[11px] font-mono text-cyan-300 flex items-center gap-2 shadow-xl">
+                  <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping" />
+                  <span>MACRO ZOOM: {zoomLevel}× FOCUSED ON WATERMARK (x:950, y:949)</span>
+                </div>
+              )}
             </div>
 
             {/* Slider Percentage & Instructions */}
