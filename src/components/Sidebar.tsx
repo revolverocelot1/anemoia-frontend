@@ -80,11 +80,17 @@ const customIcons: { [key: string]: React.ReactElement } = {
       <path d="M12 6V18M6 12H18" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
       <path d="M16 16L8 8" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
     </svg>
+  ),
+  'gemini-watermark-icon': (
+    <svg viewBox="0 0 24 24" fill="none" className="w-5 h-5">
+      <path d="M12 2L14.4 9.6L22 12L14.4 14.4L12 22L9.6 14.4L2 12L9.6 9.6L12 2Z" fill="currentColor" fillOpacity="0.25" stroke="currentColor" strokeWidth="2" strokeLinejoin="round"/>
+    </svg>
   )
 };
 
 // Minimal color config per tool
 const toolColors: Record<string, { gradient: string; border: string; badge: string }> = {
+  'gemini-watermark-remover': { gradient: 'from-cyan-600 via-blue-600 to-indigo-600', border: 'border-cyan-500/40 hover:border-cyan-400', badge: 'bg-cyan-500/20 text-cyan-300' },
   doom: { gradient: 'from-red-600 to-orange-600', border: 'border-red-500/40 hover:border-red-400', badge: 'bg-red-500/20 text-red-300' },
   'anime-gallery': { gradient: 'from-cyan-600 to-blue-600', border: 'border-cyan-500/40 hover:border-cyan-400', badge: 'bg-cyan-500/20 text-cyan-300' },
   'synthid-remover': { gradient: 'from-emerald-600 to-teal-600', border: 'border-emerald-500/40 hover:border-emerald-400', badge: 'bg-emerald-500/20 text-emerald-300' },
@@ -97,6 +103,15 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onToggle }) => {
   const navigate = useNavigate();
 
   const miscTools: ToolItem[] = [
+    {
+      id: 'gemini-watermark-remover',
+      name: 'Gemini & Veo Remover',
+      description: 'Zero-loss reverse alpha blending for images & video',
+      icon: 'gemini-watermark-icon',
+      onClick: () => { navigate('/gemini-watermark-remover'); onToggle(); },
+      badge: 'NEW',
+      badgeColor: 'bg-cyan-500/20 text-cyan-300'
+    },
     {
       id: 'doom',
       name: 'DOOM Classic',
@@ -144,7 +159,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onToggle }) => {
     }
   ];
 
-  const readyTools = ['doom', 'anime-gallery'];
+  const readyTools = ['gemini-watermark-remover', 'doom', 'anime-gallery', 'synthid-remover'];
 
 
 

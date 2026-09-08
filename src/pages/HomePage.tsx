@@ -177,6 +177,62 @@ const HomePage: React.FC<HomePageProps> = ({ onToggleSidebar }) => {
                   accent="2"
                   path="/pose-estimation"
                 />
+                {/* Gemini & Veo Watermark Remover Card - NEW */}
+                <motion.div variants={itemVariants}>
+                  <Link to="/gemini-watermark-remover" className="card h-full block group relative overflow-hidden" data-accent="1">
+                    <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/0 via-blue-500/0 to-indigo-500/0 group-hover:from-cyan-500/15 group-hover:via-blue-500/15 group-hover:to-indigo-500/15 transition-colors duration-500"></div>
+                    <div className="p-6 flex flex-col items-start text-left flex-1 h-full relative z-10">
+                      {/* BADGES */}
+                      <div className="absolute top-4 right-4 z-20 flex items-center gap-1.5">
+                        <span className="px-2 py-0.5 text-[10px] font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 rounded-md uppercase tracking-wider">
+                          NEW
+                        </span>
+                        <span className="px-2 py-0.5 text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded-md uppercase tracking-wider">
+                          ZERO LOSS
+                        </span>
+                      </div>
+
+                      <div className="icon-container mb-4 w-full h-32 bg-gradient-to-br from-cyan-950/40 via-blue-950/30 to-black/60 rounded-xl overflow-hidden border border-cyan-500/20 relative flex items-center justify-center">
+                        <div className="absolute inset-0 bg-[linear-gradient(to_right,#08334415_1px,transparent_1px),linear-gradient(to_bottom,#08334415_1px,transparent_1px)] bg-[size:16px_16px]" />
+                        <div className="relative flex items-center justify-center">
+                          <motion.div
+                            className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-cyan-500/20 via-blue-500/20 to-purple-500/20 border border-cyan-400/40 flex items-center justify-center shadow-[0_0_25px_rgba(6,182,212,0.25)]"
+                            animate={{ rotate: [0, 90, 180, 270, 360] }}
+                            transition={{ duration: 20, repeat: Infinity, ease: 'linear' }}
+                          >
+                            <svg viewBox="0 0 24 24" className="w-8 h-8 text-cyan-400" fill="none">
+                              <path d="M12 2L14.4 9.6L22 12L14.4 14.4L12 22L9.6 14.4L2 12L9.6 9.6L12 2Z" fill="currentColor" fillOpacity="0.4" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+                            </svg>
+                          </motion.div>
+                          <motion.div
+                            className="absolute -top-2 -right-2 w-6 h-6 text-yellow-300"
+                            animate={{ scale: [0.8, 1.2, 0.8], opacity: [0.6, 1, 0.6] }}
+                            transition={{ duration: 2, repeat: Infinity }}
+                          >
+                            <svg viewBox="0 0 24 24" fill="currentColor" className="w-full h-full">
+                              <path d="M12 0L14 8L22 12L14 16L12 24L10 16L2 12L10 8L12 0Z" />
+                            </svg>
+                          </motion.div>
+                        </div>
+                      </div>
+
+                      <h3 className="text-xl font-bold mb-3 text-white group-hover:text-cyan-400 transition-colors flex items-center gap-2">
+                        Gemini & Veo Remover
+                      </h3>
+                      <p className="text-base text-gray-300 flex-1 leading-relaxed">
+                        Instant reverse alpha blending for Gemini images and Veo videos. 100% private client-side processing with batch support and zero pixel degradation.
+                      </p>
+                      <div className="mt-4 pt-4 w-full border-t border-white/5 flex items-center justify-between">
+                        <span className="text-xs text-cyan-400/80 font-mono">Image + Video + Batch</span>
+                        <div className="flex items-center text-sm font-medium text-cyan-400 group-hover:text-cyan-300 transition-colors">
+                          <span>Launch Tool</span>
+                          <span className="material-symbols-outlined text-lg ml-1 group-hover:translate-x-1 transition-transform">arrow_forward</span>
+                        </div>
+                      </div>
+                    </div>
+                  </Link>
+                </motion.div>
+
                 {/* AI Upscaling Card - Custom Emblem */}
                 <motion.div variants={itemVariants}>
                   <Link to="/upscaler" className="card h-full block group relative overflow-hidden" data-accent="3">

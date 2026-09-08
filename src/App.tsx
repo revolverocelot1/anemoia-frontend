@@ -32,6 +32,8 @@ import AnimeVideoToCodePage from './pages/AnimeVideoToCodePage';
 import VideoObjectRemoverPage from './pages/VideoObjectRemoverPage';
 import SynthIDRemoverPage from './pages/SynthIDRemoverPage';
 import SynthIDRemoverLanding from './pages/landing/SynthIDRemoverLanding';
+import GeminiWatermarkRemoverPage from './pages/GeminiWatermarkRemoverPage';
+import GeminiWatermarkLanding from './pages/landing/GeminiWatermarkLanding';
 // CoffeeDonation shelved - buymeacoffee link expired
 // import CoffeeDonation from './components/CoffeeDonation';
 // import FileUploadFix from './components/FileUploadFix';
@@ -698,6 +700,26 @@ function App() {
                   <SynthIDRemoverLanding />
                 </AnimatedPage>
               }
+            />
+            <Route
+              path="/gemini-watermark-remover"
+              element={
+                <AnimatedPage>
+                  <GeminiWatermarkRemoverPage />
+                </AnimatedPage>
+              }
+            />
+            <Route
+              path="/gemini-watermark-remover/landing"
+              element={
+                <AnimatedPage>
+                  <GeminiWatermarkLanding />
+                </AnimatedPage>
+              }
+            />
+            <Route
+              path="/tools/gemini-watermark-remover"
+              element={<Navigate to="/gemini-watermark-remover/landing" replace />}
             />
             <Route path="/misc" element={<Navigate to="/" />} />
             {/* Catch-all route for non-existent pages */}
