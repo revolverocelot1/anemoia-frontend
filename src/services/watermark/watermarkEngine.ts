@@ -190,8 +190,8 @@ export function findWatermarkByCorrelation(
   width: number,
   height: number
 ): { x: number; y: number; size: number; alphaGain: number; score: number } | null {
-  const searchMarginX = Math.min(Math.floor(width * 0.22), 170);
-  const searchMarginY = Math.min(Math.floor(height * 0.22), 170);
+  const searchMarginX = Math.min(Math.floor(width * 0.28), 380);
+  const searchMarginY = Math.min(Math.floor(height * 0.30), 380);
   const startX = width - searchMarginX;
   const startY = height - searchMarginY;
 
@@ -216,19 +216,21 @@ export function findWatermarkByCorrelation(
 
     for (let y = startY; y <= height - sz; y += step) {
       for (let x = startX; x <= width - sz; x += step) {
-        // Enforce symmetric padding prior (all Google watermarks have symmetric margins)
+        // Enforce padding symmetry prior while accommodating 16:9 videos and non-square crops (up to 85px)
         const rMargin = width - (x + sz);
         const bMargin = height - (y + sz);
-        if (Math.abs(rMargin - bMargin) > 24) continue;
+        if (Math.abs(rMargin - bMargin) > 85) continue;
 
         const ncc = computePatchNcc(data, width, x, y, sz, am);
-        if (ncc > coarseBest.score) {
-          coarseBest = { score: ncc, x, y };
+        const asymPenalty = Math.max(0, Math.abs(rMargin - bMargin) - 20) * 0.0008;
+        const adjScore = ncc - asymPenalty;
+        if (adjScore > coarseBest.score) {
+          coarseBest = { score: adjScore, x, y };
         }
       }
     }
 
-    if (coarseBest.score < 0.38) continue;
+    if (coarseBest.score < 0.30) continue;
 
     // Fine-tune around coarse peak with step 1
     let fineBest = { ...coarseBest };
@@ -241,7 +243,7 @@ export function findWatermarkByCorrelation(
       }
     }
 
-    if (fineBest.score < 0.42) continue;
+    if (fineBest.score < 0.32) continue;
 
     // Sample background luminance
     const bgSamples: number[] = [];
@@ -322,12 +324,12 @@ export function findWatermarkByCorrelation(
   }
 
   // Sort candidates: prefer lowest residual variance among high-correlation matches
-  // Include margin symmetry prior: real Gemini/Flow watermarks have nearly equal right and bottom margins
+  // Include margin symmetry prior with soft penalty for 16:9 / letterboxed formats
   validCandidates.sort((a, b) => {
     const marginDiffA = Math.abs((width - (a.x + a.size)) - (height - (a.y + a.size)));
     const marginDiffB = Math.abs((width - (b.x + b.size)) - (height - (b.y + b.size)));
-    const penaltyA = 1.0 + Math.min(3.0, marginDiffA / 25);
-    const penaltyB = 1.0 + Math.min(3.0, marginDiffB / 25);
+    const penaltyA = 1.0 + Math.min(2.0, marginDiffA / 50);
+    const penaltyB = 1.0 + Math.min(2.0, marginDiffB / 50);
     const scoreA = (a.residualVariance / (a.ncc * a.ncc)) * penaltyA;
     const scoreB = (b.residualVariance / (b.ncc * b.ncc)) * penaltyB;
     return scoreA - scoreB;
@@ -369,8 +371,8 @@ export function removeWatermarkFromImageData(imageData: ImageData): WatermarkDet
 
   try {
     // Backup pristine corner pixels before Pilio modifies imageData in-place
-    const cornerW = Math.min(width, 320);
-    const cornerH = Math.min(height, 320);
+    const cornerW = Math.min(width, 400);
+    const cornerH = Math.min(height, 400);
     const cornerLeft = width - cornerW;
     const cornerTop = height - cornerH;
     const origCorner = new Uint8ClampedArray(cornerW * cornerH * 4);
