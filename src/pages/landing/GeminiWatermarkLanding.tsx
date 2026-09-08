@@ -343,17 +343,19 @@ export const GeminiWatermarkLanding: React.FC = () => {
                   {/* Optional Watermark ROI Marker */}
                   {showRoiBox && (
                     <div
-                      className="absolute border-2 border-dashed border-red-500 bg-red-500/15 pointer-events-none rounded transition-all shadow-[0_0_15px_rgba(239,68,68,0.5)]"
+                      className="absolute border-2 border-dashed border-red-500/80 bg-red-500/10 pointer-events-none rounded transition-all shadow-[0_0_15px_rgba(239,68,68,0.5)]"
                       style={{
-                        left: '92.4%',
-                        top: '92.3%',
-                        width: '3.4%',
-                        height: '3.4%'
+                        left: '92.6%',
+                        top: '92.5%',
+                        width: '3.0%',
+                        height: '3.0%'
                       }}
                     >
-                      <span className="absolute -top-5 right-0 bg-red-500 text-white text-[9px] font-mono px-1.5 py-0.5 rounded shadow whitespace-nowrap">
-                        WATERMARK (28×28)
-                      </span>
+                      {zoomLevel <= 1.5 && (
+                        <span className="absolute -top-5 right-0 bg-red-500 text-white text-[9px] font-mono px-1.5 py-0.5 rounded shadow whitespace-nowrap">
+                          WATERMARK (28×28)
+                        </span>
+                      )}
                     </div>
                   )}
                 </div>
