@@ -34,12 +34,30 @@ export const GeminiWatermarkLanding: React.FC = () => {
   const heroTextY = useTransform(heroScroll, [0, 1], ['0%', '35%']);
 
   // ── Interactive Split Slider State ──
-  const [sliderPos, setSliderPos] = useState(52);
+  const [sliderPos, setSliderPos] = useState(50);
   const [isDragging, setIsDragging] = useState(false);
   const [showRoiBox, setShowRoiBox] = useState(true);
   const [zoomLevel, setZoomLevel] = useState<number>(4.5);
   const [activeFaq, setActiveFaq] = useState<number | null>(null);
   const sliderContainerRef = useRef<HTMLDivElement>(null);
+
+  const getZoomStyle = (level: number) => {
+    if (level <= 1) {
+      return {
+        transform: 'scale(1) translate(0%, 0%)',
+        transformOrigin: '0% 0%',
+      };
+    }
+    // Center of watermark in 1024x1024 image is at (964, 963) = (94.14%, 94.04%)
+    const wmX = 0.9414;
+    const wmY = 0.9404;
+    const tx = (0.5 / level - wmX) * 100;
+    const ty = (0.5 / level - wmY) * 100;
+    return {
+      transform: `scale(${level}) translate(${tx.toFixed(2)}%, ${ty.toFixed(2)}%)`,
+      transformOrigin: '0% 0%',
+    };
+  };
 
   const handleSliderMove = useCallback((clientX: number) => {
     if (!sliderContainerRef.current) return;
@@ -298,10 +316,7 @@ export const GeminiWatermarkLanding: React.FC = () => {
               {/* Clean Output Image (Background / Right Side) */}
               <div
                 className="absolute inset-0 transition-transform duration-500 ease-out pointer-events-none"
-                style={{
-                  transform: `scale(${zoomLevel})`,
-                  transformOrigin: '94.5% 94.5%',
-                }}
+                style={getZoomStyle(zoomLevel)}
               >
                 <img
                   src="/test-images/gemini-watermark-after.jpg"
@@ -317,10 +332,7 @@ export const GeminiWatermarkLanding: React.FC = () => {
               >
                 <div
                   className="w-full h-full transition-transform duration-500 ease-out"
-                  style={{
-                    transform: `scale(${zoomLevel})`,
-                    transformOrigin: '94.5% 94.5%',
-                  }}
+                  style={getZoomStyle(zoomLevel)}
                 >
                   <img
                     src="/test-images/gemini-watermark-before.jpg"
