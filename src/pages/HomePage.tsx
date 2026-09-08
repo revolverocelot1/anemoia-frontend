@@ -209,16 +209,23 @@ const HomePage: React.FC<HomePageProps> = ({ onToggleSidebar }) => {
                         <div className="absolute inset-0 pointer-events-none bg-gradient-to-r from-transparent via-cyan-400/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000 ease-in-out" />
                       </div>
 
-                      <h3 className="text-xl font-bold mb-3 text-white group-hover:text-cyan-400 transition-colors flex items-center gap-2">
-                        Gemini & Veo Remover
+                      <h3 className="text-xl font-bold mb-2 text-white group-hover:text-cyan-400 transition-colors flex items-center gap-2">
+                        Gemini & Veo Watermark Remover
                       </h3>
-                      <p className="text-base text-gray-300 flex-1 leading-relaxed">
-                        Instant reverse alpha blending for Gemini images and Veo videos. 100% private client-side processing with batch support and zero pixel degradation.
+                      <p className="text-sm text-gray-300 flex-1 leading-relaxed">
+                        Mathematically erases Google Gemini and Veo watermarks with zero quality loss. Solves reverse alpha compositing locally in your browser with batch image and 4K video support.
                       </p>
-                      <div className="mt-4 pt-4 w-full border-t border-white/5 flex items-center justify-between">
-                        <span className="text-xs text-cyan-400/80 font-mono">Image + Video + Batch</span>
-                        <div className="flex items-center text-sm font-medium text-cyan-400 group-hover:text-cyan-300 transition-colors">
-                          <span>Launch Tool</span>
+                      <div className="mt-4 pt-3 w-full border-t border-white/5 flex items-center justify-between gap-3">
+                        <Link
+                          to="/gemini-watermark-remover/landing"
+                          onClick={(e) => e.stopPropagation()}
+                          className="text-xs text-slate-400 hover:text-cyan-300 font-medium py-1 px-2.5 rounded-md hover:bg-cyan-950/40 border border-transparent hover:border-cyan-500/30 transition-all flex items-center gap-1"
+                        >
+                          <span className="material-symbols-outlined text-sm">science</span>
+                          <span>The Science</span>
+                        </Link>
+                        <div className="flex items-center text-sm font-semibold text-cyan-400 group-hover:text-cyan-300 transition-colors">
+                          <span>Launch Remover</span>
                           <span className="material-symbols-outlined text-lg ml-1 group-hover:translate-x-1 transition-transform">arrow_forward</span>
                         </div>
                       </div>
