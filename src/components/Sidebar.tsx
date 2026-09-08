@@ -2,6 +2,7 @@ import React from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
+import IconGeminiWatermarkRemover from './icons/IconGeminiWatermarkRemover';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -82,9 +83,7 @@ const customIcons: { [key: string]: React.ReactElement } = {
     </svg>
   ),
   'gemini-watermark-icon': (
-    <svg viewBox="0 0 24 24" fill="none" className="w-5 h-5">
-      <path d="M12 2L14.4 9.6L22 12L14.4 14.4L12 22L9.6 14.4L2 12L9.6 9.6L12 2Z" fill="currentColor" fillOpacity="0.25" stroke="currentColor" strokeWidth="2" strokeLinejoin="round"/>
-    </svg>
+    <IconGeminiWatermarkRemover className="w-5 h-5" />
   )
 };
 

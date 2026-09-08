@@ -8,6 +8,7 @@ import IconSplatViewer from './icons/IconSplatViewer';
 import IconImageComparison from './icons/IconImageComparison';
 import IconVideoCaptionStudio from './icons/IconVideoCaptionStudio';
 import IconFaceSwap from './icons/IconFaceSwap';
+import IconGeminiWatermarkRemover from './icons/IconGeminiWatermarkRemover';
 
 interface ToolCardProps {
   title: string;
@@ -26,6 +27,8 @@ const iconMap: Record<string, React.ComponentType<any>> = {
   camera_invert: IconSplatViewer,
   subtitles: IconVideoCaptionStudio,
   face_retouching_natural: IconFaceSwap,
+  gemini_watermark: IconGeminiWatermarkRemover,
+  watermark_remover: IconGeminiWatermarkRemover,
   misc: BsTools,
 };
 

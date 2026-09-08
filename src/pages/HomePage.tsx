@@ -6,6 +6,7 @@ import { motion, type Variants, type Transition } from 'framer-motion';
 import { useState, useEffect } from 'react';
 import { BsTools } from 'react-icons/bs';
 import { Link } from 'react-router-dom';
+import IconGeminiWatermarkRemover from '../components/icons/IconGeminiWatermarkRemover';
 
 const containerVariants: Variants = {
   hidden: { opacity: 1 },
@@ -192,28 +193,20 @@ const HomePage: React.FC<HomePageProps> = ({ onToggleSidebar }) => {
                         </span>
                       </div>
 
-                      <div className="icon-container mb-4 w-full h-32 bg-gradient-to-br from-cyan-950/40 via-blue-950/30 to-black/60 rounded-xl overflow-hidden border border-cyan-500/20 relative flex items-center justify-center">
-                        <div className="absolute inset-0 bg-[linear-gradient(to_right,#08334415_1px,transparent_1px),linear-gradient(to_bottom,#08334415_1px,transparent_1px)] bg-[size:16px_16px]" />
-                        <div className="relative flex items-center justify-center">
-                          <motion.div
-                            className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-cyan-500/20 via-blue-500/20 to-purple-500/20 border border-cyan-400/40 flex items-center justify-center shadow-[0_0_25px_rgba(6,182,212,0.25)]"
-                            animate={{ rotate: [0, 90, 180, 270, 360] }}
-                            transition={{ duration: 20, repeat: Infinity, ease: 'linear' }}
-                          >
-                            <svg viewBox="0 0 24 24" className="w-8 h-8 text-cyan-400" fill="none">
-                              <path d="M12 2L14.4 9.6L22 12L14.4 14.4L12 22L9.6 14.4L2 12L9.6 9.6L12 2Z" fill="currentColor" fillOpacity="0.4" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
-                            </svg>
-                          </motion.div>
-                          <motion.div
-                            className="absolute -top-2 -right-2 w-6 h-6 text-yellow-300"
-                            animate={{ scale: [0.8, 1.2, 0.8], opacity: [0.6, 1, 0.6] }}
-                            transition={{ duration: 2, repeat: Infinity }}
-                          >
-                            <svg viewBox="0 0 24 24" fill="currentColor" className="w-full h-full">
-                              <path d="M12 0L14 8L22 12L14 16L12 24L10 16L2 12L10 8L12 0Z" />
-                            </svg>
-                          </motion.div>
+                      <div className="icon-container mb-4 w-full h-32 bg-gradient-to-br from-slate-950 via-slate-900 to-cyan-950/40 rounded-xl overflow-hidden border border-cyan-500/30 relative flex items-center justify-center group-hover:border-cyan-400/60 transition-all duration-500">
+                        {/* Background subtle radial glow */}
+                        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(6,182,212,0.15)_0%,transparent_70%)]" />
+                        
+                        {/* Subtle engineering grid */}
+                        <div className="absolute inset-0 opacity-20 bg-[radial-gradient(#06b6d4_1px,transparent_1px)] [background-size:12px_12px]" />
+
+                        {/* Centered SVG Icon Display with floating glass card and hover scale */}
+                        <div className="relative z-10 p-3.5 rounded-2xl bg-black/50 border border-cyan-500/30 shadow-[0_0_30px_rgba(6,182,212,0.25)] group-hover:scale-110 group-hover:shadow-[0_0_40px_rgba(6,182,212,0.45)] group-hover:border-cyan-400/60 transition-all duration-500 backdrop-blur-sm">
+                          <IconGeminiWatermarkRemover className="w-12 h-12 text-cyan-400" />
                         </div>
+
+                        {/* Dynamic sweep sheen on hover */}
+                        <div className="absolute inset-0 pointer-events-none bg-gradient-to-r from-transparent via-cyan-400/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000 ease-in-out" />
                       </div>
 
                       <h3 className="text-xl font-bold mb-3 text-white group-hover:text-cyan-400 transition-colors flex items-center gap-2">
