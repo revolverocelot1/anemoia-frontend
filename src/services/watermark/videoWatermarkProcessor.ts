@@ -146,7 +146,7 @@ export async function processVideoFile(
   await output.start();
 
   // 5. Canvas Sink for decoding video frames with hardware acceleration
-  const videoSink = new CanvasSink(videoTrack, { width, height });
+  const videoSink = new CanvasSink(videoTrack, { width, height, fit: 'fill' } as any);
 
   let detectionMeta: WatermarkDetectionResult = { detected: false };
   let cachedAlphaMap: Float32Array | null = null;
@@ -240,9 +240,12 @@ export async function processVideoFile(
       for await (const packet of audioSink.packets()) {
         await audioPacketSource.add(packet);
       }
-      audioPacketSource.close();
     } catch (audioErr) {
       console.warn('Audio packets iteration ended:', audioErr);
+    } finally {
+      try {
+        audioPacketSource.close();
+      } catch (_) {}
     }
   }
 
