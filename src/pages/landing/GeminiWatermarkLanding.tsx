@@ -319,7 +319,7 @@ export const GeminiWatermarkLanding: React.FC = () => {
                 style={getZoomStyle(zoomLevel)}
               >
                 <img
-                  src="/test-images/gemini-watermark-after.jpg"
+                  src="/test-images/bearded-man-after.jpg?v=3"
                   alt="Gemini image cleaned without watermark"
                   className="w-full h-full object-cover pointer-events-none"
                 />
@@ -335,7 +335,7 @@ export const GeminiWatermarkLanding: React.FC = () => {
                   style={getZoomStyle(zoomLevel)}
                 >
                   <img
-                    src="/test-images/gemini-watermark-before.jpg"
+                    src="/test-images/bearded-man-before.jpg?v=3"
                     alt="Original Gemini image with visible watermark"
                     className="w-full h-full object-cover"
                   />
